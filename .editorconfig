@@ -1,0 +1,20 @@
+; 标记为根配置，避免被上层 EditorConfig 覆盖
+root = true
+
+[*]
+; 文件编码
+charset = utf-8
+; 换行符类型
+end_of_line = lf
+; 文件末尾强制保留换行
+insert_final_newline = true
+; 删除行末多余空格
+trim_trailing_whitespace = true
+; 使用空格缩进
+indent_style = space
+; 缩进宽度
+indent_size = 2
+
+[*.md]
+; Markdown 中保留行末空格（用于换行语义）
+trim_trailing_whitespace = false
