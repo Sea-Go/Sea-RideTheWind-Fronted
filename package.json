@@ -13,7 +13,7 @@
     "dev": "next dev",
     "build": "next build",
     "prepare": "husky install",
-    "cz": "czg"
+    "cz": "cz"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

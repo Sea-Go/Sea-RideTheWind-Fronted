@@ -3,7 +3,7 @@
 本规范与当前项目配置保持一致：
 
 - Commitlint：`commitlint.config.cjs`
-- 交互式提交：`cz-git.config.cjs`
+- 交互式提交：`cz-git.config.js`
 
 ## 提交信息格式
 

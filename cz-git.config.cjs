@@ -21,6 +21,15 @@ module.exports = {
     "subject-full-stop": [2, "never", "."],
   },
   prompt: {
+    messages: {
+      type: "请选择提交类型:",
+      scope: "请输入影响范围（可选）:",
+      subject: "请输入简短描述（必填）:",
+      body: "请输入详细描述（可选，使用 | 换行）:",
+      breaking: "请输入破坏性变更说明（可选，使用 | 换行）:",
+      footer: "请输入关联的 Issues（可选，使用 | 换行）:",
+      confirmCommit: "确认提交以上内容？",
+    },
     types: [
       { value: "feat", name: "feat: 新增功能" },
       { value: "fix", name: "fix: 修复缺陷" },
