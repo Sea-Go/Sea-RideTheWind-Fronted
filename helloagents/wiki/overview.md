@@ -24,11 +24,13 @@ shadcn/ui 构建，并通过工程化工具链保持一致性与可维护性。
 
 ## 2. 模块索引
 
-| 模块名称 | 职责                 | 状态   | 文档                                     |
-| -------- | -------------------- | ------ | ---------------------------------------- |
-| docs     | 项目文档与工程化沉淀 | 稳定   | [modules/docs.md](modules/docs.md)       |
-| tooling  | 工程化工具链与脚手架 | 稳定   | [modules/tooling.md](modules/tooling.md) |
-| quality  | 测试与CI策略占位     | 规划中 | [modules/quality.md](modules/quality.md) |
+| 模块名称          | 职责                 | 状态   | 文档                                                         |
+| ----------------- | -------------------- | ------ | ------------------------------------------------------------ |
+| docs              | 项目文档与工程化沉淀 | 稳定   | [modules/docs.md](modules/docs.md)                           |
+| tooling           | 工程化工具链与脚手架 | 稳定   | [modules/tooling.md](modules/tooling.md)                     |
+| quality           | 测试与CI策略占位     | 规划中 | [modules/quality.md](modules/quality.md)                     |
+| common-components | 通用业务组件         | 开发中 | [modules/common-components.md](modules/common-components.md) |
+| login-page        | 登录/注册入口页面    | 开发中 | [modules/login-page.md](modules/login-page.md)               |
 
 ---
 
