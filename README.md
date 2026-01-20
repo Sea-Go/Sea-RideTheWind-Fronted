@@ -1,5 +1,6 @@
 # 项目说明
 
+- 关联后端：[Sea-TryGo](https://github.com/Sea-Go/Sea-TryGo)
 - 框架：Next.js（App Router）
 - 语言：TypeScript
 - UI：Tailwind CSS + shadcn/ui
