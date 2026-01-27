@@ -1,19 +1,18 @@
-// 全局布局（Header + Footer）
+import type { ReactNode } from "react";
 
-// src/app/layout.tsx
-import type { Metadata } from "next";
+import { Footer } from "./Footer";
+import { Header } from "./Header";
 
-import "./globals.css";
-
-export const metadata: Metadata = {
-  title: "Sea TryGo",
-  description: "你的社交分享平台",
-};
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="zh">
-      <body className="font-sans">{children}</body>
-    </html>
-  );
+interface LayoutProps {
+  children: ReactNode;
 }
+
+export const Layout = ({ children }: LayoutProps) => {
+  return (
+    <div className="flex min-h-screen flex-col bg-gray-50">
+      <Header />
+      <main className="flex-1">{children}</main>
+      <Footer />
+    </div>
+  );
+};

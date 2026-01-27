@@ -1,36 +1,23 @@
-// 分类标签
-
-// src/components/common/Tabs.tsx
 import { useState } from "react";
 
-const tabs = [
-  "推荐",
-  "穿搭",
-  "美食",
-  "彩妆",
-  "影视",
-  "职场",
-  "情感",
-  "家居",
-  "游戏",
-  "旅行",
-  "健身",
-];
+interface TabsProps {
+  tabs: string[];
+}
 
-export default function Tabs() {
-  const [activeTab, setActiveTab] = useState("推荐");
+export const Tabs = ({ tabs }: TabsProps) => {
+  const [activeTab, setActiveTab] = useState(0);
 
   return (
-    <div className="mb-6 overflow-x-auto whitespace-nowrap">
-      {tabs.map((tab) => (
+    <div className="scrollbar-hide mb-6 flex space-x-2 overflow-x-auto pb-2">
+      {tabs.map((tab, index) => (
         <button
           key={tab}
-          onClick={() => setActiveTab(tab)}
-          className={`$ { activeTab === tab ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-200" } mx-1 rounded-md px-4 py-2 transition`}
+          onClick={() => setActiveTab(index)}
+          className={`$ { activeTab === index ? "bg-red-500 text-white" : "text-gray-600 hover:text-gray-800" } rounded-full px-3 py-1 text-sm font-medium transition-colors`}
         >
           {tab}
         </button>
       ))}
     </div>
   );
-}
+};

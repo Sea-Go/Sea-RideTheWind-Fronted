@@ -1,30 +1,30 @@
-// 顶部导航栏组件
-
-// src/components/common/layout/Header.tsx
 import Link from "next/link";
 
-export default function Header() {
+export const Header = () => {
   return (
-    <header className="border-b bg-white shadow-sm">
-      <div className="container mx-auto flex items-center justify-between px-4 py-3">
-        <Link href="/" className="text-2xl font-bold text-blue-600">
-          Sea TryGo
-        </Link>
-        <nav className="flex space-x-6">
-          <Link href="/home" className="hover:text-blue-600">
+    <header className="sticky top-0 z-50 border-b bg-white shadow-sm">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+        <nav className="flex space-x-6 text-sm font-medium">
+          <Link href="/dashboard" className="text-red-500 hover:text-red-700">
             首页
           </Link>
-          <Link href="/publish" className="hover:text-blue-600">
+          <Link href="/post" className="text-gray-600 hover:text-gray-800">
             发布
           </Link>
-          <Link href="/messages" className="hover:text-blue-600">
+          <Link href="/messages" className="text-gray-600 hover:text-gray-800">
             消息
           </Link>
-          <Link href="/profile" className="hover:text-blue-600">
+          <Link href="/profile" className="text-gray-600 hover:text-gray-800">
             我
           </Link>
         </nav>
+
+        <div className="flex items-center space-x-4">
+          <button className="rounded-full bg-red-500 px-3 py-1 text-sm font-medium text-white">
+            登录
+          </button>
+        </div>
       </div>
     </header>
   );
-}
+};

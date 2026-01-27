@@ -1,33 +1,25 @@
-// 搜索栏
-
-// src/components/common/SearchBar.tsx
 import { useState } from "react";
 
-export default function SearchBar() {
+interface SearchBarProps {
+  placeholder: string;
+}
+
+export const SearchBar = ({ placeholder }: SearchBarProps) => {
   const [query, setQuery] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("搜索:", query);
-  };
-
   return (
-    <form onSubmit={handleSubmit} className="mb-6">
-      <div className="relative">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="搜索或输入任何问题"
-          className="w-full max-w-2xl rounded-full border border-gray-300 px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-        />
-        <button
-          type="submit"
-          className="absolute top-1/2 right-2 -translate-y-1/2 transform text-gray-500"
-        >
-          🔍
-        </button>
-      </div>
-    </form>
+    <div className="relative mt-6 mb-4">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-full border border-gray-300 px-4 py-3 focus:ring-2 focus:ring-red-500 focus:outline-none"
+      />
+      {/* 搜索图标可选，若无图片可移除 */}
+      {/* <button className="absolute right-3 top-1/2 transform -translate-y-1/2">
+        <Image src="/assets/images/etiwh.jpg" alt="Search" width={20} height={20} />
+      </button> */}
+    </div>
   );
-}
+};

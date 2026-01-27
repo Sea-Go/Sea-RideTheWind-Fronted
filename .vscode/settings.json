@@ -14,5 +14,8 @@
   "[css]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
   "[scss]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
   "[md]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
-  "[markdown]": { "editor.defaultFormatter": "esbenp.prettier-vscode" }
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "Codegeex.RepoIndex": true
 }
