@@ -7,3 +7,7 @@
 - `Sidebar.tsx`
 - `Navbar.tsx`
 - `PageContainer.tsx`
+
+# sht
+
+## 全局布局（Header + Footer）
