@@ -1,8 +1,8 @@
 "use client";
 
-import { CardList } from "@/components/common/CardList";
-import { SearchBar } from "@/components/common/SearchBar";
-import { Tabs } from "@/components/common/Tabs";
+import { CardList } from "@/app/dashboard/_components/CardList";
+import { SearchBar } from "@/app/dashboard/_components/SearchBar";
+import { Tabs } from "@/app/dashboard/_components/Tabs";
 import { Layout } from "@/components/layout/layout";
 
 export default function Dashboard() {

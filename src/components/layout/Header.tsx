@@ -20,9 +20,12 @@ export const Header = () => {
         </nav>
 
         <div className="flex items-center space-x-4">
-          <button className="rounded-full bg-red-500 px-3 py-1 text-sm font-medium text-white">
+          <Link
+            href="/login"
+            className="rounded-full bg-red-500 px-3 py-1 text-sm font-medium text-white"
+          >
             登录
-          </button>
+          </Link>
         </div>
       </div>
     </header>

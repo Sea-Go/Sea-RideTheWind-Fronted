@@ -4,10 +4,10 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import { useState } from "react";
 
+import { LoginForm } from "@/app/login/_components/LoginForm";
+import { RegisterForm } from "@/app/login/_components/RegisterForm";
 import etihwImg from "@/assets/images/etihw.jpg";
 import whiteImg from "@/assets/images/white.jpg";
-import { LoginForm } from "@/components/common/LoginForm";
-import { RegisterForm } from "@/components/common/RegisterForm";
 import { Button } from "@/components/ui/button";
 
 export default function LoginPage() {
