@@ -15,9 +15,10 @@
 
 ## 质量与格式化
 
-- 统一校验：pnpm lint ---- ESLint：pnpm lint:eslint Stylelint：pnpm lint:style
+- 统一校验：pnpm lint ---- ESLint：pnpm lint:eslint & Stylelint：pnpm lint:style
 - 类型检查：pnpm typecheck
 - 格式检查：pnpm format:check
+- 统一修复：pnpm fix ---- eslint . --fix & pnpm format
 
 ## 提交代码
 
