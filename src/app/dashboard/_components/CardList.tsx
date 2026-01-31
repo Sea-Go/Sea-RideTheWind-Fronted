@@ -1,11 +1,13 @@
+// import { useEffect, useState } from "react";
 import Masonry from "react-masonry-css";
 
+// import Image from "next/image";
 import { Card } from "./Card";
 
 const mockPosts = [
   {
     title: "上海有没有缺正片后勤/机位二的coser老师",
-    image: "/assets/images/04E2EFD4E320BC88CC1C951A4CAFA299.jpg",
+    image: "/assets/images/a.jpg",
     author: "一个小方",
     likes: 2,
     content: "是摄影新人和一个路人coser，如果是熟悉的ip可以来当无偿... ",
@@ -39,9 +41,6 @@ const mockPosts = [
     content: "调休了在家呆着太无聊啦，一起出来玩呀，面基，面基，面基",
   },
 ];
-
-// 检查图片路径是否正确
-console.log("图片路径示例:", mockPosts[0].image);
 
 export const CardList = () => {
   return (

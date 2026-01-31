@@ -1,0 +1,33 @@
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  /* config options here */
+  images: {
+    // 对于本地静态图片，不需要远程模式配置
+    // 远程图片配置（如果将来需要的话）
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "**",
+      },
+    ],
+    // 本地图片使用默认配置，不需要自定义loader
+    // 移除了loader配置，让Next.js使用默认的静态图片处理
+    domains: [],
+    // 启用图片优化
+    unoptimized: false,
+    // 图片质量设置
+    formats: ["image/webp", "image/avif"],
+  },
+  async redirects() {
+    return [
+      {
+        source: "/",
+        destination: "/login",
+        permanent: false,
+      },
+    ];
+  },
+};
+
+export default nextConfig;
