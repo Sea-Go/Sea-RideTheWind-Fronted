@@ -191,32 +191,61 @@
 
     letter-spacing: var(--tracking-normal);
   }
+}
 
-  input[type="password"]::-ms-reveal,
-  input[type="password"]::-ms-clear {
-    display: none !important;
+/* 瀑布流样式 */
+.my-masonry-grid {
+  display: flex;
+  margin-left: -1rem;
+  width: auto;
+}
+
+.my-masonry-grid-column {
+  padding-left: 1rem;
+  background-clip: padding-box;
+}
+
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none !important;
+}
+
+input[type="password"]::-webkit-credentials-auto-fill-button,
+input[type="password"]::-webkit-contacts-auto-fill-button,
+input[type="password"]::-webkit-textfield-decoration-container {
+  visibility: hidden !important;
+  display: none !important;
+  pointer-events: none !important;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--foreground) !important;
+  caret-color: var(--foreground) !important;
+  box-shadow: 0 0 0 1000px var(--background) inset !important;
+  transition: background-color 0s ease-in-out 0s;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .masonry-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 16px;
   }
 
-  input[type="password"]::-webkit-credentials-auto-fill-button,
-  input[type="password"]::-webkit-contacts-auto-fill-button,
-  input[type="password"]::-webkit-textfield-decoration-container {
-    visibility: hidden !important;
-    display: none !important;
-    pointer-events: none !important;
-  }
-
-  input:-webkit-autofill,
-  input:-webkit-autofill:hover,
-  input:-webkit-autofill:focus,
-  textarea:-webkit-autofill,
-  textarea:-webkit-autofill:hover,
-  textarea:-webkit-autofill:focus,
-  select:-webkit-autofill,
-  select:-webkit-autofill:hover,
-  select:-webkit-autofill:focus {
-    -webkit-text-fill-color: var(--foreground) !important;
-    caret-color: var(--foreground) !important;
-    box-shadow: 0 0 0 1000px var(--background) inset !important;
-    transition: background-color 0s ease-in-out 0s;
+  .masonry-grid-item {
+    /* 防止图片拉伸 */
+    break-inside: avoid;
   }
 }

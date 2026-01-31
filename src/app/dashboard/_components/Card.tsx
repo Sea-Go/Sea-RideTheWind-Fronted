@@ -1,5 +1,3 @@
-import Image from "next/image";
-
 interface CardProps {
   title: string;
   image?: string | null;
@@ -12,14 +10,8 @@ export const Card = ({ title, image, author, likes, content }: CardProps) => {
   return (
     <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow duration-300 hover:shadow-md">
       {image && (
-        <div className="relative h-64 w-full">
-          <Image
-            src={image}
-            alt={title}
-            fill
-            style={{ objectFit: "cover" }}
-            className="rounded-t-lg"
-          />
+        <div className="relative w-full">
+          <img src={image} alt={title} className="w-full rounded-t-lg" style={{ height: "auto" }} />
         </div>
       )}
       <div className="p-4">
