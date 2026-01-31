@@ -6,6 +6,8 @@ import { useState } from "react";
 
 import { LoginForm } from "@/app/login/_components/LoginForm";
 import { RegisterForm } from "@/app/login/_components/RegisterForm";
+import etihwImg from "@/assets/images/etihw.jpg";
+import whiteImg from "@/assets/images/white.jpg";
 import { Button } from "@/components/ui/button";
 
 export default function LoginPage() {
@@ -118,12 +120,10 @@ export default function LoginPage() {
               transition={{ duration: 0.9, delay: 0.6, ease: "easeInOut" }}
             >
               <Image
-                src="/assets/images/etihw.jpg"
+                src={etihwImg}
                 alt="注册"
-                width={350}
-                height={250}
                 className="h-auto w-full rounded-[20px] shadow-[0_10px_20px_rgba(0,0,0,0.15)]"
-                unoptimized={true}
+                placeholder="blur"
               />
             </motion.div>
           </div>
@@ -155,12 +155,10 @@ export default function LoginPage() {
               transition={{ duration: 0.9, delay: 0.6, ease: "easeInOut" }}
             >
               <Image
-                src="/assets/images/white.jpg"
+                src={whiteImg}
                 alt="登录"
-                width={350}
-                height={250}
                 className="h-auto w-full rounded-[20px] shadow-[0_10px_20px_rgba(0,0,0,0.15)]"
-                unoptimized={true}
+                placeholder="blur"
               />
             </motion.div>
           </div>
