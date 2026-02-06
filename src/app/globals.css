@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "bytemd/dist/index.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -219,4 +220,32 @@
     box-shadow: 0 0 0 1000px var(--background) inset !important;
     transition: background-color 0s ease-in-out 0s;
   }
+}
+
+/* ByteMD 编辑器样式修复 - 修复 Tailwind v4 preflight 覆盖边框的问题 */
+.bytemd.bytemd {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100% !important;
+  overflow: hidden;
+  border: 1px solid #e1e4e8;
+}
+
+.bytemd.bytemd .bytemd-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.bytemd-toolbar {
+  border-bottom: 1px solid #e1e4e8;
+}
+
+.bytemd-split .bytemd-preview {
+  border-left: 1px solid #e1e4e8;
+}
+
+.bytemd-status {
+  border-top: 1px solid #e1e4e8;
 }
