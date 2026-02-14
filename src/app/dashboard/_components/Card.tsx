@@ -1,12 +1,8 @@
 import Image from "next/image";
 
-interface CardProps {
-  title: string;
-  image?: string | null;
-  author: string;
-  likes: number;
-  content: string;
-}
+import type { DashboardPost } from "@/types";
+
+type CardProps = Omit<DashboardPost, "id" | "publishedAt">;
 
 export const Card = ({ title, image, author, likes, content }: CardProps) => {
   return (

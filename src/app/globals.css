@@ -222,12 +222,11 @@
   }
 }
 
-/* ByteMD 编辑器样式修复 - 修复 Tailwind v4 preflight 覆盖边框的问题 */
 .bytemd.bytemd {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  height: 100% !important;
+  min-height: 420px;
+  height: auto !important;
   overflow: hidden;
   border: 1px solid #e1e4e8;
 }

@@ -4,11 +4,12 @@ import { CardList } from "@/app/dashboard/_components/CardList";
 import { SearchBar } from "@/app/dashboard/_components/SearchBar";
 import { Tabs } from "@/app/dashboard/_components/Tabs";
 import { Layout } from "@/components/layout/layout";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 export default function Dashboard() {
   return (
     <Layout>
-      <div className="mx-auto max-w-7xl p-4">
+      <PageContainer className="py-4">
         <SearchBar placeholder="搜索或输入任何问题" />
         <Tabs
           tabs={[
@@ -26,7 +27,7 @@ export default function Dashboard() {
           ]}
         />
         <CardList />
-      </div>
+      </PageContainer>
     </Layout>
   );
 }

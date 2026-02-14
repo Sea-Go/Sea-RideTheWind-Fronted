@@ -2,9 +2,29 @@ import { promises as fs } from "fs";
 import { NextResponse } from "next/server";
 import path from "path";
 
+const escapeYamlString = (value: string) => value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+
 export async function POST(request: Request) {
   try {
-    const { content } = await request.json();
+    const { title, content, cover } = await request.json();
+
+    if (typeof title !== "string" || !title.trim()) {
+      return NextResponse.json(
+        { success: false, error: "Article title is required" },
+        { status: 400 },
+      );
+    }
+
+    if (typeof content !== "string" || !content.trim()) {
+      return NextResponse.json(
+        { success: false, error: "Article content is required" },
+        { status: 400 },
+      );
+    }
+
+    if (typeof cover !== "string" || !cover.trim()) {
+      return NextResponse.json({ success: false, error: "Cover is required" }, { status: 400 });
+    }
 
     const now = new Date();
     const year = now.getFullYear();
@@ -17,9 +37,10 @@ export async function POST(request: Request) {
 
     const filePath = path.join(process.cwd(), "public", fileName);
 
-    await fs.writeFile(filePath, content, "utf-8");
+    const frontmatter = `---\ntitle: "${escapeYamlString(title.trim())}"\ncover: "${escapeYamlString(cover)}"\npublishedAt: "${now.toISOString()}"\n---\n\n`;
+    await fs.writeFile(filePath, `${frontmatter}${content}`, "utf-8");
 
-    return NextResponse.json({ success: true, path: `/${fileName}` });
+    return NextResponse.json({ success: true, path: `/${fileName}`, title: title.trim(), cover });
   } catch (error) {
     console.error("Failed to save markdown file:", error);
     return NextResponse.json({ success: false, error: "Failed to save file" }, { status: 500 });
