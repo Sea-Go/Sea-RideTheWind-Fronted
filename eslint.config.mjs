@@ -9,6 +9,22 @@ import prettierPlugin from "eslint-plugin-prettier";
 import simpleImportSort from "eslint-plugin-simple-import-sort";
 
 const config = [
+  {
+    ignores: [
+      "**/.next/**",
+      "**/out/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/coverage/**",
+      "**/node_modules/**",
+      "**/.turbo/**",
+      "**/.cache/**",
+      "**/.vercel/**",
+      "public/covers/**",
+      "public/summaries/**",
+      "public/*.md",
+    ],
+  },
   // Next.js 推荐规则
   ...nextConfig,
   // 关闭与 Prettier 冲突的 ESLint 规则

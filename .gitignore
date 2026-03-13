@@ -20,6 +20,11 @@
 /dist-ssr
 /coverage
 
+# 运行期生成物
+/public/covers/
+/public/summaries/
+/public/*.md
+
 # 杂项
 .DS_Store
 Thumbs.db
@@ -41,7 +46,10 @@ yarn-error.log*
 /.pnpm-store/
 
 # 环境变量文件（如需提交可手动移除）
-.env*
+.env
+.env.*
+!.env.example
+.env*.local
 
 # Vercel
 .vercel
@@ -49,7 +57,8 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
-.env*.local
 
 # 编辑器
 .idea/
+# HelloAGENTS docs
+helloagents/

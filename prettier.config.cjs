@@ -30,15 +30,12 @@ module.exports = {
   singleAttributePerLine: false,
   // 启用 Tailwind 类名排序插件
   plugins: ["prettier-plugin-tailwindcss"],
-  // 针对 Markdown 使用更窄的行宽与自动换行
+  // 针对 Markdown 使用更窄行宽与自动换行
   overrides: [
     {
-      // 应用到 Markdown/MDX 文件
       files: ["*.md", "*.mdx"],
       options: {
-        // Markdown 行宽更短，便于阅读
         printWidth: 80,
-        // Markdown 自动换行
         proseWrap: "always",
       },
     },

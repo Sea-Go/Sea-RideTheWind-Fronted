@@ -9,5 +9,10 @@
 ## 示例
 
 - `auth.ts` (登录、注册接口)
-- `user.ts` (用户信息接口)
+- `admin.ts` (管理员相关接口)
+- `article.ts` (文章相关接口)
+- `comment.ts` (评论相关接口)
+- `like.ts` (点赞相关接口)
+- `task.ts` (任务相关接口)
+- `reco.ts` (推荐服务接口：recommend/ingest/tools/health)
 - `request.ts` (基础请求封装)

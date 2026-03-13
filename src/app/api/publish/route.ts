@@ -2,6 +2,8 @@ import { promises as fs } from "fs";
 import { NextResponse } from "next/server";
 import path from "path";
 
+import { generateCoverAssetFromContent } from "@/lib/cover";
+
 const escapeYamlString = (value: string) => value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
 export async function POST(request: Request) {
@@ -22,8 +24,16 @@ export async function POST(request: Request) {
       );
     }
 
-    if (typeof cover !== "string" || !cover.trim()) {
-      return NextResponse.json({ success: false, error: "Cover is required" }, { status: 400 });
+    let finalCover = typeof cover === "string" && cover.trim() ? cover.trim() : "";
+    let summaryPath = "";
+    if (!finalCover) {
+      const generatedResult = await generateCoverAssetFromContent({
+        title: title.trim(),
+        content: content.trim(),
+      });
+
+      finalCover = generatedResult.cover;
+      summaryPath = generatedResult.summaryPath;
     }
 
     const now = new Date();
@@ -37,10 +47,16 @@ export async function POST(request: Request) {
 
     const filePath = path.join(process.cwd(), "public", fileName);
 
-    const frontmatter = `---\ntitle: "${escapeYamlString(title.trim())}"\ncover: "${escapeYamlString(cover)}"\npublishedAt: "${now.toISOString()}"\n---\n\n`;
+    const summaryField = summaryPath ? `summaryPath: "${escapeYamlString(summaryPath)}"\n` : "";
+    const frontmatter = `---\ntitle: "${escapeYamlString(title.trim())}"\ncover: "${escapeYamlString(finalCover)}"\n${summaryField}publishedAt: "${now.toISOString()}"\n---\n\n`;
     await fs.writeFile(filePath, `${frontmatter}${content}`, "utf-8");
 
-    return NextResponse.json({ success: true, path: `/${fileName}`, title: title.trim(), cover });
+    return NextResponse.json({
+      success: true,
+      path: `/${fileName}`,
+      title: title.trim(),
+      cover: finalCover,
+    });
   } catch (error) {
     console.error("Failed to save markdown file:", error);
     return NextResponse.json({ success: false, error: "Failed to save file" }, { status: 500 });

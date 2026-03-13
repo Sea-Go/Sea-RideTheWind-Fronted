@@ -1,5 +1,6 @@
 "use client";
 
+// 内容发布页，统一使用 shadcn 表单与按钮组件。
 import Image from "next/image";
 import { useRef, useState } from "react";
 
@@ -71,9 +72,14 @@ export default function PostPage() {
         throw new Error("Generate cover failed");
       }
 
-      const data = await response.json();
-      setCover(data.cover);
-      return data.cover as string;
+      const data = (await response.json()) as { cover?: unknown };
+      if (typeof data.cover !== "string" || !data.cover.trim()) {
+        throw new Error("Generate cover succeeded but cover url is invalid");
+      }
+
+      const generatedCover = data.cover.trim();
+      setCover(generatedCover);
+      return generatedCover;
     } catch (error) {
       console.error(error);
       alert("AI 封面生成失败，请手动上传封面后重试");

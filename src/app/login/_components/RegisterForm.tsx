@@ -2,29 +2,34 @@
 
 // 注册表单组件，用于呈现基础注册交互并保持与既有样式一致。
 import { Eye, EyeOff } from "lucide-react";
-import { useRouter } from "next/navigation";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { registerUser } from "@/services/auth";
 
 export function RegisterForm() {
-  const router = useRouter();
   const [username, setUsername] = React.useState("");
+  const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [passwordVisible, setPasswordVisible] = React.useState(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage(null);
+    setSuccessMessage(null);
 
-    if (!username || !password) {
+    const normalizedUsername = username.trim();
+    const normalizedEmail = email.trim();
+
+    if (!normalizedUsername || !password) {
       setErrorMessage("请输入用户名和密码");
       return;
     }
@@ -36,8 +41,15 @@ export function RegisterForm() {
 
     setLoading(true);
     try {
-      // TODO: 对接注册接口
-      router.push("/dashboard");
+      await registerUser({
+        username: normalizedUsername,
+        password,
+        email: normalizedEmail || undefined,
+      });
+
+      setSuccessMessage("注册成功，请使用账号密码登录");
+      setPassword("");
+      setConfirmPassword("");
     } catch (error) {
       const message = error instanceof Error ? error.message : "注册失败，请稍后重试";
       setErrorMessage(message);
@@ -61,6 +73,17 @@ export function RegisterForm() {
               autoComplete="username"
               value={username}
               onChange={(event) => setUsername(event.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="register-email">邮箱（选填）</Label>
+            <Input
+              id="register-email"
+              type="email"
+              placeholder="请输入邮箱"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
             />
           </div>
           <div className="grid gap-2">
@@ -118,6 +141,11 @@ export function RegisterForm() {
             {errorMessage && (
               <p className="text-destructive text-sm leading-none" role="alert">
                 {errorMessage}
+              </p>
+            )}
+            {successMessage && (
+              <p className="text-primary text-sm leading-none" role="status">
+                {successMessage}
               </p>
             )}
           </div>

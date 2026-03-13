@@ -1,5 +1,6 @@
 "use client";
 
+// 登录注册页面，保持动效结构并统一 shadcn 主题风格。
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { useState } from "react";
@@ -105,7 +106,7 @@ export default function LoginPage() {
               <p className="text-sm md:text-base">输入您的个人详细信息，开始与我们的旅程</p>
               <Button
                 variant="outline"
-                className="border-primary-foreground text-primary-foreground hover:border-primary-foreground hover:text-primary-foreground m-0 h-[41px] w-[130px] rounded-[49px] border-2 bg-transparent text-[0.8rem] font-semibold uppercase hover:bg-white/10"
+                className="border-primary-foreground/70 text-primary-foreground hover:border-primary-foreground hover:text-primary-foreground hover:bg-primary-foreground/10 m-0 h-[41px] w-[130px] rounded-full border-2 bg-transparent text-[0.8rem] font-semibold uppercase"
                 onClick={() => setIsSignUpMode(true)}
               >
                 去注册
@@ -122,7 +123,7 @@ export default function LoginPage() {
               <Image
                 src={etihwImg}
                 alt="注册"
-                className="h-auto w-full rounded-[20px] shadow-[0_10px_20px_rgba(0,0,0,0.15)]"
+                className="h-auto w-full rounded-xl shadow-lg"
                 placeholder="blur"
               />
             </motion.div>
@@ -140,7 +141,7 @@ export default function LoginPage() {
               <p className="text-sm md:text-base">请登录您的账户，继续探索世界</p>
               <Button
                 variant="outline"
-                className="border-primary-foreground text-primary-foreground hover:border-primary-foreground hover:text-primary-foreground m-0 h-[41px] w-[130px] rounded-[49px] border-2 bg-transparent text-[0.8rem] font-semibold uppercase hover:bg-white/10"
+                className="border-primary-foreground/70 text-primary-foreground hover:border-primary-foreground hover:text-primary-foreground hover:bg-primary-foreground/10 m-0 h-[41px] w-[130px] rounded-full border-2 bg-transparent text-[0.8rem] font-semibold uppercase"
                 onClick={() => setIsSignUpMode(false)}
               >
                 去登录
@@ -157,7 +158,7 @@ export default function LoginPage() {
               <Image
                 src={whiteImg}
                 alt="登录"
-                className="h-auto w-full rounded-[20px] shadow-[0_10px_20px_rgba(0,0,0,0.15)]"
+                className="h-auto w-full rounded-xl shadow-lg"
                 placeholder="blur"
               />
             </motion.div>

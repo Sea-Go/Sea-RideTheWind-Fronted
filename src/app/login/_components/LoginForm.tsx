@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { loginUser, saveAuthToken } from "@/services/auth";
 
 export function LoginForm() {
   const router = useRouter();
@@ -22,14 +23,21 @@ export function LoginForm() {
     event.preventDefault();
     setErrorMessage(null);
 
-    if (!username || !password) {
+    const normalizedUsername = username.trim();
+
+    if (!normalizedUsername || !password) {
       setErrorMessage("请输入用户名和密码");
       return;
     }
 
     setLoading(true);
     try {
-      // TODO: 对接登录接口
+      const { token } = await loginUser({
+        username: normalizedUsername,
+        password,
+      });
+
+      saveAuthToken(token);
       router.push("/dashboard");
     } catch (error) {
       const message = error instanceof Error ? error.message : "登录失败，请稍后重试";

@@ -13,6 +13,11 @@
 - 构建：pnpm build
 - 生产启动：pnpm start
 
+## 环境变量
+
+- 在项目根目录创建 `.env.local`
+- 配置阿里 DashScope 密钥（仅服务端使用）：`DASHSCOPE_API_KEY=你的密钥`
+
 ## 质量与格式化
 
 - 统一校验：pnpm lint ---- ESLint：pnpm lint:eslint & Stylelint：pnpm lint:style
@@ -31,3 +36,42 @@
 - src/app：页面与布局
 - src/components：组件
 - src/lib：工具与通用逻辑
+
+## AI 封面流水线（当前实现）
+
+### 架构图（本地存储版）
+
+```text
+[客户端]
+	↓
+[API Gateway]
+	↓
+[文献处理服务]
+	↓
+[摘要生成服务] ——→ [摘要存储（public/summaries）]
+	↓
+[封面 Prompt 生成服务]
+	↓
+[图像生成服务]
+	↓
+[结果存储（public/covers + public/*.md）]
+```
+
+### 模块映射表
+
+| 阶段        | 代码位置                                 | 产物                              |
+| ----------- | ---------------------------------------- | --------------------------------- |
+| 文献处理    | `src/lib/pipeline/document-processor.ts` | 清洗文本 + 分段结果               |
+| 摘要生成    | `src/lib/pipeline/summary-service.ts`    | 结构化摘要对象                    |
+| 摘要存储    | `src/lib/pipeline/storage-service.ts`    | `public/summaries/*.json`         |
+| Prompt 生成 | `src/lib/pipeline/prompt-service.ts`     | 文生图 Prompt                     |
+| 图像生成    | `src/lib/pipeline/image-service.ts`      | 图片二进制数据                    |
+| 结果存储    | `src/lib/pipeline/storage-service.ts`    | `public/covers/*` + 发布 Markdown |
+| 编排入口    | `src/lib/pipeline/cover-pipeline.ts`     | 串联完整流水线                    |
+
+### 接口入口
+
+- 手动生成封面：`src/app/api/cover/generate/route.ts`
+- 发布时自动兜底生成：`src/app/api/publish/route.ts`
+
+详细设计映射见：`doc/ai文献摘要与封面生成_系统分析与设计.md`（第 9 节）。

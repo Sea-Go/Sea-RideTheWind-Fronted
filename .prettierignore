@@ -19,3 +19,4 @@ yarn.lock
 *.min.css
 **/.DS_Store
 .idea
+doc/

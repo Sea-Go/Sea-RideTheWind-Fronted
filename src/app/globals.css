@@ -1,3 +1,4 @@
+/* 全局样式与主题变量配置，包含编辑器样式适配。 */
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "bytemd/dist/index.css";
@@ -228,7 +229,7 @@
   min-height: 420px;
   height: auto !important;
   overflow: hidden;
-  border: 1px solid #e1e4e8;
+  border: 1px solid var(--border);
 }
 
 .bytemd.bytemd .bytemd-body {
@@ -238,13 +239,13 @@
 }
 
 .bytemd-toolbar {
-  border-bottom: 1px solid #e1e4e8;
+  border-bottom: 1px solid var(--border);
 }
 
 .bytemd-split .bytemd-preview {
-  border-left: 1px solid #e1e4e8;
+  border-left: 1px solid var(--border);
 }
 
 .bytemd-status {
-  border-top: 1px solid #e1e4e8;
+  border-top: 1px solid var(--border);
 }

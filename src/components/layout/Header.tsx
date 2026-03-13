@@ -1,17 +1,34 @@
-"use client";
+﻿"use client";
 
+import {
+  HomeIcon,
+  InfoIcon,
+  LogOutIcon,
+  MenuIcon,
+  MessageSquareIcon,
+  PenBoxIcon,
+  SettingsIcon,
+  UserIcon,
+} from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-
-import { PageContainer } from "./PageContainer";
+import { clearAuthToken, getAuthToken } from "@/services/auth";
 
 const navItems = [
-  { href: "/dashboard", label: "首页" },
-  { href: "/post", label: "发布" },
-  { href: "/messages", label: "消息" },
-  { href: "/profile", label: "我" },
+  { href: "/dashboard", label: "首页", icon: HomeIcon },
+  { href: "/post", label: "发布", icon: PenBoxIcon },
+  { href: "/messages", label: "消息", icon: MessageSquareIcon },
+  { href: "/profile", label: "我的", icon: UserIcon },
 ];
 
 const matchRoute = (pathname: string, href: string) =>
@@ -19,40 +36,84 @@ const matchRoute = (pathname: string, href: string) =>
 
 export const Header = () => {
   const pathname = usePathname();
+  const router = useRouter();
+  const isLoggedIn = Boolean(getAuthToken());
+
+  const handleLogout = () => {
+    clearAuthToken();
+    router.push("/login");
+  };
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-white shadow-sm">
-      <PageContainer className="flex items-center justify-between py-3">
-        <nav className="flex space-x-6 text-sm font-medium">
-          {navItems.map((item) => {
-            const isActive = matchRoute(pathname, item.href);
+    <header className="border-border bg-background sticky top-0 left-0 z-50 flex h-screen w-64 shrink-0 flex-col border-r py-6 shadow-sm">
+      <div className="text-primary mb-10 px-8 text-xl font-bold tracking-tight">Sea TryGo</div>
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "transition-colors",
-                  isActive
-                    ? "text-red-500 hover:text-red-700"
-                    : "text-gray-600 hover:text-gray-800",
-                )}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
+      <nav className="flex w-full flex-1 flex-col space-y-2 px-4 text-sm font-medium">
+        {navItems.map((item) => {
+          const isActive = matchRoute(pathname, item.href);
+          const Icon = item.icon;
 
-        <div className="flex items-center space-x-4">
-          <Link
-            href="/login"
-            className="rounded-full bg-red-500 px-3 py-1 text-sm font-medium text-white"
-          >
-            登录
-          </Link>
-        </div>
-      </PageContainer>
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-4 py-3 transition-colors",
+                isActive
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
+              )}
+            >
+              <Icon className="h-5 w-5" />
+              {item.label}
+            </Link>
+          );
+        })}
+
+        {!isLoggedIn && (
+          <div className="pt-4">
+            <Button asChild className="w-full rounded-full">
+              <Link href="/login">登录</Link>
+            </Button>
+          </div>
+        )}
+      </nav>
+
+      <div className="mt-auto px-4 pb-6">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              className="text-muted-foreground hover:bg-accent hover:text-foreground h-auto w-full justify-start gap-3 rounded-lg px-4 py-3 text-sm font-medium"
+            >
+              <MenuIcon className="h-5 w-5" />
+              更多
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="start" className="mb-2 w-56">
+            <DropdownMenuItem className="cursor-pointer gap-2">
+              <SettingsIcon className="h-4 w-4" />
+              设置
+            </DropdownMenuItem>
+            <DropdownMenuItem className="cursor-pointer gap-2">
+              <InfoIcon className="h-4 w-4" />
+              关于
+            </DropdownMenuItem>
+            {isLoggedIn && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer gap-2"
+                >
+                  <LogOutIcon className="h-4 w-4" />
+                  退出登录
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </header>
   );
 };

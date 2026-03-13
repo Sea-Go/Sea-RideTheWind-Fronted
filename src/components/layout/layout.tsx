@@ -1,3 +1,4 @@
+// 页面布局容器，统一提供页头页脚与全局背景样式。
 import type { ReactNode } from "react";
 
 import { Footer } from "./Footer";
@@ -9,10 +10,12 @@ interface LayoutProps {
 
 export const Layout = ({ children }: LayoutProps) => {
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="bg-background text-foreground flex min-h-screen">
       <Header />
-      <main className="flex-1">{children}</main>
-      <Footer />
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <main className="flex-1">{children}</main>
+        <Footer />
+      </div>
     </div>
   );
 };

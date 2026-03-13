@@ -32,10 +32,10 @@ module.exports = {
       subject: "请输入简短描述（必填）:",
       body: "请输入详细描述（可选，使用 | 换行）:",
       breaking: "请输入破坏性变更说明（可选，使用 | 换行）:",
-      markBreaking: "是否存在破坏性变更（将在头部添加 !）？",
+      markBreaking: "是否存在破坏性变更（将会在头部添加 !）？",
       footerPrefixesSelect: "请选择关联 Issue 前缀（可选）:",
       customFooterPrefix: "请输入自定义 Issue 前缀:",
-      footer: "请输入关联的 Issue 号码（例如: #31, #34）:",
+      footer: "请输入关联的 Issue 号（例如 #31, #34）:",
       confirmCommit: "确认提交以上内容？",
     },
     types: [
