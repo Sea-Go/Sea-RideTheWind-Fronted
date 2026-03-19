@@ -1,19 +1,20 @@
 import { generateImageBufferFromPrompt } from "./image-service";
 import { buildCoverPromptFromSummary } from "./prompt-service";
-import { storeCoverImageLocally, storeSummaryLocally } from "./storage-service";
+import { uploadCoverImageToServer } from "./storage-service";
 import { generateStructuredSummary } from "./summary-service";
-import type { CoverPipelineResult } from "./types";
+import type { CoverPipelineResult, CoverUploadOptions } from "./types";
 
 export const runCoverPipeline = async ({
   title,
   content,
+  upload,
 }: {
   title?: string;
   content: string;
+  upload: CoverUploadOptions;
 }): Promise<CoverPipelineResult> => {
   const summaryResult = await generateStructuredSummary({ title, content });
   const summary = summaryResult.summary;
-  const summaryPath = await storeSummaryLocally(summary);
 
   const promptResult = await buildCoverPromptFromSummary({
     summary,
@@ -22,14 +23,15 @@ export const runCoverPipeline = async ({
   });
   const prompt = promptResult.prompt;
   const imageData = await generateImageBufferFromPrompt(prompt);
-  const cover = await storeCoverImageLocally({
+  const cover = await uploadCoverImageToServer({
+    articleServerUrl: upload.articleServerUrl,
+    authorization: upload.authorization,
     buffer: imageData.buffer,
     contentType: imageData.contentType,
   });
 
   return {
     summary,
-    summaryPath,
     prompt,
     cover,
     summarySource: summaryResult.source,

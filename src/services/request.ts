@@ -4,6 +4,10 @@ export interface ApiResponse<T> {
   data: T;
 }
 
+interface RequestOptions extends RequestInit {
+  responseMode?: "auto" | "wrapped" | "raw";
+}
+
 const DEFAULT_ERROR_MESSAGE = "请求失败，请稍后重试";
 
 const buildRequestUrl = (path: string): string => {
@@ -26,33 +30,69 @@ const buildHeaders = (headers?: HeadersInit): Headers => {
   return mergedHeaders;
 };
 
-export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+const isWrappedPayload = <T>(value: unknown): value is ApiResponse<T> => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const payload = value as Record<string, unknown>;
+  return (
+    typeof payload.code === "number" &&
+    typeof payload.msg === "string" &&
+    Object.hasOwn(payload, "data")
+  );
+};
+
+export async function request<T>(path: string, init?: RequestOptions): Promise<T> {
+  const responseMode = init?.responseMode ?? "auto";
   const response = await fetch(buildRequestUrl(path), {
     ...init,
     headers: buildHeaders(init?.headers),
   });
 
-  let payload: ApiResponse<T> | null = null;
+  let payload: unknown = null;
   try {
-    payload = (await response.json()) as ApiResponse<T>;
+    payload = (await response.json()) as unknown;
   } catch (error) {
     // ignore parse errors and fallback to status-based error message below
     void error;
   }
 
+  const wrappedPayload = isWrappedPayload<T>(payload) ? payload : null;
+
   if (!response.ok) {
-    throw new Error(payload?.msg ?? DEFAULT_ERROR_MESSAGE);
+    throw new Error(wrappedPayload?.msg ?? DEFAULT_ERROR_MESSAGE);
   }
 
-  if (!payload) {
+  if (payload === null) {
     throw new Error(DEFAULT_ERROR_MESSAGE);
   }
 
-  if (payload.code !== 200) {
-    throw new Error(payload.msg || DEFAULT_ERROR_MESSAGE);
+  if (responseMode === "wrapped") {
+    if (!wrappedPayload) {
+      throw new Error(DEFAULT_ERROR_MESSAGE);
+    }
+
+    if (wrappedPayload.code !== 200) {
+      throw new Error(wrappedPayload.msg || DEFAULT_ERROR_MESSAGE);
+    }
+
+    return wrappedPayload.data;
   }
 
-  return payload.data;
+  if (responseMode === "raw") {
+    return payload as T;
+  }
+
+  if (wrappedPayload) {
+    if (wrappedPayload.code !== 200) {
+      throw new Error(wrappedPayload.msg || DEFAULT_ERROR_MESSAGE);
+    }
+
+    return wrappedPayload.data;
+  }
+
+  return payload as T;
 }
 
 export const withBearerAuthorization = (token: string, headers?: HeadersInit): Headers => {

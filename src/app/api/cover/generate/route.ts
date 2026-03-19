@@ -1,8 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
+import {
+  getRequiredArticleServerUrl,
+  resolveAuthorizationHeader,
+} from "@/app/api/_shared/article-upload";
 import { generateCoverAssetFromContent } from "@/lib/cover";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const { title, content } = await request.json();
 
@@ -12,7 +16,20 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    const result = await generateCoverAssetFromContent({ title, content });
+
+    const authorization = resolveAuthorizationHeader(request);
+    if (!authorization) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
+    const result = await generateCoverAssetFromContent({
+      title,
+      content,
+      upload: {
+        articleServerUrl: getRequiredArticleServerUrl(),
+        authorization,
+      },
+    });
 
     return NextResponse.json({
       success: true,
@@ -24,7 +41,6 @@ export async function POST(request: Request) {
       summary: result.summary,
       summarySource: result.summarySource,
       summaryGroundingScore: result.summaryGroundingScore,
-      summaryPath: result.summaryPath,
     });
   } catch (error) {
     console.error("Failed to generate AI cover:", error);

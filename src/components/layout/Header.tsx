@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { type MouseEvent, useSyncExternalStore } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -34,14 +36,27 @@ const navItems = [
 const matchRoute = (pathname: string, href: string) =>
   pathname === href || pathname.startsWith(`${href}/`);
 
+const subscribeAuthState = () => () => {};
+const getClientAuthState = () => Boolean(getAuthToken());
+const getServerAuthState = () => false;
+
 export const Header = () => {
   const pathname = usePathname();
   const router = useRouter();
-  const isLoggedIn = Boolean(getAuthToken());
+  const isLoggedIn = useSyncExternalStore(
+    subscribeAuthState,
+    getClientAuthState,
+    getServerAuthState,
+  );
 
   const handleLogout = () => {
     clearAuthToken();
     router.push("/login");
+  };
+
+  const handleMessageClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    toast.info("消息功能正在开发中~");
   };
 
   return (
@@ -57,6 +72,7 @@ export const Header = () => {
             <Link
               key={item.href}
               href={item.href}
+              onClick={item.href === "/messages" ? handleMessageClick : undefined}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-4 py-3 transition-colors",
                 isActive

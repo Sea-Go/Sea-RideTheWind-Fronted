@@ -2,24 +2,68 @@
 
 // 内容发布页，统一使用 shadcn 表单与按钮组件。
 import Image from "next/image";
-import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 import { Layout } from "@/components/layout/layout";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { createArticle, MAX_COVER_UPLOAD_SIZE_LABEL, uploadArticleCover } from "@/services/article";
+import { getAuthToken } from "@/services/auth";
 
 import MarkdownEditor from "./_components/MarkdownEditor";
 
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+
+const extractCreatedArticleId = (payload: unknown): string | null => {
+  const record = asRecord(payload);
+  if (!record) {
+    return null;
+  }
+
+  const directId = record.id ?? record.article_id;
+  if (directId !== undefined && directId !== null && String(directId).trim()) {
+    return String(directId).trim();
+  }
+
+  const article = asRecord(record.article);
+  if (!article) {
+    return null;
+  }
+
+  const nestedId = article.id ?? article.article_id;
+  if (nestedId !== undefined && nestedId !== null && String(nestedId).trim()) {
+    return String(nestedId).trim();
+  }
+
+  return null;
+};
+
 export default function PostPage() {
+  const router = useRouter();
   const coverUploadInputRef = useRef<HTMLInputElement | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [title, setTitle] = useState("");
+  const [brief, setBrief] = useState("");
+  const [manualTypeTag, setManualTypeTag] = useState("");
   const [content, setContent] = useState("");
   const [cover, setCover] = useState<string | null>(null);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isGeneratingCover, setIsGeneratingCover] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const currentToken = getAuthToken();
+    if (!currentToken) {
+      router.replace("/login?next=/post");
+      return;
+    }
+    setToken(currentToken);
+  }, [router]);
 
   const handleUploadCover = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -28,24 +72,18 @@ export default function PostPage() {
     }
 
     try {
-      setIsUploadingCover(true);
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const response = await fetch("/api/cover/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error("Upload cover failed");
+      if (!token) {
+        router.push("/login?next=/post");
+        return;
       }
 
-      const data = await response.json();
-      setCover(data.cover);
+      setIsUploadingCover(true);
+      const uploadedCover = await uploadArticleCover(token, file);
+      setCover(uploadedCover);
+      setErrorMessage(null);
     } catch (error) {
       console.error(error);
-      alert("封面上传失败，请重试");
+      setErrorMessage(error instanceof Error ? error.message : "封面上传失败，请重试");
     } finally {
       setIsUploadingCover(false);
       event.target.value = "";
@@ -54,7 +92,11 @@ export default function PostPage() {
 
   const handleGenerateCover = async () => {
     if (!content.trim()) {
-      alert("请先输入文章内容，再生成封面");
+      setErrorMessage("请先输入文章内容，再生成封面");
+      return null;
+    }
+    if (!token) {
+      router.push("/login?next=/post");
       return null;
     }
 
@@ -64,6 +106,7 @@ export default function PostPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ title, content }),
       });
@@ -79,10 +122,11 @@ export default function PostPage() {
 
       const generatedCover = data.cover.trim();
       setCover(generatedCover);
+      setErrorMessage(null);
       return generatedCover;
     } catch (error) {
       console.error(error);
-      alert("AI 封面生成失败，请手动上传封面后重试");
+      setErrorMessage("AI 封面生成失败，请手动上传封面后重试");
       return null;
     } finally {
       setIsGeneratingCover(false);
@@ -91,13 +135,20 @@ export default function PostPage() {
 
   const handlePublish = async () => {
     try {
+      if (!token) {
+        router.push("/login?next=/post");
+        return;
+      }
+
+      setErrorMessage(null);
+
       if (!title.trim()) {
-        alert("文章标题不能为空");
+        setErrorMessage("文章标题不能为空");
         return;
       }
 
       if (!content.trim()) {
-        alert("文章内容不能为空");
+        setErrorMessage("文章内容不能为空");
         return;
       }
 
@@ -109,33 +160,28 @@ export default function PostPage() {
       }
 
       if (!finalCover) {
-        alert("发布前必须有封面，请上传或重试 AI 生成");
+        setErrorMessage("发布前必须有封面，请上传或重试 AI 生成");
         return;
       }
 
-      const response = await fetch("/api/publish", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ title, content, cover: finalCover }),
+      const result = await createArticle(token, {
+        title: title.trim(),
+        brief: brief.trim() || undefined,
+        content: content.trim(),
+        cover_image_url: finalCover,
+        manual_type_tag: manualTypeTag.trim() || undefined,
       });
 
-      if (!response.ok) {
-        throw new Error("Publish failed");
+      const createdId = extractCreatedArticleId(result);
+      if (createdId) {
+        router.push(`/article/${encodeURIComponent(createdId)}`);
+        return;
       }
 
-      const data = await response.json();
-      alert(`发布成功！文件已保存至: ${data.path}，封面: ${data.cover}`);
-      setTitle("");
-      setContent("");
-      setCover(null);
-      if (coverUploadInputRef.current) {
-        coverUploadInputRef.current.value = "";
-      }
+      router.push("/dashboard/recommend");
     } catch (error) {
       console.error(error);
-      alert("发布失败，请重试");
+      setErrorMessage(error instanceof Error ? error.message : "发布失败，请重试");
     } finally {
       setIsPublishing(false);
     }
@@ -156,6 +202,7 @@ export default function PostPage() {
           </Button>
         </div>
         <div className="mb-4 rounded-md border p-4">
+          {errorMessage && <p className="text-destructive mb-3 text-sm">{errorMessage}</p>}
           <div className="mb-3">
             <Label htmlFor="post-title" className="mb-2">
               文章标题（必填）
@@ -167,6 +214,34 @@ export default function PostPage() {
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               maxLength={60}
+              disabled={isPublishing || isUploadingCover || isGeneratingCover}
+            />
+          </div>
+          <div className="mb-3">
+            <Label htmlFor="post-brief" className="mb-2">
+              文章摘要（可选）
+            </Label>
+            <Input
+              id="post-brief"
+              type="text"
+              placeholder="请输入摘要"
+              value={brief}
+              onChange={(event) => setBrief(event.target.value)}
+              maxLength={200}
+              disabled={isPublishing || isUploadingCover || isGeneratingCover}
+            />
+          </div>
+          <div className="mb-3">
+            <Label htmlFor="post-tag" className="mb-2">
+              分类标签（可选）
+            </Label>
+            <Input
+              id="post-tag"
+              type="text"
+              placeholder="如：travel"
+              value={manualTypeTag}
+              onChange={(event) => setManualTypeTag(event.target.value)}
+              maxLength={40}
               disabled={isPublishing || isUploadingCover || isGeneratingCover}
             />
           </div>
@@ -183,6 +258,9 @@ export default function PostPage() {
                 onChange={handleUploadCover}
                 disabled={isUploadingCover || isGeneratingCover || isPublishing}
               />
+              <p className="text-muted-foreground mt-1 text-xs">
+                上传图片大小需不超过 {MAX_COVER_UPLOAD_SIZE_LABEL}
+              </p>
             </div>
             <Button
               variant="outline"

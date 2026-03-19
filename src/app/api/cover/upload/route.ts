@@ -1,67 +1,58 @@
-import { promises as fs } from "fs";
-import { NextResponse } from "next/server";
-import path from "path";
+import { NextRequest, NextResponse } from "next/server";
 
-const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+import {
+  ARTICLE_UPLOAD_UPSTREAM_PATH,
+  getRequiredArticleServerUrl,
+  resolveAuthorizationHeader,
+} from "@/app/api/_shared/article-upload";
 
-const getFileExtension = (mimeType: string) => {
-  if (mimeType === "image/jpeg") {
-    return "jpg";
+const buildResponseHeaders = (upstreamResponse: Response): Headers => {
+  const headers = new Headers();
+  const contentType = upstreamResponse.headers.get("content-type");
+  if (contentType) {
+    headers.set("content-type", contentType);
   }
-  if (mimeType === "image/png") {
-    return "png";
-  }
-  if (mimeType === "image/webp") {
-    return "webp";
-  }
-  if (mimeType === "image/gif") {
-    return "gif";
-  }
-  return "png";
+  return headers;
 };
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest): Promise<Response> {
   try {
+    const authorization = resolveAuthorizationHeader(request);
+    if (!authorization) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
     const formData = await request.formData();
-    const file = formData.get("file");
-
-    if (!(file instanceof File)) {
+    const image = formData.get("image");
+    if (!(image instanceof File)) {
       return NextResponse.json(
-        { success: false, error: "Cover file is required" },
+        { success: false, error: "Cover image is required" },
         { status: 400 },
       );
     }
 
-    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unsupported image type",
+    const upstreamFormData = new FormData();
+    upstreamFormData.append("image", image, image.name);
+
+    const upstreamResponse = await fetch(
+      `${getRequiredArticleServerUrl()}${ARTICLE_UPLOAD_UPSTREAM_PATH}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: authorization,
         },
-        { status: 400 },
-      );
-    }
+        body: upstreamFormData,
+        cache: "no-store",
+      },
+    );
 
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    const now = new Date();
-    const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(
-      now.getDate(),
-    ).padStart(2, "0")}${String(now.getHours()).padStart(2, "0")}${String(
-      now.getMinutes(),
-    ).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
-    const extension = getFileExtension(file.type);
-    const fileName = `cover-${timestamp}.${extension}`;
-    const coverDir = path.join(process.cwd(), "public", "covers");
-    const filePath = path.join(coverDir, fileName);
-
-    await fs.mkdir(coverDir, { recursive: true });
-    await fs.writeFile(filePath, buffer);
-
-    return NextResponse.json({ success: true, cover: `/covers/${fileName}` });
+    return new Response(await upstreamResponse.arrayBuffer(), {
+      status: upstreamResponse.status,
+      statusText: upstreamResponse.statusText,
+      headers: buildResponseHeaders(upstreamResponse),
+    });
   } catch (error) {
     console.error("Failed to upload cover:", error);
-    return NextResponse.json({ success: false, error: "Failed to upload cover" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Failed to upload cover" }, { status: 502 });
   }
 }

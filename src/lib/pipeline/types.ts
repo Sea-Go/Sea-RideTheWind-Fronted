@@ -26,9 +26,13 @@ export interface ProcessedDocument {
   chunks: string[];
 }
 
+export interface CoverUploadOptions {
+  articleServerUrl: string;
+  authorization: string;
+}
+
 export interface CoverPipelineResult {
   summary: StructuredSummary;
-  summaryPath: string;
   prompt: string;
   cover: string;
   summarySource: GenerationSource;

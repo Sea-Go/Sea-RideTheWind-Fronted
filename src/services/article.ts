@@ -1,5 +1,9 @@
-import { ARTICLE_API_PATHS } from "@/constants/api-paths";
+import { ARTICLE_API_PATHS, COVER_API_PATHS } from "@/constants/api-paths";
+import { extractUploadError, extractUploadUrl } from "@/lib/upload-response";
 import { request, withBearerAuthorization } from "@/services/request";
+
+export const MAX_COVER_UPLOAD_SIZE_BYTES = 900 * 1024;
+export const MAX_COVER_UPLOAD_SIZE_LABEL = "900KB";
 
 export interface ArticlePayload {
   title?: string;
@@ -36,8 +40,37 @@ export interface GetArticleOptions {
   incr_view?: boolean;
 }
 
-export type ArticleResponse = Record<string, unknown>;
-export type ArticleListResponse = Record<string, unknown>;
+export interface ArticleItem {
+  id?: string | number;
+  article_id?: string | number;
+  author_id?: string | number;
+  author_name?: string;
+  username?: string;
+  title?: string;
+  brief?: string;
+  content?: string;
+  cover_image_url?: string;
+  cover?: string;
+  like_count?: number;
+  likes?: number;
+  create_time?: string;
+  created_at?: string;
+  published_at?: string;
+  [key: string]: unknown;
+}
+
+export interface ArticleResponse {
+  article?: ArticleItem;
+  [key: string]: unknown;
+}
+
+export interface ArticleListResponse {
+  list?: ArticleItem[];
+  articles?: ArticleItem[];
+  items?: ArticleItem[];
+  records?: ArticleItem[];
+  [key: string]: unknown;
+}
 
 const appendQueryParams = (
   path: string,
@@ -58,6 +91,39 @@ const appendQueryParams = (
 
   const query = searchParams.toString();
   return query ? `${path}?${query}` : path;
+};
+
+export const uploadArticleCover = async (token: string, file: File): Promise<string> => {
+  if (file.size > MAX_COVER_UPLOAD_SIZE_BYTES) {
+    throw new Error(`封面文件过大，请上传不超过 ${MAX_COVER_UPLOAD_SIZE_LABEL} 的图片`);
+  }
+
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const response = await fetch(COVER_API_PATHS.upload, {
+    method: "POST",
+    headers: withBearerAuthorization(token),
+    body: formData,
+  });
+
+  let payload: unknown = null;
+  try {
+    payload = (await response.json()) as unknown;
+  } catch (error) {
+    void error;
+  }
+
+  if (!response.ok) {
+    throw new Error(extractUploadError(payload) ?? "封面上传失败，请重试");
+  }
+
+  const uploadedUrl = extractUploadUrl(payload);
+  if (!uploadedUrl) {
+    throw new Error("封面上传成功，但未返回有效地址");
+  }
+
+  return uploadedUrl;
 };
 
 export const createArticle = (

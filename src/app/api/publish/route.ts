@@ -1,12 +1,16 @@
 import { promises as fs } from "fs";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 
+import {
+  getRequiredArticleServerUrl,
+  resolveAuthorizationHeader,
+} from "@/app/api/_shared/article-upload";
 import { generateCoverAssetFromContent } from "@/lib/cover";
 
 const escapeYamlString = (value: string) => value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const { title, content, cover } = await request.json();
 
@@ -25,15 +29,22 @@ export async function POST(request: Request) {
     }
 
     let finalCover = typeof cover === "string" && cover.trim() ? cover.trim() : "";
-    let summaryPath = "";
     if (!finalCover) {
+      const authorization = resolveAuthorizationHeader(request);
+      if (!authorization) {
+        return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+      }
+
       const generatedResult = await generateCoverAssetFromContent({
         title: title.trim(),
         content: content.trim(),
+        upload: {
+          articleServerUrl: getRequiredArticleServerUrl(),
+          authorization,
+        },
       });
 
       finalCover = generatedResult.cover;
-      summaryPath = generatedResult.summaryPath;
     }
 
     const now = new Date();
@@ -47,8 +58,7 @@ export async function POST(request: Request) {
 
     const filePath = path.join(process.cwd(), "public", fileName);
 
-    const summaryField = summaryPath ? `summaryPath: "${escapeYamlString(summaryPath)}"\n` : "";
-    const frontmatter = `---\ntitle: "${escapeYamlString(title.trim())}"\ncover: "${escapeYamlString(finalCover)}"\n${summaryField}publishedAt: "${now.toISOString()}"\n---\n\n`;
+    const frontmatter = `---\ntitle: "${escapeYamlString(title.trim())}"\ncover: "${escapeYamlString(finalCover)}"\npublishedAt: "${now.toISOString()}"\n---\n\n`;
     await fs.writeFile(filePath, `${frontmatter}${content}`, "utf-8");
 
     return NextResponse.json({

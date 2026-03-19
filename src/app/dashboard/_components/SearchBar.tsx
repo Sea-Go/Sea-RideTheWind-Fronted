@@ -1,30 +1,65 @@
 "use client";
 
-// Dashboard 搜索栏，使用 shadcn Input 统一风格。
-import { useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { type KeyboardEvent, useEffect, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 interface SearchBarProps {
   placeholder: string;
+  initialQuery?: string;
 }
 
-export const SearchBar = ({ placeholder }: SearchBarProps) => {
-  const [query, setQuery] = useState("");
+export const SearchBar = ({ placeholder, initialQuery = "" }: SearchBarProps) => {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [query, setQuery] = useState(initialQuery);
+
+  useEffect(() => {
+    setQuery(initialQuery);
+  }, [initialQuery]);
+
+  const submitSearch = () => {
+    const trimmedQuery = query.trim();
+    const currentQuery = searchParams.get("q")?.trim() ?? "";
+    if (trimmedQuery === currentQuery) {
+      return;
+    }
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    if (trimmedQuery) {
+      nextParams.set("q", trimmedQuery);
+    } else {
+      nextParams.delete("q");
+    }
+
+    const nextQuery = nextParams.toString();
+    router.push(nextQuery ? `${pathname}?${nextQuery}` : pathname);
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+    event.preventDefault();
+    submitSearch();
+  };
 
   return (
-    <div className="relative mt-6 mb-4">
+    <div className="mt-6 mb-4 flex items-center gap-2">
       <Input
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className="h-12 w-full rounded-full px-4"
+        className="h-12 flex-1 rounded-full px-4"
       />
-      {/* 搜索图标可选，若无图片可移除 */}
-      {/* <button className="absolute right-3 top-1/2 transform -translate-y-1/2">
-        <Image src="/assets/images/etiwh.jpg" alt="Search" width={20} height={20} />
-      </button> */}
+      <Button type="button" className="h-12 rounded-full px-5" onClick={submitSearch}>
+        {"\u641c\u7d22"}
+      </Button>
     </div>
   );
 };

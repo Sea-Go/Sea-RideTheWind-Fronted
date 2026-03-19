@@ -32,11 +32,19 @@ export const ADMIN_CENTER_API_PATHS = {
 const ARTICLE_BFF_PREFIX = "/api/article";
 
 export const ARTICLE_API_PATHS = {
+  upload: `${ARTICLE_BFF_PREFIX}/v1/upload`,
   create: `${ARTICLE_BFF_PREFIX}/v1/article`,
   getById: (id: string) => `${ARTICLE_BFF_PREFIX}/v1/article/${encodeURIComponent(id)}`,
   updateById: (id: string) => `${ARTICLE_BFF_PREFIX}/v1/article/${encodeURIComponent(id)}`,
   deleteById: (id: string) => `${ARTICLE_BFF_PREFIX}/v1/article/${encodeURIComponent(id)}`,
   list: `${ARTICLE_BFF_PREFIX}/v1/articles`,
+} as const;
+
+// ─── 封面服务（通过 BFF: /api/cover/*）────────────────────────────────────
+const COVER_BFF_PREFIX = "/api/cover";
+
+export const COVER_API_PATHS = {
+  upload: `${COVER_BFF_PREFIX}/upload`,
 } as const;
 
 // ─── 评论服务（通过 BFF: /api/comment/*）───────────────────────────────────
@@ -71,6 +79,7 @@ const RECO_V1_PREFIX = `${RECO_BFF_PREFIX}/v1`;
 
 export const RECO_API_PATHS = {
   recommend: `${RECO_V1_PREFIX}/reco/recommend`,
+  search: `${RECO_V1_PREFIX}/search`,
   ingest: `${RECO_V1_PREFIX}/docs/ingest`,
   tools: `${RECO_V1_PREFIX}/tools`,
   health: `${RECO_BFF_PREFIX}/health`,

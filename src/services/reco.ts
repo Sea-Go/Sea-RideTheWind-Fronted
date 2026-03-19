@@ -10,7 +10,56 @@ export interface RecommendArticlesPayload {
   period_bucket?: string;
 }
 
-export type RecommendArticlesResponse = Record<string, unknown>;
+export interface RecommendArticleItem {
+  article_id?: string | number;
+  id?: string | number;
+  target_id?: string | number;
+  [key: string]: unknown;
+}
+
+export interface RecommendArticlesResponse {
+  list?: RecommendArticleItem[];
+  articles?: RecommendArticleItem[];
+  items?: RecommendArticleItem[];
+  [key: string]: unknown;
+}
+
+export interface SearchPayload {
+  request_id: string;
+  user_id: string;
+  session_id: string;
+  query: string;
+  top_k: number;
+  need_answer: boolean;
+  explain: boolean;
+}
+
+export interface SearchRecoHit {
+  article_id?: string | number;
+  id?: string | number;
+  target_id?: string | number;
+  [key: string]: unknown;
+}
+
+export interface SearchRecoData {
+  trace_id?: string;
+  request_id?: string;
+  search_request_id?: string;
+  status?: string;
+  answer?: string;
+  hits?: SearchRecoHit[];
+  items?: SearchRecoHit[];
+  explanation?: string;
+  debug?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface SearchResponse {
+  code?: number;
+  msg?: string;
+  data?: SearchRecoData;
+  [key: string]: unknown;
+}
 
 export interface IngestDocumentPayload {
   article_id: string;
@@ -41,6 +90,13 @@ export const recommendArticles = (
   request<RecommendArticlesResponse>(RECO_API_PATHS.recommend, {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+
+export const searchReco = (payload: SearchPayload): Promise<SearchResponse> =>
+  request<SearchResponse>(RECO_API_PATHS.search, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    responseMode: "raw",
   });
 
 export const ingestDocument = (payload: IngestDocumentPayload): Promise<IngestDocumentResponse> =>

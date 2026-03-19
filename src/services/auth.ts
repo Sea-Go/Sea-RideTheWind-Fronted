@@ -2,6 +2,8 @@ import { USER_CENTER_API_PATHS } from "@/constants/api-paths";
 import { request, withBearerAuthorization } from "@/services/request";
 
 const TOKEN_STORAGE_KEY = "user_center_token";
+const TOKEN_COOKIE_KEY = "user_center_token";
+const TOKEN_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 
 export interface RegisterUserPayload {
   username: string;
@@ -42,7 +44,7 @@ export interface LogoutResponse {
 
 export interface UpdateUserPayload {
   username?: string;
-  password?: string;
+  password: string;
   email?: string;
   extra_info?: Record<string, string>;
 }
@@ -100,13 +102,29 @@ export const saveAuthToken = (token: string): void => {
     return;
   }
   window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+  document.cookie = `${TOKEN_COOKIE_KEY}=${encodeURIComponent(token)}; Path=/; Max-Age=${TOKEN_COOKIE_MAX_AGE}; SameSite=Lax`;
 };
 
 export const getAuthToken = (): string | null => {
   if (typeof window === "undefined") {
     return null;
   }
-  return window.localStorage.getItem(TOKEN_STORAGE_KEY);
+
+  const localToken = window.localStorage.getItem(TOKEN_STORAGE_KEY);
+  if (localToken) {
+    return localToken;
+  }
+
+  const cookieToken = document.cookie
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(`${TOKEN_COOKIE_KEY}=`));
+  if (!cookieToken) {
+    return null;
+  }
+
+  const [, value = ""] = cookieToken.split("=");
+  return decodeURIComponent(value) || null;
 };
 
 export const clearAuthToken = (): void => {
@@ -114,4 +132,5 @@ export const clearAuthToken = (): void => {
     return;
   }
   window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+  document.cookie = `${TOKEN_COOKIE_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
 };

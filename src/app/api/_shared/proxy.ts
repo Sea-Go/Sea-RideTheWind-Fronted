@@ -66,14 +66,14 @@ export const createProxyHandler = (
     }
 
     const method = request.method.toUpperCase();
-    const body = BODYLESS_METHODS.has(method) ? undefined : await request.text();
+    const upstreamBody = BODYLESS_METHODS.has(method) ? undefined : await request.arrayBuffer();
     const upstreamUrl = `${serverUrl}${upstreamPath}${request.nextUrl.search}`;
 
     try {
       const upstreamResponse = await fetch(upstreamUrl, {
         method,
         headers: buildUpstreamHeaders(request),
-        body,
+        body: upstreamBody && upstreamBody.byteLength > 0 ? upstreamBody : undefined,
         cache: "no-store",
       });
 

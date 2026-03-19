@@ -1,7 +1,7 @@
-import { promises as fs } from "fs";
-import path from "path";
+import { extractUploadError, extractUploadUrl } from "@/lib/upload-response";
 
-import type { StructuredSummary } from "./types";
+const MAX_IMAGE_SIZE_BYTES = 8 * 1024 * 1024;
+const ARTICLE_UPLOAD_UPSTREAM_PATH = "/v1/upload";
 
 const detectExtension = (contentType: string) => {
   const normalized = contentType.toLowerCase();
@@ -17,32 +17,60 @@ const detectExtension = (contentType: string) => {
   return "png";
 };
 
-export const storeSummaryLocally = async (summary: StructuredSummary) => {
-  const summaryDir = path.join(process.cwd(), "public", "summaries");
-  await fs.mkdir(summaryDir, { recursive: true });
-
-  const now = Date.now();
-  const fileName = `summary-${now}.json`;
-  const filePath = path.join(summaryDir, fileName);
-
-  await fs.writeFile(filePath, JSON.stringify(summary, null, 2), "utf-8");
-  return `/summaries/${fileName}`;
-};
-
-export const storeCoverImageLocally = async ({
+export const uploadCoverImageToServer = async ({
+  articleServerUrl,
+  authorization,
   buffer,
   contentType,
 }: {
+  articleServerUrl: string;
+  authorization: string;
   buffer: Buffer;
   contentType: string;
 }) => {
+  if (!authorization.trim()) {
+    throw new Error("Missing authorization for cover upload");
+  }
+  if (buffer.byteLength === 0) {
+    throw new Error("Generated image buffer is empty");
+  }
+  if (buffer.byteLength > MAX_IMAGE_SIZE_BYTES) {
+    throw new Error("Generated image is too large");
+  }
+
   const extension = detectExtension(contentType);
-  const coverDir = path.join(process.cwd(), "public", "covers");
-  await fs.mkdir(coverDir, { recursive: true });
-
   const fileName = `cover-ai-${Date.now()}.${extension}`;
-  const filePath = path.join(coverDir, fileName);
-  await fs.writeFile(filePath, buffer);
+  const normalizedType = contentType.split(";")[0]?.trim() || "image/png";
 
-  return `/covers/${fileName}`;
+  const formData = new FormData();
+  const bytes = Uint8Array.from(buffer);
+  const blob = new Blob([bytes.buffer], { type: normalizedType });
+  formData.append("image", blob, fileName);
+
+  const response = await fetch(`${articleServerUrl}${ARTICLE_UPLOAD_UPSTREAM_PATH}`, {
+    method: "POST",
+    headers: {
+      Authorization: authorization,
+    },
+    body: formData,
+    cache: "no-store",
+  });
+
+  let payload: unknown = null;
+  try {
+    payload = (await response.json()) as unknown;
+  } catch (error) {
+    void error;
+  }
+
+  if (!response.ok) {
+    throw new Error(extractUploadError(payload) ?? "封面上传失败，请重试");
+  }
+
+  const uploadedUrl = extractUploadUrl(payload);
+  if (!uploadedUrl) {
+    throw new Error("封面上传成功，但未返回有效地址");
+  }
+
+  return uploadedUrl;
 };

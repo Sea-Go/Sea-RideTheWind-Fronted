@@ -2,7 +2,7 @@
 
 // 登录表单组件，用于呈现基础登录交互并保持与既有样式一致。
 import { Eye, EyeOff } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { loginUser, saveAuthToken } from "@/services/auth";
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [passwordVisible, setPasswordVisible] = React.useState(false);
@@ -38,7 +39,12 @@ export function LoginForm() {
       });
 
       saveAuthToken(token);
-      router.push("/dashboard");
+      const next = searchParams.get("next");
+      const safeNext =
+        next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\")
+          ? next
+          : "/dashboard";
+      router.push(safeNext);
     } catch (error) {
       const message = error instanceof Error ? error.message : "登录失败，请稍后重试";
       setErrorMessage(message);

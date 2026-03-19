@@ -1,6 +1,10 @@
 import { ADMIN_CENTER_API_PATHS } from "@/constants/api-paths";
 import { request, withBearerAuthorization } from "@/services/request";
 
+const ADMIN_TOKEN_STORAGE_KEY = "admin_center_token";
+const ADMIN_TOKEN_COOKIE_KEY = "admin_center_token";
+const ADMIN_TOKEN_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+
 export interface AdminExtraInfo {
   [key: string]: unknown;
 }
@@ -221,3 +225,41 @@ export const logoutAdmin = (token: string): Promise<AdminLogoutResponse> =>
     method: "POST",
     headers: withBearerAuthorization(token),
   });
+
+export const saveAdminAuthToken = (token: string): void => {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
+  document.cookie = `${ADMIN_TOKEN_COOKIE_KEY}=${encodeURIComponent(token)}; Path=/; Max-Age=${ADMIN_TOKEN_COOKIE_MAX_AGE}; SameSite=Lax`;
+};
+
+export const getAdminAuthToken = (): string | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const localToken = window.localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY);
+  if (localToken) {
+    return localToken;
+  }
+
+  const cookieToken = document.cookie
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(`${ADMIN_TOKEN_COOKIE_KEY}=`));
+  if (!cookieToken) {
+    return null;
+  }
+
+  const [, value = ""] = cookieToken.split("=");
+  return decodeURIComponent(value) || null;
+};
+
+export const clearAdminAuthToken = (): void => {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+  document.cookie = `${ADMIN_TOKEN_COOKIE_KEY}=; Path=/; Max-Age=0; SameSite=Lax`;
+};

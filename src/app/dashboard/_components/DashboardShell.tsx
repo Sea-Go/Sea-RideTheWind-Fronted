@@ -9,12 +9,16 @@ import { Tabs } from "./Tabs";
 
 interface DashboardShellProps {
   children: ReactNode;
+  query?: string;
 }
 
-export const DashboardShell = ({ children }: DashboardShellProps) => (
+export const DashboardShell = ({ children, query }: DashboardShellProps) => (
   <Layout>
     <PageContainer className="py-4">
-      <SearchBar placeholder="搜索或输入任何问题" />
+      <SearchBar
+        placeholder={"\u641c\u7d22\u6216\u8f93\u5165\u4efb\u4f55\u95ee\u9898"}
+        initialQuery={query}
+      />
       <Tabs tabs={DASHBOARD_TABS} />
       {children}
     </PageContainer>
