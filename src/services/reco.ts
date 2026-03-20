@@ -2,12 +2,12 @@ import { RECO_API_PATHS } from "@/constants/api-paths";
 import { request } from "@/services/request";
 
 export interface RecommendArticlesPayload {
-  rec_request_id?: string;
+  rec_request_id: string;
   user_id: string;
-  session_id?: string;
+  session_id: string;
   surface: string;
-  query?: string;
-  period_bucket?: string;
+  query: string;
+  period_bucket: string;
 }
 
 export interface RecommendArticleItem {
@@ -18,6 +18,12 @@ export interface RecommendArticleItem {
 }
 
 export interface RecommendArticlesResponse {
+  trace_id?: string;
+  rec_request_id?: string;
+  status?: string;
+  ids?: string[];
+  explanation?: string;
+  data?: RecommendArticlesResponse;
   list?: RecommendArticleItem[];
   articles?: RecommendArticleItem[];
   items?: RecommendArticleItem[];

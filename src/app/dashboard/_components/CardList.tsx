@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { type ArticleItem, getArticle, listArticles } from "@/services/article";
+import { type ArticleItem, getArticle } from "@/services/article";
 import { getAuthToken, getUserProfile } from "@/services/auth";
 import {
   applyReactionStep,
@@ -16,7 +16,15 @@ import {
   resolveReactionFinalState,
   toLikeState,
 } from "@/services/like";
-import { recommendArticles, searchReco } from "@/services/reco";
+import { searchReco } from "@/services/reco";
+import {
+  buildGuestRecoUserId,
+  buildUserRecoKey,
+  fetchRecommendSnapshot,
+  getOrCreateRecoSessionId,
+  readRecommendSnapshotCache,
+  type RecommendSnapshot,
+} from "@/services/reco-snapshot";
 import type { DashboardPost } from "@/types";
 
 import { Card } from "./Card";
@@ -120,24 +128,8 @@ const toDashboardPost = (item: ArticleItem, index: number): DashboardPost => {
   };
 };
 
-const extractRecoArticleIds = (payload: unknown): string[] => {
-  const items = pickFirstArray(payload);
-  if (!items.length) {
-    return [];
-  }
-
-  return items
-    .map((item) => {
-      const record = asRecord(item);
-      if (!record) {
-        return "";
-      }
-
-      const candidate = record.article_id ?? record.id ?? record.target_id;
-      return candidate === undefined || candidate === null ? "" : String(candidate).trim();
-    })
-    .filter((id): id is string => Boolean(id));
-};
+const toRecommendSnapshotPosts = (snapshot: RecommendSnapshot): DashboardPost[] =>
+  snapshot.ids.map((id, index) => toRecommendFallbackPost(id, index, snapshot.explanation ?? ""));
 
 const collectIdCandidates = (record: Record<string, unknown>): unknown[] => {
   const values: unknown[] = [record.article_id, record.id, record.target_id, record.articleId];
@@ -257,6 +249,25 @@ const toSearchFallbackPost = (
   };
 };
 
+const toRecommendFallbackPost = (
+  recoId: string,
+  index: number,
+  explanation: string,
+): DashboardPost => {
+  const safeId = recoId.trim() || `${INVALID_ID_PREFIX}reco-${index}`;
+  const idSuffix = safeId.length > 8 ? safeId.slice(-8) : safeId;
+  const description = explanation || `推荐编号: ${idSuffix}`;
+  return {
+    id: safeId,
+    title: `推荐结果 ${index + 1}`,
+    content: description || FALLBACK_CONTENT,
+    image: null,
+    author: FALLBACK_AUTHOR,
+    likes: 0,
+    publishedAt: "",
+  };
+};
+
 const createSearchRequestId = (): string => {
   const randomPart = Math.random().toString(36).slice(2, 8);
   return `search_${Date.now()}_${randomPart}`;
@@ -329,8 +340,50 @@ export const CardList = ({ query = "" }: CardListProps) => {
   const [likeMetaMap, setLikeMetaMap] = useState<Record<string, LikeMeta>>({});
   const [authorIdMap, setAuthorIdMap] = useState<Record<string, string>>({});
 
+  const loadLikeStates = useCallback(
+    async (currentToken: string, targetPosts: DashboardPost[]): Promise<void> => {
+      const validIds = targetPosts
+        .map((post) => post.id)
+        .filter((id) => !id.startsWith(INVALID_ID_PREFIX) && canFetchArticleDetail(id));
+      if (!validIds.length) {
+        return;
+      }
+
+      try {
+        const [counts, states] = await Promise.all([
+          getLikeCount(currentToken, {
+            target_type: "article",
+            target_ids: validIds,
+          }),
+          getLikeState(currentToken, {
+            target_type: "article",
+            target_ids: validIds,
+          }),
+        ]);
+
+        const nextMetaMap: Record<string, LikeMeta> = {};
+        for (const post of targetPosts) {
+          const countItem = counts.counts?.[post.id];
+          nextMetaMap[post.id] = {
+            likeCount: toNumber(countItem?.like_count, post.likes),
+            dislikeCount: toNumber(countItem?.dislike_count, 0),
+            likeState: toLikeState(states.states?.[post.id], LIKE_STATE.NONE),
+            busy: false,
+          };
+        }
+        setLikeMetaMap(nextMetaMap);
+      } catch (error) {
+        console.warn("Failed to load like states in dashboard:", error);
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
-    const fetchPosts = async () => {
+    let cancelled = false;
+    let disposeRecommendListeners: (() => void) | null = null;
+
+    const fetchPosts = async (): Promise<void> => {
       try {
         setIsLoading(true);
         setFetchErrorMessage(null);
@@ -340,9 +393,6 @@ export const CardList = ({ query = "" }: CardListProps) => {
 
         const currentToken = getAuthToken();
         setToken(currentToken);
-
-        let finalPosts: DashboardPost[] = [];
-        let nextAuthorIdMap: Record<string, string> = {};
 
         if (normalizedQuery) {
           const sessionId = getOrCreateSearchSessionId();
@@ -371,12 +421,17 @@ export const CardList = ({ query = "" }: CardListProps) => {
           const searchItems = extractSearchItems(searchPayload);
 
           if (!searchItems.length) {
+            if (cancelled) {
+              return;
+            }
             setPosts([]);
+            setAuthorIdMap({});
+            setIsLoading(false);
             return;
           }
 
-          finalPosts = [];
-          nextAuthorIdMap = {};
+          let finalPosts: DashboardPost[] = [];
+          let nextAuthorIdMap: Record<string, string> = {};
 
           const resolvedPosts = await Promise.all(
             searchItems.map(async (item, index) => {
@@ -412,9 +467,12 @@ export const CardList = ({ query = "" }: CardListProps) => {
           );
 
           finalPosts = resolvedPosts;
-
+          if (cancelled) {
+            return;
+          }
           setPosts(finalPosts);
           setAuthorIdMap(nextAuthorIdMap);
+          setIsLoading(false);
 
           if (!finalPosts.length) {
             setFetchErrorMessage(
@@ -422,113 +480,183 @@ export const CardList = ({ query = "" }: CardListProps) => {
             );
             return;
           }
-        } else {
-          let recoIds: string[] = [];
+
           if (currentToken) {
-            try {
-              const profile = await getUserProfile(currentToken);
-              const recoPayload = await recommendArticles({
-                user_id: profile.user.uid,
-                surface: "dashboard_recommend",
-              });
-              recoIds = extractRecoArticleIds(recoPayload);
-            } catch (error) {
-              console.warn("Recommend fallback to articles list:", error);
-            }
+            void loadLikeStates(currentToken, finalPosts);
           }
+          return;
+        }
 
-          const articlesPayload = await listArticles({
-            page: 1,
-            page_size: 20,
-            sort_by: "create_time",
-            desc: true,
-          });
+        const sessionId = getOrCreateRecoSessionId();
+        const guestUserId = buildGuestRecoUserId(sessionId);
+        const guestUserKey = buildUserRecoKey(guestUserId);
+        let currentPriority = 0;
 
-          const articleItems = pickFirstArray(articlesPayload)
-            .map((item) => asRecord(item))
-            .filter((item): item is ArticleItem => Boolean(item));
-
-          nextAuthorIdMap = {};
-          const normalizedPosts = articleItems.map((item, index) => {
-            const post = toDashboardPost(item, index);
-            const authorId = item.author_id;
-            if (authorId !== undefined && authorId !== null && String(authorId).trim()) {
-              nextAuthorIdMap[post.id] = String(authorId).trim();
-            }
-            return post;
-          });
-
-          if (!normalizedPosts.length) {
-            setPosts([]);
+        const applyRecommendSnapshot = (
+          snapshot: RecommendSnapshot | null,
+          priority: number,
+        ): void => {
+          if (cancelled || !snapshot || !snapshot.ids.length || priority < currentPriority) {
             return;
           }
 
-          finalPosts = normalizedPosts;
-          if (recoIds.length) {
-            const postMap = new Map(normalizedPosts.map((post) => [post.id, post]));
-            const recoOrderedPosts = recoIds
-              .map((id) => postMap.get(id))
-              .filter(Boolean) as DashboardPost[];
-            const restPosts = normalizedPosts.filter((post) => !recoIds.includes(post.id));
-            finalPosts = [...recoOrderedPosts, ...restPosts];
+          currentPriority = priority;
+          const posts = toRecommendSnapshotPosts(snapshot);
+          setPosts(posts);
+          setAuthorIdMap({});
+          setFetchErrorMessage(null);
+          setIsLoading(false);
+          if (currentToken) {
+            void loadLikeStates(currentToken, posts);
+          }
+        };
+
+        const applyEmptyRecommendState = (): void => {
+          if (cancelled || currentPriority > 0) {
+            return;
           }
 
-          setPosts(finalPosts);
-          setAuthorIdMap(nextAuthorIdMap);
-        }
+          setPosts([]);
+          setAuthorIdMap({});
+          setIsLoading(false);
+        };
 
-        if (!currentToken || !finalPosts.length) {
-          return;
-        }
-
-        const validIds = finalPosts
-          .map((post) => post.id)
-          .filter((id) => !id.startsWith(INVALID_ID_PREFIX));
-        if (!validIds.length) {
-          return;
-        }
-
-        try {
-          const [counts, states] = await Promise.all([
-            getLikeCount(currentToken, {
-              target_type: "article",
-              target_ids: validIds,
-            }),
-            getLikeState(currentToken, {
-              target_type: "article",
-              target_ids: validIds,
-            }),
-          ]);
-
-          const nextMetaMap: Record<string, LikeMeta> = {};
-          for (const post of finalPosts) {
-            const countItem = counts.counts?.[post.id];
-            nextMetaMap[post.id] = {
-              likeCount: toNumber(countItem?.like_count, post.likes),
-              dislikeCount: toNumber(countItem?.dislike_count, 0),
-              likeState: toLikeState(states.states?.[post.id], LIKE_STATE.NONE),
-              busy: false,
-            };
+        const refreshGuestRecommend = async (): Promise<void> => {
+          try {
+            const snapshot = await fetchRecommendSnapshot({
+              userId: guestUserId,
+              userKey: guestUserKey,
+              sessionId,
+              surface: "dashboard_recommend",
+              query: "",
+              periodBucket: "d1",
+            });
+            applyRecommendSnapshot(snapshot, 1);
+            if (!snapshot?.ids.length) {
+              applyEmptyRecommendState();
+            }
+          } catch (error) {
+            console.warn("Failed to refresh guest recommend snapshot:", error);
+            if (currentPriority === 0 && !cancelled) {
+              setFetchErrorMessage(
+                "\u63a8\u8350\u5185\u5bb9\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5",
+              );
+              setPosts([]);
+              setAuthorIdMap({});
+              setIsLoading(false);
+            }
           }
-          setLikeMetaMap(nextMetaMap);
-        } catch (error) {
-          console.warn("Failed to load like states in dashboard:", error);
-        }
+        };
+
+        let resolvedUserId: string | null = null;
+        let resolvingUserId: Promise<string | null> | null = null;
+        const resolveUserId = async (): Promise<string | null> => {
+          if (!currentToken) {
+            return null;
+          }
+
+          if (resolvedUserId) {
+            return resolvedUserId;
+          }
+
+          if (resolvingUserId) {
+            return resolvingUserId;
+          }
+
+          resolvingUserId = (async () => {
+            try {
+              const profile = await getUserProfile(currentToken);
+              const uid = profile.user.uid?.trim();
+              resolvedUserId = uid || null;
+              return resolvedUserId;
+            } catch (error) {
+              console.warn("Recommend fallback to guest user_id:", error);
+              resolvedUserId = null;
+              return null;
+            } finally {
+              resolvingUserId = null;
+            }
+          })();
+          return resolvingUserId;
+        };
+
+        const refreshUserRecommend = async (): Promise<void> => {
+          const uid = await resolveUserId();
+          if (!uid || cancelled) {
+            return;
+          }
+
+          const userKey = buildUserRecoKey(uid);
+          const userCached = readRecommendSnapshotCache(userKey);
+          applyRecommendSnapshot(userCached.snapshot, 2);
+
+          try {
+            const snapshot = await fetchRecommendSnapshot({
+              userId: uid,
+              userKey,
+              sessionId,
+              surface: "dashboard_recommend",
+              query: "",
+              periodBucket: "d1",
+            });
+            applyRecommendSnapshot(snapshot, 2);
+          } catch (error) {
+            console.warn("Failed to refresh user recommend snapshot:", error);
+          }
+        };
+
+        const guestCached = readRecommendSnapshotCache(guestUserKey);
+        applyRecommendSnapshot(guestCached.snapshot, 1);
+
+        const triggerRecommendRefresh = (): void => {
+          void refreshGuestRecommend();
+          if (currentToken) {
+            void refreshUserRecommend();
+          }
+        };
+
+        triggerRecommendRefresh();
+
+        const handleVisibilityChange = (): void => {
+          if (document.visibilityState !== "visible") {
+            return;
+          }
+          triggerRecommendRefresh();
+        };
+        const handleOnline = (): void => {
+          triggerRecommendRefresh();
+        };
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        window.addEventListener("online", handleOnline);
+        disposeRecommendListeners = () => {
+          document.removeEventListener("visibilitychange", handleVisibilityChange);
+          window.removeEventListener("online", handleOnline);
+        };
       } catch (error) {
         console.warn("Failed to load dashboard posts:", error);
+        if (cancelled) {
+          return;
+        }
         setFetchErrorMessage(
           normalizedQuery
             ? "\u641c\u7d22\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5"
             : "\u63a8\u8350\u5185\u5bb9\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5",
         );
         setPosts([]);
-      } finally {
         setIsLoading(false);
       }
     };
 
     void fetchPosts();
-  }, [normalizedQuery]);
+
+    return () => {
+      cancelled = true;
+      if (disposeRecommendListeners) {
+        disposeRecommendListeners();
+      }
+    };
+  }, [loadLikeStates, normalizedQuery]);
 
   const getCurrentMeta = (postId: string): LikeMeta => {
     const cachedMeta = likeMetaMap[postId];
@@ -585,7 +713,7 @@ export const CardList = ({ query = "" }: CardListProps) => {
       return;
     }
 
-    if (postId.startsWith(INVALID_ID_PREFIX)) {
+    if (postId.startsWith(INVALID_ID_PREFIX) || !canFetchArticleDetail(postId)) {
       setActionMessage("\u5f53\u524d\u6587\u7ae0\u6682\u4e0d\u652f\u6301\u70b9\u8d5e/\u70b9\u8e29");
       return;
     }
@@ -670,10 +798,24 @@ export const CardList = ({ query = "" }: CardListProps) => {
   };
 
   if (isLoading) {
+    if (isSearchMode) {
+      return <p className="text-muted-foreground py-8 text-center">{"\u641c\u7d22\u4e2d..."}</p>;
+    }
+
     return (
-      <p className="text-muted-foreground py-8 text-center">
-        {"\u6587\u7ae0\u52a0\u8f7d\u4e2d..."}
-      </p>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+        {Array.from({ length: 10 }).map((_, index) => (
+          <div
+            key={`reco-skeleton-${index}`}
+            className="border-border bg-card h-44 animate-pulse rounded-lg border p-4"
+          >
+            <div className="bg-muted h-4 w-2/3 rounded" />
+            <div className="bg-muted mt-4 h-3 w-full rounded" />
+            <div className="bg-muted mt-2 h-3 w-5/6 rounded" />
+            <div className="bg-muted mt-6 h-3 w-1/3 rounded" />
+          </div>
+        ))}
+      </div>
     );
   }
 

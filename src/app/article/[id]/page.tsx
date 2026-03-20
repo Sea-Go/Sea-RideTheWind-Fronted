@@ -10,7 +10,13 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
 import { type ArticleItem, getArticle } from "@/services/article";
 import { getAuthToken } from "@/services/auth";
-import { type CommentItem, getCommentList } from "@/services/comment";
+import {
+  type CommentId,
+  type CommentItem,
+  type CommentSubject,
+  getCommentReplies,
+  getRootComments,
+} from "@/services/comment";
 import {
   applyReactionStep,
   buildReactionSteps,
@@ -25,6 +31,16 @@ import {
 } from "@/services/like";
 
 const PAGE_SIZE = 10;
+
+interface ReplyThreadState {
+  expanded: boolean;
+  initialized: boolean;
+  items: CommentItem[];
+  page: number;
+  hasMore: boolean;
+  isLoading: boolean;
+  error: string | null;
+}
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" ? (value as Record<string, unknown>) : null;
@@ -46,8 +62,37 @@ const toArticleItem = (value: unknown): ArticleItem | null => {
 const toText = (value: unknown, fallback = ""): string =>
   typeof value === "string" && value.trim() ? value.trim() : fallback;
 
-const toNumber = (value: unknown, fallback = 0): number =>
-  typeof value === "number" && Number.isFinite(value) ? value : fallback;
+const toNumber = (value: unknown, fallback = 0): number => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return fallback;
+};
+
+const toCommentIdKey = (id: CommentId): string => String(id);
+
+const createEmptyReplyThreadState = (): ReplyThreadState => ({
+  expanded: false,
+  initialized: false,
+  items: [],
+  page: 0,
+  hasMore: false,
+  isLoading: false,
+  error: null,
+});
+
+const normalizeCommentSubject = (value: unknown): CommentSubject | null => {
+  const subject = asRecord(value);
+  return subject ? (subject as unknown as CommentSubject) : null;
+};
 
 export default function ArticleDetailPage() {
   const params = useParams<{ id: string }>();
@@ -66,10 +111,14 @@ export default function ArticleDetailPage() {
   const [reactionMessage, setReactionMessage] = useState<string | null>(null);
 
   const [comments, setComments] = useState<CommentItem[]>([]);
+  const [commentSubject, setCommentSubject] = useState<CommentSubject | null>(null);
   const [commentPage, setCommentPage] = useState(1);
   const [hasMoreComments, setHasMoreComments] = useState(false);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
+  const [replyStateByRootId, setReplyStateByRootId] = useState<Record<string, ReplyThreadState>>(
+    {},
+  );
 
   useEffect(() => {
     setToken(getAuthToken());
@@ -83,33 +132,119 @@ export default function ArticleDetailPage() {
       }
 
       try {
-        const response = await getCommentList(authToken, {
+        const response = await getRootComments(authToken, {
           target_type: "article",
           target_id: articleId,
           sort_type: 0,
-          root_id: 0,
           page,
           page_size: PAGE_SIZE,
         });
 
         const nextComments = Array.isArray(response.comment) ? response.comment : [];
+        const nextSubject = normalizeCommentSubject(response.subject);
         setComments((prev) => (append ? [...prev, ...nextComments] : nextComments));
+        setCommentSubject(nextSubject);
         setCommentPage(page);
 
-        const totalCount = toNumber(response.subject?.total_count, 0);
-        if (totalCount > 0) {
-          setHasMoreComments(page * PAGE_SIZE < totalCount);
+        const rootCount = toNumber(nextSubject?.root_count, 0);
+        if (rootCount > 0) {
+          setHasMoreComments(page * PAGE_SIZE < rootCount);
         } else {
           setHasMoreComments(nextComments.length >= PAGE_SIZE);
+        }
+
+        if (!append) {
+          setReplyStateByRootId({});
         }
         setCommentError(null);
       } catch (error) {
         setCommentError(error instanceof Error ? error.message : "评论加载失败，请重试");
         if (!append) {
           setComments([]);
+          setCommentSubject(null);
+          setReplyStateByRootId({});
         }
       } finally {
         setIsLoadingComments(false);
+      }
+    },
+    [articleId],
+  );
+
+  const loadReplies = useCallback(
+    async (
+      authToken: string,
+      rootId: CommentId,
+      replyCount: number,
+      page: number,
+      append: boolean,
+    ) => {
+      const rootKey = toCommentIdKey(rootId);
+      setReplyStateByRootId((prev) => {
+        const prevState = prev[rootKey] ?? createEmptyReplyThreadState();
+        return {
+          ...prev,
+          [rootKey]: {
+            ...prevState,
+            expanded: true,
+            initialized: true,
+            isLoading: true,
+            error: null,
+          },
+        };
+      });
+
+      try {
+        const response = await getCommentReplies(authToken, {
+          target_type: "article",
+          target_id: articleId,
+          sort_type: 0,
+          root_id: rootId,
+          page,
+          page_size: PAGE_SIZE,
+        });
+
+        const nextReplies = Array.isArray(response.comment) ? response.comment : [];
+        const totalCount = toNumber(response.subject?.total_count, 0);
+        setReplyStateByRootId((prev) => {
+          const prevState = prev[rootKey] ?? createEmptyReplyThreadState();
+          const mergedItems = append ? [...prevState.items, ...nextReplies] : nextReplies;
+          const loadedCount = mergedItems.length;
+          const hasMore =
+            totalCount > 0
+              ? page * PAGE_SIZE < totalCount
+              : replyCount > 0
+                ? loadedCount < replyCount
+                : nextReplies.length >= PAGE_SIZE;
+
+          return {
+            ...prev,
+            [rootKey]: {
+              ...prevState,
+              expanded: true,
+              initialized: true,
+              items: mergedItems,
+              page,
+              hasMore,
+              isLoading: false,
+              error: null,
+            },
+          };
+        });
+      } catch (error) {
+        setReplyStateByRootId((prev) => {
+          const prevState = prev[rootKey] ?? createEmptyReplyThreadState();
+          return {
+            ...prev,
+            [rootKey]: {
+              ...prevState,
+              expanded: true,
+              initialized: true,
+              isLoading: false,
+              error: error instanceof Error ? error.message : "回复加载失败，请重试",
+            },
+          };
+        });
       }
     },
     [articleId],
@@ -169,6 +304,7 @@ export default function ArticleDetailPage() {
         setLikeState(LIKE_STATE.NONE);
 
         if (token) {
+          setReplyStateByRootId({});
           await Promise.all([
             syncLikeStats(token, {
               likeCount: initialLikes,
@@ -179,6 +315,8 @@ export default function ArticleDetailPage() {
           ]);
         } else {
           setComments([]);
+          setCommentSubject(null);
+          setReplyStateByRootId({});
           setHasMoreComments(false);
           setCommentError("登录后可查看评论内容");
         }
@@ -274,6 +412,85 @@ export default function ArticleDetailPage() {
     await loadComments(token, commentPage + 1, true);
   };
 
+  const handleToggleReplies = async (comment: CommentItem) => {
+    if (!token) {
+      return;
+    }
+
+    const rootKey = toCommentIdKey(comment.id);
+    const currentState = replyStateByRootId[rootKey];
+
+    if (currentState?.expanded) {
+      setReplyStateByRootId((prev) => ({
+        ...prev,
+        [rootKey]: {
+          ...currentState,
+          expanded: false,
+        },
+      }));
+      return;
+    }
+
+    if (currentState?.initialized) {
+      setReplyStateByRootId((prev) => ({
+        ...prev,
+        [rootKey]: {
+          ...currentState,
+          expanded: true,
+          error: null,
+        },
+      }));
+      return;
+    }
+
+    const initialReplies = Array.isArray(comment.children) ? comment.children : [];
+    if (initialReplies.length > 0) {
+      const replyCount = toNumber(comment.reply_count, initialReplies.length);
+      setReplyStateByRootId((prev) => ({
+        ...prev,
+        [rootKey]: {
+          expanded: true,
+          initialized: true,
+          items: initialReplies,
+          page: 1,
+          hasMore: replyCount > initialReplies.length,
+          isLoading: false,
+          error: null,
+        },
+      }));
+      return;
+    }
+
+    await loadReplies(token, comment.id, toNumber(comment.reply_count, 0), 1, false);
+  };
+
+  const handleLoadMoreReplies = async (comment: CommentItem) => {
+    if (!token) {
+      return;
+    }
+
+    const rootKey = toCommentIdKey(comment.id);
+    const replyState = replyStateByRootId[rootKey];
+    if (!replyState || replyState.isLoading || !replyState.hasMore) {
+      return;
+    }
+
+    await loadReplies(
+      token,
+      comment.id,
+      toNumber(comment.reply_count, 0),
+      replyState.page + 1,
+      true,
+    );
+  };
+
+  const handleRetryReplies = async (comment: CommentItem) => {
+    if (!token) {
+      return;
+    }
+    await loadReplies(token, comment.id, toNumber(comment.reply_count, 0), 1, false);
+  };
+
   if (isLoadingArticle) {
     return (
       <Layout>
@@ -303,6 +520,8 @@ export default function ArticleDetailPage() {
   const cover = toText(article.cover_image_url ?? article.cover);
   const author = toText(article.author_name ?? article.username, "匿名用户");
   const createdAt = toText(article.create_time ?? article.created_at ?? article.published_at, "--");
+  const rootCommentCount = toNumber(commentSubject?.root_count, comments.length);
+  const totalCommentCount = toNumber(commentSubject?.total_count, rootCommentCount);
 
   return (
     <Layout>
@@ -369,7 +588,17 @@ export default function ArticleDetailPage() {
 
         <section className="space-y-4 rounded-xl border p-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">评论</h2>
+            <div className="space-y-1">
+              <h2 className="text-xl font-semibold">
+                评论
+                {token && !commentError ? `（${rootCommentCount}）` : ""}
+              </h2>
+              {token && !commentError && (
+                <p className="text-muted-foreground text-xs">
+                  总评论（含回复）：{totalCommentCount}
+                </p>
+              )}
+            </div>
             <Button variant="outline" disabled>
               评论发布待开放
             </Button>
@@ -385,19 +614,88 @@ export default function ArticleDetailPage() {
 
           {comments.length > 0 && (
             <div className="space-y-3">
-              {comments.map((comment) => (
-                <div key={comment.id} className="space-y-2 rounded-lg border p-4">
-                  <div className="text-muted-foreground flex items-center justify-between text-xs">
-                    <span>用户 {comment.user_id}</span>
-                    <span>{comment.created_at}</span>
+              {comments.map((comment) => {
+                const rootKey = toCommentIdKey(comment.id);
+                const replyState = replyStateByRootId[rootKey];
+                const replyCount = toNumber(comment.reply_count, 0);
+                const canToggleReplies = replyCount > 0;
+
+                return (
+                  <div key={rootKey} className="space-y-3 rounded-lg border p-4">
+                    <div className="text-muted-foreground flex items-center justify-between text-xs">
+                      <span>用户 {comment.user_id}</span>
+                      <span>{comment.created_at}</span>
+                    </div>
+                    <p className="text-sm leading-6">{comment.content}</p>
+                    <div className="text-muted-foreground flex items-center justify-between gap-2 text-xs">
+                      <span>
+                        👍 {comment.like_count} · 👎 {comment.dislike_count} · 回复 {replyCount}
+                      </span>
+                      {canToggleReplies && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void handleToggleReplies(comment)}
+                          disabled={replyState?.isLoading}
+                        >
+                          {replyState?.expanded ? "收起回复" : `查看回复（${replyCount}）`}
+                        </Button>
+                      )}
+                    </div>
+
+                    {replyState?.expanded && (
+                      <div className="ml-4 space-y-2 border-l pl-4">
+                        {replyState.error && (
+                          <div className="space-y-2">
+                            <p className="text-destructive text-xs">{replyState.error}</p>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => void handleRetryReplies(comment)}
+                              disabled={replyState.isLoading}
+                            >
+                              {replyState.isLoading ? "重试中..." : "重试加载回复"}
+                            </Button>
+                          </div>
+                        )}
+
+                        {!replyState.error &&
+                          !replyState.isLoading &&
+                          replyState.items.length === 0 && (
+                            <p className="text-muted-foreground text-xs">暂无回复</p>
+                          )}
+
+                        {replyState.items.map((reply, index) => {
+                          const replyKey = `${rootKey}-${toCommentIdKey(reply.id)}-${index}`;
+                          return (
+                            <div key={replyKey} className="space-y-1 rounded-md border px-3 py-2">
+                              <div className="text-muted-foreground flex items-center justify-between text-xs">
+                                <span>用户 {reply.user_id}</span>
+                                <span>{reply.created_at}</span>
+                              </div>
+                              <p className="text-sm leading-6">{reply.content}</p>
+                              <p className="text-muted-foreground text-xs">
+                                👍 {reply.like_count} · 👎 {reply.dislike_count}
+                              </p>
+                            </div>
+                          );
+                        })}
+
+                        {replyState.hasMore && !replyState.error && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => void handleLoadMoreReplies(comment)}
+                            disabled={replyState.isLoading}
+                          >
+                            {replyState.isLoading ? "加载中..." : "加载更多回复"}
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <p className="text-sm leading-6">{comment.content}</p>
-                  <div className="text-muted-foreground text-xs">
-                    👍 {comment.like_count} · 👎 {comment.dislike_count} · 回复{" "}
-                    {comment.reply_count}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 

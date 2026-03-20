@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { AppPromptProvider } from "@/components/common/AppPromptProvider";
+import { RecoPrewarm } from "@/components/common/RecoPrewarm";
 
 import "./globals.css";
 
@@ -32,6 +33,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <AppPromptProvider>{children}</AppPromptProvider>
+        <RecoPrewarm />
       </body>
     </html>
   );

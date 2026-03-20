@@ -30,7 +30,8 @@ export const Card = ({
   onLike,
   onDislike,
 }: CardProps) => {
-  const canOpenDetail = !id.startsWith("article-");
+  const canOpenDetail =
+    !id.startsWith("article-") && !id.startsWith("art_") && !id.startsWith("chk_");
 
   return (
     <UICard className="gap-0 overflow-hidden p-0 transition-shadow hover:shadow-md">

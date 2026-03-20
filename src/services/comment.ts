@@ -1,21 +1,23 @@
 import { COMMENT_API_PATHS } from "@/constants/api-paths";
 import { request, withBearerAuthorization } from "@/services/request";
 
+export type CommentId = number | string;
+
 export interface GetCommentListPayload {
   target_type: string;
   target_id: string;
   sort_type?: number;
-  root_id?: number;
+  root_id?: CommentId;
   page?: number;
   page_size?: number;
 }
 
 export interface CommentItem {
-  id: number;
+  id: CommentId;
   user_id: number;
   content: string;
-  root_id: number;
-  parent_id: number;
+  root_id: CommentId;
+  parent_id: CommentId;
   like_count: number;
   dislike_count: number;
   reply_count: number;
@@ -50,3 +52,17 @@ export const getCommentList = (
     headers: withBearerAuthorization(token),
     body: JSON.stringify(payload),
   });
+
+export const getRootComments = (
+  token: string,
+  payload: Omit<GetCommentListPayload, "root_id">,
+): Promise<GetCommentListResponse> =>
+  getCommentList(token, {
+    ...payload,
+    root_id: 0,
+  });
+
+export const getCommentReplies = (
+  token: string,
+  payload: Omit<GetCommentListPayload, "root_id"> & { root_id: CommentId },
+): Promise<GetCommentListResponse> => getCommentList(token, payload);
