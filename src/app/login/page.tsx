@@ -3,7 +3,7 @@
 // 登录注册页面，保持动效结构并统一 shadcn 主题风格。
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 
 import { LoginForm } from "@/app/login/_components/LoginForm";
 import { RegisterForm } from "@/app/login/_components/RegisterForm";
@@ -77,7 +77,9 @@ export default function LoginPage() {
               animate={loginFormMotion}
               transition={{ duration: 0.2, delay: 0.7 }}
             >
-              <LoginForm />
+              <Suspense fallback={null}>
+                <LoginForm />
+              </Suspense>
             </motion.div>
 
             {/* 注册表单包装器 */}
