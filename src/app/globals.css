@@ -249,3 +249,147 @@
 .bytemd-status {
   border-top: 1px solid var(--border);
 }
+
+.article-markdown .bytemd {
+  height: auto !important;
+  border: 0;
+  background: transparent;
+}
+
+.article-markdown .bytemd-body,
+.article-markdown .bytemd-preview {
+  height: auto;
+  overflow: visible;
+}
+
+.article-markdown .markdown-body {
+  max-width: none;
+  padding: 0;
+  color: var(--foreground);
+  background: transparent;
+  font-size: 1rem;
+  line-height: 1.95;
+}
+
+.article-markdown .markdown-body > *:first-child {
+  margin-top: 0;
+}
+
+.article-markdown .markdown-body > *:last-child {
+  margin-bottom: 0;
+}
+
+.article-markdown .markdown-body h1,
+.article-markdown .markdown-body h2,
+.article-markdown .markdown-body h3,
+.article-markdown .markdown-body h4,
+.article-markdown .markdown-body h5,
+.article-markdown .markdown-body h6 {
+  color: var(--foreground);
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+  margin: 2rem 0 1rem;
+}
+
+.article-markdown .markdown-body h1 {
+  font-size: 2rem;
+}
+
+.article-markdown .markdown-body h2 {
+  font-size: 1.5rem;
+}
+
+.article-markdown .markdown-body h3 {
+  font-size: 1.25rem;
+}
+
+.article-markdown .markdown-body p,
+.article-markdown .markdown-body ul,
+.article-markdown .markdown-body ol,
+.article-markdown .markdown-body blockquote,
+.article-markdown .markdown-body pre,
+.article-markdown .markdown-body table {
+  margin: 1rem 0;
+}
+
+.article-markdown .markdown-body ul,
+.article-markdown .markdown-body ol {
+  padding-left: 1.5rem;
+}
+
+.article-markdown .markdown-body li + li {
+  margin-top: 0.4rem;
+}
+
+.article-markdown .markdown-body blockquote {
+  border-left: 4px solid color-mix(in oklab, var(--primary) 45%, white);
+  padding: 0.25rem 0 0.25rem 1rem;
+  color: var(--muted-foreground);
+  background: color-mix(in oklab, var(--accent) 60%, transparent);
+  border-radius: 0 1rem 1rem 0;
+}
+
+.article-markdown .markdown-body a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.article-markdown .markdown-body hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 2rem 0;
+}
+
+.article-markdown .markdown-body code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: color-mix(in oklab, var(--accent) 88%, white);
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.4rem;
+}
+
+.article-markdown .markdown-body pre {
+  background: oklch(0.24 0.02 255);
+  color: oklch(0.96 0.01 91);
+  padding: 1rem 1.1rem;
+  border-radius: 1rem;
+  overflow-x: auto;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 6%);
+}
+
+.article-markdown .markdown-body pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.article-markdown .markdown-body img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.5rem auto;
+  border-radius: 1rem;
+  box-shadow: 0 12px 30px rgb(15 23 42 / 10%);
+}
+
+.article-markdown .markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 0.9rem;
+  border: 1px solid var(--border);
+}
+
+.article-markdown .markdown-body th,
+.article-markdown .markdown-body td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.8rem 0.9rem;
+  text-align: left;
+}
+
+.article-markdown .markdown-body th {
+  background: color-mix(in oklab, var(--accent) 82%, white);
+  font-weight: 600;
+}

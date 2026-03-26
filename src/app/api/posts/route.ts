@@ -45,7 +45,7 @@ const parseMarkdownFile = (fileName: string, raw: string): DashboardPost | null 
     id: fileName,
     title: title || fileName,
     image: coverMatch?.[1] ?? null,
-    author: "匿名用户",
+    author: "识海用户",
     likes: 0,
     content: cleanedContent.slice(0, 90),
     publishedAt: publishedAtMatch?.[1] ?? "",
@@ -78,6 +78,6 @@ export async function GET() {
     return NextResponse.json({ success: true, posts: sortedPosts });
   } catch (error) {
     console.error("Failed to read posts:", error);
-    return NextResponse.json({ success: false, error: "Failed to read posts" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "读取文章列表失败" }, { status: 500 });
   }
 }

@@ -3,6 +3,21 @@ import { request, withBearerAuthorization } from "@/services/request";
 
 export type CommentId = number | string;
 
+export interface CreateCommentPayload {
+  target_type: string;
+  target_id: string;
+  root_id?: CommentId;
+  parent_id?: CommentId;
+  content: string;
+  meta?: string;
+}
+
+export interface CreateCommentResponse {
+  id: CommentId;
+  created_at: string;
+  subject_count: number;
+}
+
 export interface GetCommentListPayload {
   target_type: string;
   target_id: string;
@@ -42,6 +57,21 @@ export interface GetCommentListResponse {
   comment: CommentItem[];
   subject: CommentSubject;
 }
+
+export const createComment = (
+  token: string,
+  payload: CreateCommentPayload,
+): Promise<CreateCommentResponse> =>
+  request<CreateCommentResponse>(COMMENT_API_PATHS.create, {
+    method: "POST",
+    headers: withBearerAuthorization(token),
+    body: JSON.stringify({
+      ...payload,
+      root_id: payload.root_id ?? 0,
+      parent_id: payload.parent_id ?? 0,
+      meta: payload.meta ?? "",
+    }),
+  });
 
 export const getCommentList = (
   token: string,

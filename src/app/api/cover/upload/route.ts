@@ -19,14 +19,14 @@ export async function POST(request: NextRequest): Promise<Response> {
   try {
     const authorization = resolveAuthorizationHeader(request);
     if (!authorization) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ success: false, error: "未授权访问" }, { status: 401 });
     }
 
     const formData = await request.formData();
     const image = formData.get("image");
     if (!(image instanceof File)) {
       return NextResponse.json(
-        { success: false, error: "Cover image is required" },
+        { success: false, error: "缺少封面图片" },
         { status: 400 },
       );
     }
@@ -53,6 +53,6 @@ export async function POST(request: NextRequest): Promise<Response> {
     });
   } catch (error) {
     console.error("Failed to upload cover:", error);
-    return NextResponse.json({ success: false, error: "Failed to upload cover" }, { status: 502 });
+    return NextResponse.json({ success: false, error: "封面上传失败" }, { status: 502 });
   }
 }

@@ -1,9 +1,9 @@
 import { ARTICLE_API_PATHS, COVER_API_PATHS } from "@/constants/api-paths";
 import { extractUploadError, extractUploadUrl } from "@/lib/upload-response";
-import { request, withBearerAuthorization } from "@/services/request";
+import { type ApiResponse, request, withBearerAuthorization } from "@/services/request";
 
 export const MAX_COVER_UPLOAD_SIZE_BYTES = 900 * 1024;
-export const MAX_COVER_UPLOAD_SIZE_LABEL = "900KB";
+export const MAX_COVER_UPLOAD_SIZE_LABEL = "900 千字节";
 
 export interface ArticlePayload {
   title?: string;
@@ -51,11 +51,19 @@ export interface ArticleItem {
   content?: string;
   cover_image_url?: string;
   cover?: string;
+  status?: number;
   like_count?: number;
   likes?: number;
-  create_time?: string;
+  view_count?: number;
+  comment_count?: number;
+  share_count?: number;
+  create_time?: string | number;
+  update_time?: string | number;
   created_at?: string;
   published_at?: string;
+  manual_type_tag?: string;
+  secondary_tags?: string[];
+  ext_info?: Record<string, string>;
   [key: string]: unknown;
 }
 
@@ -64,11 +72,19 @@ export interface ArticleResponse {
   [key: string]: unknown;
 }
 
+export interface CreateArticleResponse {
+  article_id?: string;
+  [key: string]: unknown;
+}
+
 export interface ArticleListResponse {
   list?: ArticleItem[];
   articles?: ArticleItem[];
   items?: ArticleItem[];
   records?: ArticleItem[];
+  total?: number;
+  page?: number;
+  page_size?: number;
   [key: string]: unknown;
 }
 
@@ -81,7 +97,6 @@ const appendQueryParams = (
   }
 
   const searchParams = new URLSearchParams();
-
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined) {
       continue;
@@ -93,15 +108,20 @@ const appendQueryParams = (
   return query ? `${path}?${query}` : path;
 };
 
-export const uploadArticleCover = async (token: string, file: File): Promise<string> => {
-  if (file.size > MAX_COVER_UPLOAD_SIZE_BYTES) {
-    throw new Error(`封面文件过大，请上传不超过 ${MAX_COVER_UPLOAD_SIZE_LABEL} 的图片`);
+const uploadArticleAsset = async (
+  endpoint: string,
+  token: string,
+  file: File,
+  maxBytes?: number,
+): Promise<string> => {
+  if (typeof maxBytes === "number" && file.size > maxBytes) {
+    throw new Error(`图片过大，请上传小于 ${MAX_COVER_UPLOAD_SIZE_LABEL} 的文件。`);
   }
 
   const formData = new FormData();
   formData.append("image", file);
 
-  const response = await fetch(COVER_API_PATHS.upload, {
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: withBearerAuthorization(token),
     body: formData,
@@ -115,25 +135,32 @@ export const uploadArticleCover = async (token: string, file: File): Promise<str
   }
 
   if (!response.ok) {
-    throw new Error(extractUploadError(payload) ?? "封面上传失败，请重试");
+    throw new Error(extractUploadError(payload) ?? "图片上传失败，请稍后重试。");
   }
 
   const uploadedUrl = extractUploadUrl(payload);
   if (!uploadedUrl) {
-    throw new Error("封面上传成功，但未返回有效地址");
+    throw new Error("图片上传成功，但未返回有效地址。");
   }
 
   return uploadedUrl;
 };
 
+export const uploadArticleCover = async (token: string, file: File): Promise<string> =>
+  uploadArticleAsset(COVER_API_PATHS.upload, token, file, MAX_COVER_UPLOAD_SIZE_BYTES);
+
+export const uploadArticleInlineImage = async (token: string, file: File): Promise<string> =>
+  uploadArticleAsset(ARTICLE_API_PATHS.upload, token, file);
+
 export const createArticle = (
   token: string,
   payload: CreateArticlePayload,
-): Promise<ArticleResponse> =>
-  request<ArticleResponse>(ARTICLE_API_PATHS.create, {
+): Promise<ApiResponse<CreateArticleResponse | null>> =>
+  request<ApiResponse<CreateArticleResponse | null>>(ARTICLE_API_PATHS.create, {
     method: "POST",
     headers: withBearerAuthorization(token),
     body: JSON.stringify(payload),
+    responseMode: "raw",
   });
 
 export const getArticle = (id: string, options?: GetArticleOptions): Promise<ArticleResponse> =>

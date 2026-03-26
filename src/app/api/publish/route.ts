@@ -16,14 +16,14 @@ export async function POST(request: NextRequest) {
 
     if (typeof title !== "string" || !title.trim()) {
       return NextResponse.json(
-        { success: false, error: "Article title is required" },
+        { success: false, error: "文章标题不能为空" },
         { status: 400 },
       );
     }
 
     if (typeof content !== "string" || !content.trim()) {
       return NextResponse.json(
-        { success: false, error: "Article content is required" },
+        { success: false, error: "文章内容不能为空" },
         { status: 400 },
       );
     }
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     if (!finalCover) {
       const authorization = resolveAuthorizationHeader(request);
       if (!authorization) {
-        return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+        return NextResponse.json({ success: false, error: "未授权访问" }, { status: 401 });
       }
 
       const generatedResult = await generateCoverAssetFromContent({
@@ -69,6 +69,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Failed to save markdown file:", error);
-    return NextResponse.json({ success: false, error: "Failed to save file" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "保存文件失败" }, { status: 500 });
   }
 }

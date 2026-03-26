@@ -1,9 +1,7 @@
 "use client";
 
-// 内容发布页，统一使用 shadcn 表单与按钮组件。
-import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useState } from "react";
 
 import { Layout } from "@/components/layout/layout";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -14,6 +12,10 @@ import { createArticle, MAX_COVER_UPLOAD_SIZE_LABEL, uploadArticleCover } from "
 import { getAuthToken } from "@/services/auth";
 
 import MarkdownEditor from "./_components/MarkdownEditor";
+import SecondaryTagsInput from "./_components/SecondaryTagsInput";
+
+const COVER_GENERATION_HINT =
+  "根据标题和正文内容自动生成封面；如果没有手动上传封面，发布前也会自动尝试生成。";
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" ? (value as Record<string, unknown>) : null;
@@ -22,6 +24,14 @@ const extractCreatedArticleId = (payload: unknown): string | null => {
   const record = asRecord(payload);
   if (!record) {
     return null;
+  }
+
+  const dataRecord = asRecord(record.data);
+  if (dataRecord) {
+    const dataId = dataRecord.id ?? dataRecord.article_id;
+    if (dataId !== undefined && dataId !== null && String(dataId).trim()) {
+      return String(dataId).trim();
+    }
   }
 
   const directId = record.id ?? record.article_id;
@@ -44,17 +54,22 @@ const extractCreatedArticleId = (payload: unknown): string | null => {
 
 export default function PostPage() {
   const router = useRouter();
-  const coverUploadInputRef = useRef<HTMLInputElement | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [brief, setBrief] = useState("");
-  const [manualTypeTag, setManualTypeTag] = useState("");
+  const [secondaryTags, setSecondaryTags] = useState<string[]>([]);
   const [content, setContent] = useState("");
   const [cover, setCover] = useState<string | null>(null);
+  const [isCoverPreviewFailed, setIsCoverPreviewFailed] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isGeneratingCover, setIsGeneratingCover] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const setCoverWithPreviewReset = (nextCover: string | null) => {
+    setCover(nextCover);
+    setIsCoverPreviewFailed(false);
+  };
 
   useEffect(() => {
     const currentToken = getAuthToken();
@@ -65,7 +80,7 @@ export default function PostPage() {
     setToken(currentToken);
   }, [router]);
 
-  const handleUploadCover = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUploadCover = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
       return;
@@ -79,11 +94,10 @@ export default function PostPage() {
 
       setIsUploadingCover(true);
       const uploadedCover = await uploadArticleCover(token, file);
-      setCover(uploadedCover);
+      setCoverWithPreviewReset(uploadedCover);
       setErrorMessage(null);
     } catch (error) {
-      console.error(error);
-      setErrorMessage(error instanceof Error ? error.message : "封面上传失败，请重试");
+      setErrorMessage(error instanceof Error ? error.message : "封面上传失败，请稍后重试。");
     } finally {
       setIsUploadingCover(false);
       event.target.value = "";
@@ -92,7 +106,7 @@ export default function PostPage() {
 
   const handleGenerateCover = async () => {
     if (!content.trim()) {
-      setErrorMessage("请先输入文章内容，再生成封面");
+      setErrorMessage("请先输入文章正文，再生成封面。");
       return null;
     }
     if (!token) {
@@ -112,21 +126,23 @@ export default function PostPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Generate cover failed");
+        const responseText = await response.text();
+        throw new Error(responseText || "封面生成失败。");
       }
 
       const data = (await response.json()) as { cover?: unknown };
       if (typeof data.cover !== "string" || !data.cover.trim()) {
-        throw new Error("Generate cover succeeded but cover url is invalid");
+        throw new Error("封面生成成功，但返回的地址无效。");
       }
 
       const generatedCover = data.cover.trim();
-      setCover(generatedCover);
+      setCoverWithPreviewReset(generatedCover);
       setErrorMessage(null);
       return generatedCover;
     } catch (error) {
-      console.error(error);
-      setErrorMessage("AI 封面生成失败，请手动上传封面后重试");
+      setErrorMessage(
+        error instanceof Error ? error.message : "智能封面生成失败，请手动上传封面。",
+      );
       return null;
     } finally {
       setIsGeneratingCover(false);
@@ -143,12 +159,11 @@ export default function PostPage() {
       setErrorMessage(null);
 
       if (!title.trim()) {
-        setErrorMessage("文章标题不能为空");
+        setErrorMessage("标题不能为空。");
         return;
       }
-
       if (!content.trim()) {
-        setErrorMessage("文章内容不能为空");
+        setErrorMessage("正文内容不能为空。");
         return;
       }
 
@@ -158,9 +173,8 @@ export default function PostPage() {
       if (!finalCover) {
         finalCover = await handleGenerateCover();
       }
-
       if (!finalCover) {
-        setErrorMessage("发布前必须有封面，请上传或重试 AI 生成");
+        setErrorMessage("发布前必须提供封面。");
         return;
       }
 
@@ -169,19 +183,18 @@ export default function PostPage() {
         brief: brief.trim() || undefined,
         content: content.trim(),
         cover_image_url: finalCover,
-        manual_type_tag: manualTypeTag.trim() || undefined,
+        secondary_tags: secondaryTags,
       });
 
       const createdId = extractCreatedArticleId(result);
-      if (createdId) {
+      if ((result.code === 200 || result.code === 1003) && createdId) {
         router.push(`/article/${encodeURIComponent(createdId)}`);
         return;
       }
 
-      router.push("/dashboard/recommend");
+      throw new Error(result.msg || "发布失败，请稍后重试。");
     } catch (error) {
-      console.error(error);
-      setErrorMessage(error instanceof Error ? error.message : "发布失败，请重试");
+      setErrorMessage(error instanceof Error ? error.message : "发布失败，请稍后重试。");
     } finally {
       setIsPublishing(false);
     }
@@ -192,7 +205,7 @@ export default function PostPage() {
       <PageContainer className="bg-background flex min-h-[calc(100vh-9rem)] flex-col py-6">
         <div className="flex items-center justify-between py-8">
           <h1 className="text-primary text-center text-3xl font-extrabold tracking-tight">
-            编辑内容
+            发布文章
           </h1>
           <Button
             onClick={handlePublish}
@@ -201,12 +214,12 @@ export default function PostPage() {
             {isPublishing ? "发布中..." : "发布"}
           </Button>
         </div>
-        <div className="mb-4 rounded-md border p-4">
-          {errorMessage && <p className="text-destructive mb-3 text-sm">{errorMessage}</p>}
-          <div className="mb-3">
-            <Label htmlFor="post-title" className="mb-2">
-              文章标题（必填）
-            </Label>
+
+        <div className="mb-4 space-y-4 rounded-md border p-4">
+          {errorMessage && <p className="text-destructive text-sm">{errorMessage}</p>}
+
+          <div className="space-y-2">
+            <Label htmlFor="post-title">标题</Label>
             <Input
               id="post-title"
               type="text"
@@ -217,71 +230,99 @@ export default function PostPage() {
               disabled={isPublishing || isUploadingCover || isGeneratingCover}
             />
           </div>
-          <div className="mb-3">
-            <Label htmlFor="post-brief" className="mb-2">
-              文章摘要（可选）
-            </Label>
+
+          <div className="space-y-2">
+            <Label htmlFor="post-brief">摘要</Label>
             <Input
               id="post-brief"
               type="text"
-              placeholder="请输入摘要"
+              placeholder="请输入文章摘要"
               value={brief}
               onChange={(event) => setBrief(event.target.value)}
               maxLength={200}
               disabled={isPublishing || isUploadingCover || isGeneratingCover}
             />
           </div>
-          <div className="mb-3">
-            <Label htmlFor="post-tag" className="mb-2">
-              分类标签（可选）
-            </Label>
-            <Input
-              id="post-tag"
-              type="text"
-              placeholder="如：travel"
-              value={manualTypeTag}
-              onChange={(event) => setManualTypeTag(event.target.value)}
-              maxLength={40}
-              disabled={isPublishing || isUploadingCover || isGeneratingCover}
-            />
-          </div>
-          <div className="mb-3 flex items-center justify-between gap-4">
-            <div className="w-full">
-              <Label htmlFor="cover-upload" className="mb-2">
-                文章封面（必填）
-              </Label>
+
+          <SecondaryTagsInput
+            tags={secondaryTags}
+            onChange={setSecondaryTags}
+            disabled={isPublishing || isUploadingCover || isGeneratingCover}
+          />
+
+          <div className="flex items-start justify-between gap-4">
+            <div className="w-full space-y-2">
+              <Label htmlFor="cover-upload">封面图片</Label>
               <Input
                 id="cover-upload"
-                ref={coverUploadInputRef}
                 type="file"
                 accept="image/*"
                 onChange={handleUploadCover}
                 disabled={isUploadingCover || isGeneratingCover || isPublishing}
               />
-              <p className="text-muted-foreground mt-1 text-xs">
-                上传图片大小需不超过 {MAX_COVER_UPLOAD_SIZE_LABEL}
+              <p className="text-muted-foreground text-xs">
+                最大上传大小：{MAX_COVER_UPLOAD_SIZE_LABEL}
               </p>
             </div>
-            <Button
-              variant="outline"
-              onClick={handleGenerateCover}
-              disabled={isUploadingCover || isGeneratingCover || isPublishing}
-            >
-              {isGeneratingCover ? "AI 生成中..." : "AI 生成封面"}
-            </Button>
+            <div className="group relative shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => void handleGenerateCover()}
+                disabled={isUploadingCover || isGeneratingCover || isPublishing}
+                aria-describedby="cover-generate-tooltip"
+              >
+                {isGeneratingCover ? "生成中..." : "智能生成封面"}
+              </Button>
+              <div
+                id="cover-generate-tooltip"
+                role="tooltip"
+                className="bg-background/95 text-muted-foreground pointer-events-none absolute top-full right-0 z-20 mt-2 hidden w-72 rounded-lg border p-3 text-xs leading-5 shadow-lg backdrop-blur-sm group-focus-within:block group-hover:block"
+              >
+                {COVER_GENERATION_HINT}
+              </div>
+            </div>
           </div>
+
           {isUploadingCover && <p className="text-muted-foreground text-sm">封面上传中...</p>}
+
           {!isUploadingCover && !cover && (
-            <p className="text-muted-foreground text-sm">未上传封面时，发布会自动触发 AI 生成。</p>
+            <p className="text-muted-foreground text-sm">
+              如果你没有上传封面，系统会在发布时尝试自动生成。
+            </p>
           )}
+
           {cover && (
-            <div className="relative mt-2 h-48 w-full overflow-hidden rounded-md border">
-              <Image src={cover} alt="cover preview" fill className="object-cover" />
+            <div className="mt-2 space-y-2">
+              <div className="overflow-hidden rounded-md border">
+                {isCoverPreviewFailed ? (
+                  <div className="flex h-48 items-center justify-center bg-slate-50 px-4 text-center text-sm text-amber-700">
+                    当前封面地址暂时无法预览，请重新上传封面，或稍后再试。
+                  </div>
+                ) : (
+                  <img
+                    src={cover}
+                    alt="封面预览"
+                    className="h-48 w-full object-cover"
+                    onError={() => setIsCoverPreviewFailed(true)}
+                  />
+                )}
+              </div>
+              {isCoverPreviewFailed && (
+                <p className="text-sm text-amber-700">
+                  封面地址已保留，但浏览器当前无法加载这张图片。
+                </p>
+              )}
             </div>
           )}
         </div>
+
         <div className="min-h-0 flex-1 pb-8">
-          <MarkdownEditor value={content} onChange={setContent} />
+          <MarkdownEditor
+            value={content}
+            onChange={setContent}
+            token={token}
+            onUploadError={setErrorMessage}
+          />
         </div>
       </PageContainer>
     </Layout>

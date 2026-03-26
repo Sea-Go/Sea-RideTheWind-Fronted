@@ -21,7 +21,7 @@ export const resolveAuthorizationHeader = (request: NextRequest): string | null 
 export const getRequiredArticleServerUrl = (): string => {
   const value = process.env.ARTICLE_API_SERVER_URL?.trim();
   if (!value) {
-    throw new Error("Missing required environment variable: ARTICLE_API_SERVER_URL");
+    throw new Error("缺少必要环境变量：ARTICLE_API_SERVER_URL");
   }
 
   return value.replace(/\/+$/, "");

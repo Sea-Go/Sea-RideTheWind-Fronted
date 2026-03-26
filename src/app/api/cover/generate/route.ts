@@ -12,14 +12,14 @@ export async function POST(request: NextRequest) {
 
     if (typeof content !== "string" || !content.trim()) {
       return NextResponse.json(
-        { success: false, error: "Article content is required" },
+        { success: false, error: "文章内容不能为空" },
         { status: 400 },
       );
     }
 
     const authorization = resolveAuthorizationHeader(request);
     if (!authorization) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ success: false, error: "未授权访问" }, { status: 401 });
     }
 
     const result = await generateCoverAssetFromContent({
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Failed to generate AI cover:", error);
     return NextResponse.json(
-      { success: false, error: "Failed to generate AI cover" },
+      { success: false, error: "智能封面生成失败" },
       { status: 500 },
     );
   }
