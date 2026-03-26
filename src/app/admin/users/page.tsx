@@ -186,7 +186,7 @@ export default function AdminUsersPage() {
                 {items.map((item) => (
                   <div key={String(item.uid)} className="space-y-2 rounded-lg border p-4">
                     <p className="text-sm">
-                      UID：<span className="font-mono">{item.uid}</span>
+                      用户编号：<span className="font-mono">{item.uid}</span>
                     </p>
                     <p className="text-sm">用户名：{item.username || "--"}</p>
                     <p className="text-sm">邮箱：{item.email || "--"}</p>

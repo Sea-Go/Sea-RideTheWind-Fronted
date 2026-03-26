@@ -225,7 +225,7 @@ export default function AdminUserDetailPage() {
             {user && (
               <>
                 <div className="grid gap-2">
-                  <Label htmlFor="admin-user-uid">UID</Label>
+                  <Label htmlFor="admin-user-uid">用户编号</Label>
                   <Input id="admin-user-uid" value={uid} readOnly />
                 </div>
                 <div className="grid gap-2">

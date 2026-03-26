@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
@@ -94,6 +95,12 @@ function AdminLoginContent() {
             <Button type="submit" disabled={isLoading}>
               {isLoading ? "登录中..." : "进入管理后台"}
             </Button>
+            <p className="text-muted-foreground text-center text-sm">
+              还没有管理员账号？
+              <Link href="/admin/register" className="text-primary ml-1 font-medium hover:underline">
+                去注册
+              </Link>
+            </p>
           </form>
         </CardContent>
       </Card>

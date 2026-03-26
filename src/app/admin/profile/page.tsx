@@ -39,6 +39,7 @@ export default function AdminProfilePage() {
   const [newAdminEmail, setNewAdminEmail] = useState("");
   const [newAdminPassword, setNewAdminPassword] = useState("");
   const [newAdminPosition, setNewAdminPosition] = useState("");
+  const [newAdminInviteCode, setNewAdminInviteCode] = useState("");
 
   useEffect(() => {
     const currentToken = getAdminAuthToken();
@@ -111,6 +112,11 @@ export default function AdminProfilePage() {
       return;
     }
 
+    if (!newAdminInviteCode.trim()) {
+      setErrorMessage("请输入管理员邀请码");
+      return;
+    }
+
     setIsCreating(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -119,12 +125,14 @@ export default function AdminProfilePage() {
         username: newAdminUsername.trim(),
         password: newAdminPassword.trim(),
         email: newAdminEmail.trim() || undefined,
+        invite_code: newAdminInviteCode.trim(),
         extra_info: newAdminPosition.trim() ? { position: newAdminPosition.trim() } : undefined,
       });
       setNewAdminUsername("");
       setNewAdminPassword("");
       setNewAdminEmail("");
       setNewAdminPosition("");
+      setNewAdminInviteCode("");
       setSuccessMessage("已创建新管理员");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "创建管理员失败");
@@ -178,7 +186,7 @@ export default function AdminProfilePage() {
               <h2 className="text-xl font-semibold">管理员信息</h2>
               {admin && (
                 <p className="text-muted-foreground text-xs">
-                  UID：<span className="font-mono">{admin.uid}</span>
+                  用户编号：<span className="font-mono">{admin.uid}</span>
                 </p>
               )}
               <div className="grid gap-2">
@@ -235,6 +243,13 @@ export default function AdminProfilePage() {
 
             <section className="space-y-4 rounded-xl border p-6">
               <h2 className="text-xl font-semibold">创建管理员</h2>
+              <p className="text-muted-foreground text-sm">
+                也可以使用独立的
+                <Link href="/admin/register" className="text-primary ml-1 hover:underline">
+                  管理员账号页面
+                </Link>
+                进行注册。
+              </p>
               <div className="grid gap-2">
                 <Label htmlFor="admin-create-username">账号</Label>
                 <Input
@@ -267,6 +282,15 @@ export default function AdminProfilePage() {
                   id="admin-create-position"
                   value={newAdminPosition}
                   onChange={(event) => setNewAdminPosition(event.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="admin-create-invite-code">邀请码</Label>
+                <Input
+                  id="admin-create-invite-code"
+                  value={newAdminInviteCode}
+                  onChange={(event) => setNewAdminInviteCode(event.target.value)}
+                  placeholder="请输入固定邀请码"
                 />
               </div>
               <Button onClick={handleCreateAdmin} disabled={isCreating || isSaving || isLoggingOut}>

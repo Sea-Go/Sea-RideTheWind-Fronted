@@ -90,19 +90,25 @@ export default function AdminHomePage() {
               <section className="space-y-2 rounded-xl border p-6">
                 <h2 className="text-xl font-semibold">管理员信息</h2>
                 <p className="text-sm">
-                  UID：<span className="font-mono">{admin.uid}</span>
+                  用户编号：<span className="font-mono">{admin.uid}</span>
                 </p>
                 <p className="text-sm">用户名：{admin.username}</p>
                 <p className="text-sm">邮箱：{admin.email || "--"}</p>
               </section>
             )}
 
-            <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
               <Button asChild variant="outline">
                 <Link href="/admin/users">用户管理</Link>
               </Button>
               <Button asChild variant="outline">
                 <Link href="/admin/profile">管理员资料</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/admin/register">管理员账号</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/admin/messages">消息中心</Link>
               </Button>
               <Button variant="destructive" onClick={handleLogout} disabled={isLoggingOut}>
                 {isLoggingOut ? "退出中..." : "退出登录"}

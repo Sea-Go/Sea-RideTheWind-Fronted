@@ -25,6 +25,7 @@ export interface AdminCreatePayload {
   username: string;
   password: string;
   email?: string;
+  invite_code: string;
   extra_info?: AdminExtraInfo;
 }
 
