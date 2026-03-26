@@ -121,7 +121,7 @@ export function AppPromptProvider({ children }: { children: React.ReactNode }) {
 export function useAppPrompt() {
   const context = useContext(PromptContext);
   if (!context) {
-    throw new Error("useAppPrompt must be used within AppPromptProvider");
+  throw new Error("useAppPrompt 必须在 AppPromptProvider 内部使用");
   }
   return context;
 }

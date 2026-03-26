@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useAppPrompt } from "@/components/common/AppPromptProvider";
 import { Layout } from "@/components/layout/layout";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { ProfileThemeShell } from "@/components/profile/ProfileThemeShell";
 import { Button } from "@/components/ui/button";
 import { clearAuthToken, deleteCurrentUser, getAuthToken, logoutUser } from "@/services/auth";
 
@@ -88,46 +89,48 @@ export default function ProfileSecurityPage() {
 
   return (
     <Layout>
-      <PageContainer className="space-y-6 py-8">
-        <header className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">安全设置</h1>
-          <p className="text-muted-foreground text-sm">管理账号退出与注销等高风险操作。</p>
-          <div>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/profile">返回个人中心</Link>
-            </Button>
-          </div>
-        </header>
-
-        {isLoading ? (
-          <p className="text-muted-foreground">加载中...</p>
-        ) : (
-          <section className="space-y-4 rounded-xl border p-6">
-            <p className="text-muted-foreground text-sm">
-              提示：注销账号后将无法恢复，请谨慎操作。
-            </p>
-
-            {errorMessage && <p className="text-destructive text-sm">{errorMessage}</p>}
-            {successMessage && <p className="text-primary text-sm">{successMessage}</p>}
-
-            <div className="flex flex-wrap gap-3">
-              <Button
-                variant="outline"
-                onClick={handleLogout}
-                disabled={isLoggingOut || isDeleting}
-              >
-                {isLoggingOut ? "退出中..." : "退出登录"}
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDeleteAccount}
-                disabled={isDeleting || isLoggingOut}
-              >
-                {isDeleting ? "注销中..." : "注销账号"}
+      <PageContainer className="py-8">
+        <ProfileThemeShell className="space-y-6">
+          <header className="space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight">安全设置</h1>
+            <p className="text-muted-foreground text-sm">管理账号退出与注销等高风险操作。</p>
+            <div>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/profile">返回个人中心</Link>
               </Button>
             </div>
-          </section>
-        )}
+          </header>
+
+          {isLoading ? (
+            <p className="text-muted-foreground">加载中...</p>
+          ) : (
+            <section className="space-y-4 rounded-xl border p-6">
+              <p className="text-muted-foreground text-sm">
+                提示：注销账号后将无法恢复，请谨慎操作。
+              </p>
+
+              {errorMessage && <p className="text-destructive text-sm">{errorMessage}</p>}
+              {successMessage && <p className="text-primary text-sm">{successMessage}</p>}
+
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  variant="outline"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut || isDeleting}
+                >
+                  {isLoggingOut ? "退出中..." : "退出登录"}
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteAccount}
+                  disabled={isDeleting || isLoggingOut}
+                >
+                  {isDeleting ? "注销中..." : "注销账号"}
+                </Button>
+              </div>
+            </section>
+          )}
+        </ProfileThemeShell>
       </PageContainer>
     </Layout>
   );

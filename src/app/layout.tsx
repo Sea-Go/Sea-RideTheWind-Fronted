@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sea TryGo",
-  description: "我喜欢你",
+  title: "识海社区",
+  description: "识海社区中文内容平台",
 };
 
 export default function RootLayout({

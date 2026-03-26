@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { Layout } from "@/components/layout/layout";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { ProfileThemeShell } from "@/components/profile/ProfileThemeShell";
 import { Button } from "@/components/ui/button";
 import { getAuthToken } from "@/services/auth";
 import { getUserLikeList, getUserTotalLike, type UserLikeItem } from "@/services/like";
@@ -101,63 +102,65 @@ export default function ProfileLikesPage() {
 
   return (
     <Layout>
-      <PageContainer className="space-y-6 py-8">
-        <header className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">我的点赞</h1>
-          <p className="text-muted-foreground text-sm">查看我点过赞的内容与累计获赞统计。</p>
-          <div>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/profile">返回个人中心</Link>
-            </Button>
-          </div>
-        </header>
+      <PageContainer className="py-8">
+        <ProfileThemeShell className="space-y-6">
+          <header className="space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight">我的点赞</h1>
+            <p className="text-muted-foreground text-sm">查看我点过赞的内容与累计获赞统计。</p>
+            <div>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/profile">返回个人中心</Link>
+              </Button>
+            </div>
+          </header>
 
-        {isLoading ? (
-          <p className="text-muted-foreground">加载中...</p>
-        ) : (
-          <>
-            <section className="rounded-xl border p-6">
-              <p className="text-muted-foreground text-sm">累计获赞</p>
-              <p className="mt-2 text-4xl font-bold">{totalLikeCount}</p>
-            </section>
+          {isLoading ? (
+            <p className="text-muted-foreground">加载中...</p>
+          ) : (
+            <>
+              <section className="rounded-xl border p-6">
+                <p className="text-muted-foreground text-sm">累计获赞</p>
+                <p className="mt-2 text-4xl font-bold">{totalLikeCount}</p>
+              </section>
 
-            <section className="space-y-4 rounded-xl border p-6">
-              <h2 className="text-xl font-semibold">点赞记录</h2>
-              {errorMessage && <p className="text-destructive text-sm">{errorMessage}</p>}
+              <section className="space-y-4 rounded-xl border p-6">
+                <h2 className="text-xl font-semibold">点赞记录</h2>
+                {errorMessage && <p className="text-destructive text-sm">{errorMessage}</p>}
 
-              {!errorMessage && items.length === 0 && (
-                <p className="text-muted-foreground text-sm">暂无点赞记录</p>
-              )}
+                {!errorMessage && items.length === 0 && (
+                  <p className="text-muted-foreground text-sm">暂无点赞记录</p>
+                )}
 
-              {items.length > 0 && (
-                <div className="space-y-3">
-                  {items.map((item, index) => (
-                    <div
-                      key={`${item.target_id}-${item.timestamp}-${index}`}
-                      className="rounded-lg border p-4"
-                    >
-                      <p className="text-sm">
-                        目标类型：<span className="font-medium">{item.target_type}</span>
-                      </p>
-                      <p className="text-sm">
-                        目标 ID：<span className="font-mono">{item.target_id}</span>
-                      </p>
-                      <p className="text-muted-foreground mt-1 text-xs">
-                        点赞时间：{formatTimestamp(item.timestamp)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
+                {items.length > 0 && (
+                  <div className="space-y-3">
+                    {items.map((item, index) => (
+                      <div
+                        key={`${item.target_id}-${item.timestamp}-${index}`}
+                        className="rounded-lg border p-4"
+                      >
+                        <p className="text-sm">
+                          目标类型：<span className="font-medium">{item.target_type}</span>
+                        </p>
+                        <p className="text-sm">
+                          目标编号：<span className="font-mono">{item.target_id}</span>
+                        </p>
+                        <p className="text-muted-foreground mt-1 text-xs">
+                          点赞时间：{formatTimestamp(item.timestamp)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-              {!isEnd && items.length > 0 && (
-                <Button variant="secondary" onClick={handleLoadMore} disabled={isLoadingMore}>
-                  {isLoadingMore ? "加载中..." : "加载更多"}
-                </Button>
-              )}
-            </section>
-          </>
-        )}
+                {!isEnd && items.length > 0 && (
+                  <Button variant="secondary" onClick={handleLoadMore} disabled={isLoadingMore}>
+                    {isLoadingMore ? "加载中..." : "加载更多"}
+                  </Button>
+                )}
+              </section>
+            </>
+          )}
+        </ProfileThemeShell>
       </PageContainer>
     </Layout>
   );
