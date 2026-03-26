@@ -22,8 +22,8 @@ const buildUpstreamPath = (path: string[]): string | null => {
 const proxyRequest = createProxyHandler({
   envVarName: "RECO_API_SERVER_URL",
   proxyName: "reco-proxy",
-  unavailableMessage: "Reco service unavailable",
-  notFoundMessage: "Reco route not found",
+  unavailableMessage: "推荐服务暂时不可用",
+  notFoundMessage: "推荐服务路由不存在",
   resolveUpstreamPath: buildUpstreamPath,
 });
 

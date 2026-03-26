@@ -1,18 +1,20 @@
-# API 服务 (Services)
+# API 链接层
 
-这里存放与后端交互的代码，通常是对 fetch 或 axios 的封装以及具体的 API 调用函数。
+这里存放前端和后端交互的服务封装，通常是对 `fetch`
+的二次包装，以及业务接口调用函数。
 
-## 结构建议
+## 建议结构
 
-建议按业务模块划分文件。
+按业务模块拆分文件，避免把所有接口都堆在一个文件里。
 
-## 示例
+## 当前服务
 
-- `auth.ts` (登录、注册接口)
-- `admin.ts` (管理员相关接口)
-- `article.ts` (文章相关接口)
-- `comment.ts` (评论相关接口)
-- `like.ts` (点赞相关接口)
-- `task.ts` (任务相关接口)
-- `reco.ts` (推荐服务接口：recommend/ingest/tools/health)
-- `request.ts` (基础请求封装)
+- `auth.ts`
+- `admin.ts`
+- `article.ts`
+- `comment.ts`
+- `like.ts`
+- `follow.ts`
+- `task.ts`
+- `reco.ts`
+- `request.ts`

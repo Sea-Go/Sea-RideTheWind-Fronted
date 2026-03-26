@@ -7,7 +7,7 @@ const ADMIN_CENTER_V1_PREFIX = "/admincenter/v1";
 const proxyRequest = createProxyHandler({
   envVarName: "ADMIN_CENTER_API_SERVER_URL",
   proxyName: "admincenter-proxy",
-  unavailableMessage: "Admin service unavailable",
+  unavailableMessage: "管理服务暂时不可用",
   resolveUpstreamPath: (path) => {
     if (path.length === 0) {
       return ADMIN_CENTER_V1_PREFIX;

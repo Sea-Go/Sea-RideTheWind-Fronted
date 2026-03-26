@@ -7,7 +7,7 @@ const USER_CENTER_V1_PREFIX = "/usercenter/v1";
 const proxyRequest = createProxyHandler({
   envVarName: "USER_CENTER_API_SERVER_URL",
   proxyName: "usercenter-proxy",
-  unavailableMessage: "User center service unavailable",
+  unavailableMessage: "用户中心服务暂时不可用",
   resolveUpstreamPath: (path) => {
     if (path.length === 0) {
       return USER_CENTER_V1_PREFIX;

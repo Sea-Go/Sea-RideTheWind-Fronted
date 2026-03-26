@@ -5,7 +5,7 @@ import { createProxyHandler, type ProxyRouteContext } from "@/app/api/_shared/pr
 const proxyRequest = createProxyHandler({
   envVarName: "ARTICLE_API_SERVER_URL",
   proxyName: "article-proxy",
-  unavailableMessage: "Article service unavailable",
+  unavailableMessage: "文章服务暂时不可用",
   resolveUpstreamPath: (path) => {
     if (path.length === 0) {
       return null;

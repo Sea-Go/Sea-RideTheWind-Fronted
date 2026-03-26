@@ -7,7 +7,7 @@ const COMMENT_V1_PREFIX = "/comment/v1";
 const proxyRequest = createProxyHandler({
   envVarName: "COMMENT_API_SERVER_URL",
   proxyName: "comment-proxy",
-  unavailableMessage: "Comment service unavailable",
+  unavailableMessage: "评论服务暂时不可用",
   resolveUpstreamPath: (path) => {
     if (path.length === 0) {
       return null;

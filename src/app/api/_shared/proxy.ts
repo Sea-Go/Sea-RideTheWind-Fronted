@@ -22,7 +22,7 @@ interface CreateProxyHandlerOptions {
 const getRequiredServerUrl = (envVarName: string, proxyName: string): string => {
   const value = process.env[envVarName]?.trim();
   if (!value) {
-    throw new Error(`[${proxyName}] Missing required environment variable: ${envVarName}`);
+    throw new Error(`[${proxyName}] 缺少必要环境变量：${envVarName}`);
   }
   return value.replace(/\/+$/, "");
 };
@@ -60,7 +60,7 @@ export const createProxyHandler = (
 
     if (!upstreamPath) {
       return NextResponse.json(
-        { code: 404, msg: options.notFoundMessage ?? "Route not found", data: null },
+        { code: 404, msg: options.notFoundMessage ?? "请求路径不存在", data: null },
         { status: 404 },
       );
     }

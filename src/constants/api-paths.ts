@@ -51,6 +51,7 @@ export const COVER_API_PATHS = {
 const COMMENT_BFF_PREFIX = "/api/comment";
 
 export const COMMENT_API_PATHS = {
+  create: `${COMMENT_BFF_PREFIX}/v1/comment/create`,
   list: `${COMMENT_BFF_PREFIX}/v1/comment/list`,
 } as const;
 
@@ -64,6 +65,58 @@ export const LIKE_API_PATHS = {
   getUserLikeList: `${LIKE_BFF_PREFIX}/v1/getuserlikelist`,
   getLikeCount: `${LIKE_BFF_PREFIX}/v1/getlikecount`,
   getLikeState: `${LIKE_BFF_PREFIX}/v1/getlikestate`,
+} as const;
+
+// ─── 关注服务（通过 BFF: /api/follow/*）────────────────────────────────────
+const FOLLOW_BFF_PREFIX = "/api/follow";
+
+export const FOLLOW_API_PATHS = {
+  follow: `${FOLLOW_BFF_PREFIX}/v1/follow`,
+  unfollow: `${FOLLOW_BFF_PREFIX}/v1/unfollow`,
+  block: `${FOLLOW_BFF_PREFIX}/v1/block`,
+  unblock: `${FOLLOW_BFF_PREFIX}/v1/unblock`,
+  getFollowList: `${FOLLOW_BFF_PREFIX}/v1/follow/list`,
+  getBlockList: `${FOLLOW_BFF_PREFIX}/v1/block/list`,
+  getFollowerList: `${FOLLOW_BFF_PREFIX}/v1/follower/list`,
+  getRecommendations: `${FOLLOW_BFF_PREFIX}/v1/recommendations`,
+} as const;
+
+const FAVORITE_BFF_PREFIX = "/api/favorite";
+const FAVORITE_V1_PREFIX = `${FAVORITE_BFF_PREFIX}/v1`;
+
+export const FAVORITE_API_PATHS = {
+  createFolder: `${FAVORITE_V1_PREFIX}/folder/create`,
+  deleteFolder: `${FAVORITE_V1_PREFIX}/folder/delete`,
+  listFolders: `${FAVORITE_V1_PREFIX}/folder/list`,
+  updateFolder: `${FAVORITE_V1_PREFIX}/folder/update`,
+  createItem: `${FAVORITE_V1_PREFIX}/item/create`,
+  deleteItem: `${FAVORITE_V1_PREFIX}/item/delete`,
+  listItems: `${FAVORITE_V1_PREFIX}/item/list`,
+} as const;
+
+const MESSAGE_BFF_PREFIX = "/api/message";
+
+export const MESSAGE_API_PATHS = {
+  getUnreadSummary: `${MESSAGE_BFF_PREFIX}/v1/unread`,
+  listNotifications: `${MESSAGE_BFF_PREFIX}/v1/notifications/list`,
+  markNotificationRead: `${MESSAGE_BFF_PREFIX}/v1/notifications/read`,
+  markAllNotificationsRead: `${MESSAGE_BFF_PREFIX}/v1/notifications/readall`,
+  listConversations: `${MESSAGE_BFF_PREFIX}/v1/conversations/list`,
+  getConversationMessages: `${MESSAGE_BFF_PREFIX}/v1/conversations/messages`,
+  sendUserChatMessage: `${MESSAGE_BFF_PREFIX}/v1/conversations/send`,
+  markConversationRead: `${MESSAGE_BFF_PREFIX}/v1/conversations/read`,
+  sendAdminNotification: `${MESSAGE_BFF_PREFIX}/v1/admin/notifications/send`,
+  listAdminConversations: `${MESSAGE_BFF_PREFIX}/v1/admin/conversations/list`,
+  getAdminConversationMessages: `${MESSAGE_BFF_PREFIX}/v1/admin/conversations/messages`,
+  sendAdminChatMessage: `${MESSAGE_BFF_PREFIX}/v1/admin/conversations/send`,
+  markAdminConversationRead: `${MESSAGE_BFF_PREFIX}/v1/admin/conversations/read`,
+} as const;
+
+const HOT_BFF_PREFIX = "/api/hot";
+
+export const HOT_API_PATHS = {
+  list: (page = 1, pageSize = 20) =>
+    `${HOT_BFF_PREFIX}/v1/articles?page=${encodeURIComponent(String(page))}&page_size=${encodeURIComponent(String(pageSize))}`,
 } as const;
 
 // ─── 任务服务（通过 BFF: /api/taskcenter/v1/*）────────────────────────────

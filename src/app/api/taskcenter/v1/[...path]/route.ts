@@ -7,7 +7,7 @@ const TASK_CENTER_V1_PREFIX = "/taskcenter/v1";
 const proxyRequest = createProxyHandler({
   envVarName: "TASK_CENTER_API_SERVER_URL",
   proxyName: "taskcenter-proxy",
-  unavailableMessage: "Task service unavailable",
+  unavailableMessage: "任务服务暂时不可用",
   resolveUpstreamPath: (path) => {
     if (path.length === 0) {
       return TASK_CENTER_V1_PREFIX;

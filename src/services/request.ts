@@ -10,6 +10,9 @@ interface RequestOptions extends RequestInit {
 
 const DEFAULT_ERROR_MESSAGE = "请求失败，请稍后重试";
 
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+
 const buildRequestUrl = (path: string): string => {
   if (/^https?:\/\//i.test(path)) {
     return path;
@@ -19,7 +22,7 @@ const buildRequestUrl = (path: string): string => {
     return path;
   }
 
-  throw new Error("request path must start with /api/ or use an absolute URL");
+  throw new Error("请求路径必须以 /api/ 开头，或使用绝对地址");
 };
 
 const buildHeaders = (headers?: HeadersInit): Headers => {
@@ -43,6 +46,52 @@ const isWrappedPayload = <T>(value: unknown): value is ApiResponse<T> => {
   );
 };
 
+const parseResponsePayload = async (response: Response): Promise<unknown> => {
+  const rawText = await response.text();
+  if (!rawText) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawText) as unknown;
+  } catch (error) {
+    void error;
+    return rawText;
+  }
+};
+
+const extractPayloadMessage = (payload: unknown): string | null => {
+  if (typeof payload === "string" && payload.trim()) {
+    return payload.trim();
+  }
+
+  const record = asRecord(payload);
+  if (!record) {
+    return null;
+  }
+
+  const candidates = [record.msg, record.message, record.error];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  const nestedError = asRecord(record.error);
+  if (!nestedError) {
+    return null;
+  }
+
+  const nestedCandidates = [nestedError.msg, nestedError.message, nestedError.error];
+  for (const candidate of nestedCandidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return null;
+};
+
 export async function request<T>(path: string, init?: RequestOptions): Promise<T> {
   const responseMode = init?.responseMode ?? "auto";
   const response = await fetch(buildRequestUrl(path), {
@@ -50,18 +99,12 @@ export async function request<T>(path: string, init?: RequestOptions): Promise<T
     headers: buildHeaders(init?.headers),
   });
 
-  let payload: unknown = null;
-  try {
-    payload = (await response.json()) as unknown;
-  } catch (error) {
-    // ignore parse errors and fallback to status-based error message below
-    void error;
-  }
-
+  const payload = await parseResponsePayload(response);
   const wrappedPayload = isWrappedPayload<T>(payload) ? payload : null;
+  const payloadMessage = extractPayloadMessage(payload);
 
   if (!response.ok) {
-    throw new Error(wrappedPayload?.msg ?? DEFAULT_ERROR_MESSAGE);
+    throw new Error(wrappedPayload?.msg ?? payloadMessage ?? DEFAULT_ERROR_MESSAGE);
   }
 
   if (payload === null) {

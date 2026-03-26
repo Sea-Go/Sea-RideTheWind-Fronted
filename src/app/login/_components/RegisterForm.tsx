@@ -1,16 +1,17 @@
 "use client";
 
-// 注册表单组件，用于呈现基础注册交互并保持与既有样式一致。
 import { Eye, EyeOff } from "lucide-react";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { registerUser } from "@/services/auth";
+import { loginUser, registerUser, saveAuthToken } from "@/services/auth";
 
 export function RegisterForm() {
+  const router = useRouter();
   const [username, setUsername] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -30,12 +31,12 @@ export function RegisterForm() {
     const normalizedEmail = email.trim();
 
     if (!normalizedUsername || !password) {
-      setErrorMessage("请输入用户名和密码");
+      setErrorMessage("请输入用户名和密码。");
       return;
     }
 
     if (password !== confirmPassword) {
-      setErrorMessage("两次输入的密码不一致");
+      setErrorMessage("两次输入的密码不一致。");
       return;
     }
 
@@ -47,11 +48,31 @@ export function RegisterForm() {
         email: normalizedEmail || undefined,
       });
 
-      setSuccessMessage("注册成功，请使用账号密码登录");
-      setPassword("");
-      setConfirmPassword("");
+      try {
+        const { token } = await loginUser({
+          username: normalizedUsername,
+          password,
+        });
+
+        saveAuthToken(token);
+        const next =
+          typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search).get("next")
+            : null;
+        const safeNext =
+          next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\")
+            ? next
+            : "/dashboard";
+        router.push(safeNext);
+        return;
+      } catch (loginError) {
+        void loginError;
+        setSuccessMessage("注册成功，但自动登录失败，请手动登录。");
+        setPassword("");
+        setConfirmPassword("");
+      }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "注册失败，请稍后重试";
+      const message = error instanceof Error ? error.message : "注册失败，请稍后重试。";
       setErrorMessage(message);
     } finally {
       setLoading(false);
@@ -128,7 +149,7 @@ export function RegisterForm() {
                 size="icon"
                 className="absolute top-1/2 right-1 -translate-y-1/2"
                 onClick={() => setConfirmPasswordVisible((visible) => !visible)}
-                aria-label={confirmPasswordVisible ? "隐藏密码" : "显示密码"}
+                aria-label={confirmPasswordVisible ? "隐藏确认密码" : "显示确认密码"}
               >
                 {confirmPasswordVisible ? <EyeOff /> : <Eye />}
               </Button>

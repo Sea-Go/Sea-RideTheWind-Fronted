@@ -2,23 +2,23 @@ import { NextRequest } from "next/server";
 
 import { createProxyHandler, type ProxyRouteContext } from "@/app/api/_shared/proxy";
 
-const LIKE_V1_PREFIX = "/like/v1";
+const HOT_V1_PREFIX = "/hot";
 
 const proxyRequest = createProxyHandler({
-  envVarName: "LIKE_API_SERVER_URL",
-  proxyName: "like-proxy",
-  unavailableMessage: "点赞服务暂时不可用",
+  envVarName: "HOT_API_SERVER_URL",
+  proxyName: "hot-proxy",
+  unavailableMessage: "热榜服务暂时不可用",
   resolveUpstreamPath: (path) => {
     if (path.length === 0) {
       return null;
     }
 
     if (path[0] === "v1") {
-      const rest = path.slice(1).join("/");
-      return rest ? `${LIKE_V1_PREFIX}/${rest}` : LIKE_V1_PREFIX;
+      const rest = path.join("/");
+      return `${HOT_V1_PREFIX}/${rest}`;
     }
 
-    return `/${path.join("/")}`;
+    return `${HOT_V1_PREFIX}/${path.join("/")}`;
   },
 });
 
