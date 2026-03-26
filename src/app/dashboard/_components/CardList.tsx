@@ -1,9 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { RefreshCcwIcon, SearchIcon, SparklesIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  DEFAULT_DASHBOARD_TAB,
+  buildDashboardTabSearchText,
+  type DashboardTabSlug,
+} from "@/app/dashboard/_constants/tabs";
+import { FavoritePickerDialog } from "@/components/favorite/FavoritePickerDialog";
+import { Button } from "@/components/ui/button";
 import { type ArticleItem, getArticle } from "@/services/article";
 import { getAuthToken, getUserProfile } from "@/services/auth";
+import { deleteFavoriteItems, loadFavoriteInventory } from "@/services/favorite";
 import {
   applyReactionStep,
   buildReactionSteps,
@@ -23,6 +32,8 @@ import {
   fetchRecommendSnapshot,
   getOrCreateRecoSessionId,
   readRecommendSnapshotCache,
+  readRecommendViewCache,
+  saveRecommendViewCache,
   type RecommendSnapshot,
 } from "@/services/reco-snapshot";
 import type { DashboardPost } from "@/types";
@@ -30,11 +41,17 @@ import type { DashboardPost } from "@/types";
 import { Card } from "./Card";
 
 const FALLBACK_TITLE = "\u672a\u547d\u540d\u6587\u7ae0";
-const FALLBACK_AUTHOR = "\u533f\u540d\u7528\u6237";
+const FALLBACK_AUTHOR = "\u672a\u77e5\u4f5c\u8005";
 const FALLBACK_CONTENT = "\u6682\u65e0\u6458\u8981";
 const INVALID_ID_PREFIX = "article-";
 const SEARCH_TOP_K = 20;
 const SEARCH_SESSION_STORAGE_KEY = "dashboard_search_session_id";
+
+const createEmptyFavoriteMeta = (): FavoriteMeta => ({
+  favorited: false,
+  favoriteIds: [],
+  busy: false,
+});
 
 interface LikeMeta {
   likeCount: number;
@@ -43,8 +60,15 @@ interface LikeMeta {
   busy: boolean;
 }
 
+interface FavoriteMeta {
+  favorited: boolean;
+  favoriteIds: string[];
+  busy: boolean;
+}
+
 interface CardListProps {
   query?: string;
+  tabSlug?: DashboardTabSlug;
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -88,6 +112,19 @@ const pickArticleId = (item: ArticleItem, fallbackIndex: number): string => {
   return `${INVALID_ID_PREFIX}${fallbackIndex}`;
 };
 
+const resolveAuthorText = (item: ArticleItem): string => {
+  if (typeof item.author_name === "string" && item.author_name.trim()) {
+    return item.author_name.trim();
+  }
+  if (typeof item.username === "string" && item.username.trim()) {
+    return item.username.trim();
+  }
+  if (item.author_id !== undefined && item.author_id !== null && String(item.author_id).trim()) {
+    return `用户 ${String(item.author_id).trim()}`;
+  }
+  return FALLBACK_AUTHOR;
+};
+
 const toDashboardPost = (item: ArticleItem, index: number): DashboardPost => {
   const title =
     (typeof item.title === "string" && item.title.trim()) ||
@@ -101,10 +138,7 @@ const toDashboardPost = (item: ArticleItem, index: number): DashboardPost => {
     (typeof item.cover_image_url === "string" && item.cover_image_url.trim()) ||
     (typeof item.cover === "string" && item.cover.trim()) ||
     null;
-  const author =
-    (typeof item.author_name === "string" && item.author_name.trim()) ||
-    (typeof item.username === "string" && item.username.trim()) ||
-    FALLBACK_AUTHOR;
+  const author = resolveAuthorText(item);
   const likes =
     typeof item.like_count === "number"
       ? item.like_count
@@ -229,7 +263,7 @@ const toSearchFallbackPost = (
   const author =
     (typeof item.author_name === "string" && item.author_name.trim()) ||
     (typeof item.author === "string" && item.author.trim()) ||
-    FALLBACK_AUTHOR;
+    (rawArticleId ? `用户 ${rawArticleId}` : FALLBACK_AUTHOR);
   const publishedAt =
     typeof item.create_time === "number"
       ? String(item.create_time)
@@ -329,16 +363,114 @@ const pickArticleFromPayload = (payload: unknown): ArticleItem | null => {
   return null;
 };
 
-export const CardList = ({ query = "" }: CardListProps) => {
+const resolveRecommendPosts = async (
+  snapshot: RecommendSnapshot,
+  token: string | null,
+): Promise<{ posts: DashboardPost[]; authorIdMap: Record<string, string> }> => {
+  const resolvedEntries = await Promise.all(
+    snapshot.ids.map(async (articleId, index) => {
+      if (canFetchArticleDetail(articleId)) {
+        try {
+          const articlePayload = await getArticle(articleId, {
+            token: token ?? undefined,
+            incr_view: false,
+          });
+          const article = pickArticleFromPayload(articlePayload);
+          if (article) {
+            const normalizedArticle: ArticleItem = {
+              ...article,
+              id: article.id ?? article.article_id ?? articleId,
+              article_id: article.article_id ?? article.id ?? articleId,
+            };
+            const post = toDashboardPost(normalizedArticle, index);
+            const authorId = article.author_id;
+            return {
+              post,
+              authorId:
+                authorId !== undefined && authorId !== null && String(authorId).trim()
+                  ? String(authorId).trim()
+                  : null,
+            };
+          }
+        } catch (error) {
+          console.warn(`Failed to hydrate recommend article: ${articleId}`, error);
+        }
+      }
+
+      return null;
+    }),
+  );
+
+  const hydratedPosts: DashboardPost[] = [];
+  const nextAuthorIdMap: Record<string, string> = {};
+
+  for (const entry of resolvedEntries) {
+    if (!entry) {
+      continue;
+    }
+
+    hydratedPosts.push(entry.post);
+    if (entry.authorId) {
+      nextAuthorIdMap[entry.post.id] = entry.authorId;
+    }
+  }
+
+  if (hydratedPosts.length > 0) {
+    return { posts: hydratedPosts, authorIdMap: nextAuthorIdMap };
+  }
+
+  return {
+    posts: snapshot.ids.map((articleId, index) =>
+      toRecommendFallbackPost(articleId, index, snapshot.explanation ?? ""),
+    ),
+    authorIdMap: {},
+  };
+};
+
+export const CardList = ({ query = "", tabSlug = DEFAULT_DASHBOARD_TAB }: CardListProps) => {
   const normalizedQuery = useMemo(() => query.trim(), [query]);
-  const isSearchMode = normalizedQuery.length > 0;
+  const presetTabQuery = useMemo(() => {
+    if (tabSlug === DEFAULT_DASHBOARD_TAB || normalizedQuery) {
+      return "";
+    }
+    return buildDashboardTabSearchText(tabSlug).trim();
+  }, [normalizedQuery, tabSlug]);
+  const effectiveQuery = useMemo(
+    () => (normalizedQuery || presetTabQuery).trim(),
+    [normalizedQuery, presetTabQuery],
+  );
+  const isSearchMode = effectiveQuery.length > 0;
   const [posts, setPosts] = useState<DashboardPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchErrorMessage, setFetchErrorMessage] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [likeMetaMap, setLikeMetaMap] = useState<Record<string, LikeMeta>>({});
+  const [favoriteMetaMap, setFavoriteMetaMap] = useState<Record<string, FavoriteMeta>>({});
   const [authorIdMap, setAuthorIdMap] = useState<Record<string, string>>({});
+  const [favoriteDialogPost, setFavoriteDialogPost] = useState<Pick<
+    DashboardPost,
+    "id" | "title" | "image"
+  > | null>(null);
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const [refreshFeedbackTick, setRefreshFeedbackTick] = useState(0);
+  const [showRefreshFeedback, setShowRefreshFeedback] = useState(false);
+  const handledRefreshNonceRef = useRef(0);
+
+  useEffect(() => {
+    if (!refreshFeedbackTick) {
+      return;
+    }
+
+    setShowRefreshFeedback(true);
+    const timer = window.setTimeout(() => {
+      setShowRefreshFeedback(false);
+    }, 1100);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [refreshFeedbackTick]);
 
   const loadLikeStates = useCallback(
     async (currentToken: string, targetPosts: DashboardPost[]): Promise<void> => {
@@ -379,9 +511,42 @@ export const CardList = ({ query = "" }: CardListProps) => {
     [],
   );
 
+  const loadFavoriteStates = useCallback(
+    async (currentToken: string, targetPosts: DashboardPost[]): Promise<void> => {
+      const validIds = targetPosts
+        .map((post) => post.id)
+        .filter((id) => !id.startsWith(INVALID_ID_PREFIX) && canFetchArticleDetail(id));
+      if (!validIds.length) {
+        setFavoriteMetaMap({});
+        return;
+      }
+
+      try {
+        const inventory = await loadFavoriteInventory(currentToken);
+        const nextMetaMap: Record<string, FavoriteMeta> = {};
+
+        for (const post of targetPosts) {
+          const favorites = inventory.articleMap[post.id] ?? [];
+          nextMetaMap[post.id] = {
+            favorited: favorites.length > 0,
+            favoriteIds: favorites.map((favorite) => favorite.favoriteId).filter(Boolean),
+            busy: false,
+          };
+        }
+
+        setFavoriteMetaMap(nextMetaMap);
+      } catch (error) {
+        console.warn("Failed to load favorite states in dashboard:", error);
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     let cancelled = false;
     let disposeRecommendListeners: (() => void) | null = null;
+    const isManualRecommendRefresh = !isSearchMode && refreshNonce > handledRefreshNonceRef.current;
+    handledRefreshNonceRef.current = refreshNonce;
 
     const fetchPosts = async (): Promise<void> => {
       try {
@@ -389,12 +554,13 @@ export const CardList = ({ query = "" }: CardListProps) => {
         setFetchErrorMessage(null);
         setActionMessage(null);
         setLikeMetaMap({});
+        setFavoriteMetaMap({});
         setAuthorIdMap({});
 
         const currentToken = getAuthToken();
         setToken(currentToken);
 
-        if (normalizedQuery) {
+        if (effectiveQuery) {
           const sessionId = getOrCreateSearchSessionId();
           let searchUserId = `guest:${sessionId}`;
 
@@ -413,7 +579,7 @@ export const CardList = ({ query = "" }: CardListProps) => {
             request_id: createSearchRequestId(),
             user_id: searchUserId,
             session_id: sessionId,
-            query: normalizedQuery,
+            query: effectiveQuery,
             top_k: SEARCH_TOP_K,
             need_answer: false,
             explain: false,
@@ -483,6 +649,7 @@ export const CardList = ({ query = "" }: CardListProps) => {
 
           if (currentToken) {
             void loadLikeStates(currentToken, finalPosts);
+            void loadFavoriteStates(currentToken, finalPosts);
           }
           return;
         }
@@ -491,24 +658,86 @@ export const CardList = ({ query = "" }: CardListProps) => {
         const guestUserId = buildGuestRecoUserId(sessionId);
         const guestUserKey = buildUserRecoKey(guestUserId);
         let currentPriority = 0;
+        const RECOMMEND_PRIORITY = {
+          guestCachedSnapshotFallback: 10,
+          guestCachedResolved: 20,
+          guestLiveSnapshotFallback: 25,
+          guestLiveResolved: 30,
+          userCachedSnapshotFallback: 40,
+          userCachedResolved: 50,
+          userLiveSnapshotFallback: 55,
+          userLiveResolved: 60,
+        } as const;
 
-        const applyRecommendSnapshot = (
-          snapshot: RecommendSnapshot | null,
-          priority: number,
-        ): void => {
-          if (cancelled || !snapshot || !snapshot.ids.length || priority < currentPriority) {
+        let recommendSnapshotSeq = 0;
+
+        const applyRecommendViewCache = (userKey: string, priority: number): void => {
+          const cachedView = readRecommendViewCache(userKey).view;
+          if (cancelled || !cachedView || !cachedView.posts.length || priority < currentPriority) {
             return;
           }
 
           currentPriority = priority;
-          const posts = toRecommendSnapshotPosts(snapshot);
-          setPosts(posts);
-          setAuthorIdMap({});
+          setPosts(cachedView.posts);
+          setAuthorIdMap(cachedView.authorIdMap);
           setFetchErrorMessage(null);
           setIsLoading(false);
           if (currentToken) {
-            void loadLikeStates(currentToken, posts);
+            void loadLikeStates(currentToken, cachedView.posts);
+            void loadFavoriteStates(currentToken, cachedView.posts);
           }
+        };
+
+        const applyRecommendSnapshot = (
+          snapshot: RecommendSnapshot | null,
+          fallbackPriority: number,
+          resolvedPriority: number,
+        ): void => {
+          if (cancelled || !snapshot || !snapshot.ids.length) {
+            return;
+          }
+
+          const snapshotSeq = ++recommendSnapshotSeq;
+          if (fallbackPriority >= currentPriority) {
+            currentPriority = fallbackPriority;
+            const fallbackPosts = toRecommendSnapshotPosts(snapshot);
+            setPosts(fallbackPosts);
+            setAuthorIdMap({});
+            setFetchErrorMessage(null);
+            setIsLoading(false);
+            if (currentToken) {
+              void loadLikeStates(currentToken, fallbackPosts);
+              void loadFavoriteStates(currentToken, fallbackPosts);
+            }
+          }
+
+          void (async () => {
+            const resolved = await resolveRecommendPosts(snapshot, currentToken);
+            if (
+              cancelled ||
+              snapshotSeq !== recommendSnapshotSeq ||
+              resolvedPriority < currentPriority
+            ) {
+              return;
+            }
+
+            currentPriority = resolvedPriority;
+            setPosts(resolved.posts);
+            setAuthorIdMap(resolved.authorIdMap);
+            setFetchErrorMessage(null);
+            setIsLoading(false);
+            if (currentToken) {
+              void loadLikeStates(currentToken, resolved.posts);
+              void loadFavoriteStates(currentToken, resolved.posts);
+            }
+
+            const hasRenderablePosts = resolved.posts.some(
+              (post) => !post.id.startsWith(INVALID_ID_PREFIX) && canFetchArticleDetail(post.id),
+            );
+            if (hasRenderablePosts) {
+              saveRecommendViewCache(snapshot, resolved.posts, resolved.authorIdMap);
+            }
+          })();
         };
 
         const applyEmptyRecommendState = (): void => {
@@ -523,15 +752,24 @@ export const CardList = ({ query = "" }: CardListProps) => {
 
         const refreshGuestRecommend = async (): Promise<void> => {
           try {
-            const snapshot = await fetchRecommendSnapshot({
-              userId: guestUserId,
-              userKey: guestUserKey,
-              sessionId,
-              surface: "dashboard_recommend",
-              query: "",
-              periodBucket: "d1",
-            });
-            applyRecommendSnapshot(snapshot, 1);
+            const snapshot = await fetchRecommendSnapshot(
+              {
+                userId: guestUserId,
+                userKey: guestUserKey,
+                sessionId,
+                surface: "dashboard_recommend",
+                query: "",
+                periodBucket: "d1",
+              },
+              {
+                force: isManualRecommendRefresh,
+              },
+            );
+            applyRecommendSnapshot(
+              snapshot,
+              RECOMMEND_PRIORITY.guestLiveSnapshotFallback,
+              RECOMMEND_PRIORITY.guestLiveResolved,
+            );
             if (!snapshot?.ids.length) {
               applyEmptyRecommendState();
             }
@@ -587,26 +825,50 @@ export const CardList = ({ query = "" }: CardListProps) => {
           }
 
           const userKey = buildUserRecoKey(uid);
-          const userCached = readRecommendSnapshotCache(userKey);
-          applyRecommendSnapshot(userCached.snapshot, 2);
+          if (!isManualRecommendRefresh) {
+            applyRecommendViewCache(userKey, RECOMMEND_PRIORITY.userCachedResolved);
+
+            const userCached = readRecommendSnapshotCache(userKey);
+            applyRecommendSnapshot(
+              userCached.snapshot,
+              RECOMMEND_PRIORITY.userCachedSnapshotFallback,
+              RECOMMEND_PRIORITY.userCachedResolved,
+            );
+          }
 
           try {
-            const snapshot = await fetchRecommendSnapshot({
-              userId: uid,
-              userKey,
-              sessionId,
-              surface: "dashboard_recommend",
-              query: "",
-              periodBucket: "d1",
-            });
-            applyRecommendSnapshot(snapshot, 2);
+            const snapshot = await fetchRecommendSnapshot(
+              {
+                userId: uid,
+                userKey,
+                sessionId,
+                surface: "dashboard_recommend",
+                query: "",
+                periodBucket: "d1",
+              },
+              {
+                force: isManualRecommendRefresh,
+              },
+            );
+            applyRecommendSnapshot(
+              snapshot,
+              RECOMMEND_PRIORITY.userLiveSnapshotFallback,
+              RECOMMEND_PRIORITY.userLiveResolved,
+            );
           } catch (error) {
             console.warn("Failed to refresh user recommend snapshot:", error);
           }
         };
 
-        const guestCached = readRecommendSnapshotCache(guestUserKey);
-        applyRecommendSnapshot(guestCached.snapshot, 1);
+        if (!isManualRecommendRefresh) {
+          applyRecommendViewCache(guestUserKey, RECOMMEND_PRIORITY.guestCachedResolved);
+          const guestCached = readRecommendSnapshotCache(guestUserKey);
+          applyRecommendSnapshot(
+            guestCached.snapshot,
+            RECOMMEND_PRIORITY.guestCachedSnapshotFallback,
+            RECOMMEND_PRIORITY.guestCachedResolved,
+          );
+        }
 
         const triggerRecommendRefresh = (): void => {
           void refreshGuestRecommend();
@@ -641,7 +903,9 @@ export const CardList = ({ query = "" }: CardListProps) => {
         setFetchErrorMessage(
           normalizedQuery
             ? "\u641c\u7d22\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5"
-            : "\u63a8\u8350\u5185\u5bb9\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5",
+            : effectiveQuery
+              ? "\u5206\u533a\u5185\u5bb9\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5"
+              : "\u63a8\u8350\u5185\u5bb9\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5",
         );
         setPosts([]);
         setIsLoading(false);
@@ -656,7 +920,7 @@ export const CardList = ({ query = "" }: CardListProps) => {
         disposeRecommendListeners();
       }
     };
-  }, [loadLikeStates, normalizedQuery]);
+  }, [effectiveQuery, loadFavoriteStates, loadLikeStates, normalizedQuery, refreshNonce]);
 
   const getCurrentMeta = (postId: string): LikeMeta => {
     const cachedMeta = likeMetaMap[postId];
@@ -797,48 +1061,245 @@ export const CardList = ({ query = "" }: CardListProps) => {
     await handleReaction(postId, LIKE_STATE.DISLIKED);
   };
 
+  const handleFavorite = async (post: Pick<DashboardPost, "id" | "title" | "image">) => {
+    if (!token) {
+      setActionMessage("请先登录后再收藏");
+      return;
+    }
+
+    if (post.id.startsWith(INVALID_ID_PREFIX) || !canFetchArticleDetail(post.id)) {
+      setActionMessage("当前文章暂不支持收藏");
+      return;
+    }
+
+    const currentMeta = favoriteMetaMap[post.id] ?? createEmptyFavoriteMeta();
+    if (currentMeta.busy) {
+      return;
+    }
+
+    setActionMessage(null);
+    if (!currentMeta.favorited) {
+      setFavoriteDialogPost(post);
+      return;
+    }
+
+    setFavoriteMetaMap((prev) => ({
+      ...prev,
+      [post.id]: {
+        ...currentMeta,
+        busy: true,
+      },
+    }));
+
+    try {
+      await deleteFavoriteItems(token, currentMeta.favoriteIds);
+      setFavoriteMetaMap((prev) => ({
+        ...prev,
+        [post.id]: {
+          ...createEmptyFavoriteMeta(),
+        },
+      }));
+      setActionMessage("已取消收藏");
+    } catch (error) {
+      setFavoriteMetaMap((prev) => ({
+        ...prev,
+        [post.id]: {
+          ...currentMeta,
+          busy: false,
+        },
+      }));
+      setActionMessage(error instanceof Error ? error.message : "收藏失败，请稍后重试");
+    }
+  };
+
+  const refreshButtonLabel = isSearchMode
+    ? normalizedQuery
+      ? "重新搜索"
+      : "刷新分区"
+    : "刷新推荐";
+  const refreshButtonActionLabel = isLoading ? "加载中..." : refreshButtonLabel;
+  const refreshPanelTitle = isSearchMode
+    ? normalizedQuery
+      ? "搜索结果面板"
+      : "分区内容面板"
+    : "为你推荐";
+  const refreshPanelDescription = isSearchMode
+    ? normalizedQuery
+      ? `当前关键词：${normalizedQuery}`
+      : "按当前分区条件重新拉取一批内容"
+    : "主动刷新一次，看看识海社区此刻想先推给你什么";
+  const refreshPanelMeta = isLoading
+    ? "正在同步最新内容"
+    : posts.length > 0
+      ? `当前展示 ${posts.length} 篇内容`
+      : isSearchMode
+        ? "准备重新拉取搜索结果"
+        : "准备重新拉取推荐流";
+
+  const handleManualRefresh = () => {
+    setActionMessage(null);
+    setRefreshFeedbackTick((prev) => prev + 1);
+    setRefreshNonce((prev) => prev + 1);
+  };
+
+  const refreshFeedbackMessage = isLoading
+    ? "\u6b63\u5728\u4e3a\u4f60\u62c9\u53d6\u6700\u65b0\u5185\u5bb9..."
+    : showRefreshFeedback
+      ? isSearchMode
+        ? "\u5df2\u6536\u5230\uff0c\u6b63\u5728\u5237\u65b0\u5f53\u524d\u7ed3\u679c"
+        : "\u5df2\u6536\u5230\uff0c\u6b63\u5728\u5237\u65b0\u63a8\u8350"
+      : "\u70b9\u51fb\u540e\u4f1a\u7acb\u5373\u62c9\u53d6\u4e00\u6279\u65b0\u7684\u5185\u5bb9";
+
+  const actionMessageIsError =
+    !!actionMessage &&
+    (actionMessage.includes("失败") ||
+      actionMessage.includes("请先") ||
+      actionMessage.includes("不支持") ||
+      actionMessage.includes("同步"));
+
+  const renderRefreshPanel = () => (
+    <div className="relative overflow-hidden rounded-2xl border border-sky-200/70 bg-[linear-gradient(135deg,rgba(240,249,255,0.96),rgba(236,253,245,0.92))] p-4 shadow-sm shadow-sky-100/60">
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-36 bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.18),transparent_70%)]" />
+      <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0 space-y-2">
+          <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/80 bg-white/70 px-3 py-1 text-xs font-medium text-sky-700 shadow-sm">
+            {isSearchMode ? (
+              <SearchIcon className="size-3.5" />
+            ) : (
+              <SparklesIcon className="size-3.5" />
+            )}
+            {refreshPanelTitle}
+          </div>
+          <div className="space-y-1">
+            <p className="text-foreground text-base font-semibold tracking-tight">
+              {isSearchMode ? "换一批更贴近当前检索的内容" : "刷新一轮新的推荐候选"}
+            </p>
+            <p className="text-muted-foreground text-sm">{refreshPanelDescription}</p>
+          </div>
+        </div>
+        <div className="flex flex-col items-stretch gap-2 md:items-end">
+          <div className="flex items-center justify-between gap-3 md:justify-end">
+            <div className="text-muted-foreground rounded-full bg-white/75 px-3 py-2 text-xs shadow-sm">
+              {refreshPanelMeta}
+            </div>
+            <div className="relative">
+              {showRefreshFeedback ? (
+                <>
+                  <span
+                    key={`refresh-ring-${refreshFeedbackTick}`}
+                    className="pointer-events-none absolute inset-0 animate-ping rounded-full bg-sky-400/25"
+                  />
+                  <span
+                    key={`refresh-glow-${refreshFeedbackTick}`}
+                    className="pointer-events-none absolute -inset-1 animate-pulse rounded-full bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.32),rgba(45,212,191,0.14),transparent_72%)] blur-md"
+                  />
+                </>
+              ) : null}
+              <Button
+                variant="default"
+                size="lg"
+                onClick={handleManualRefresh}
+                disabled={isLoading}
+                className={`relative h-11 rounded-full px-5 text-sm font-semibold text-white transition-all duration-300 ${
+                  showRefreshFeedback
+                    ? "scale-[0.985] bg-slate-900 shadow-xl ring-4 shadow-sky-400/25 ring-sky-200/60 hover:bg-slate-800"
+                    : "bg-slate-900 shadow-lg shadow-slate-900/15 hover:bg-slate-800"
+                }`}
+              >
+                <RefreshCcwIcon
+                  className={
+                    isLoading
+                      ? "size-4 animate-spin"
+                      : showRefreshFeedback
+                        ? "size-4 animate-pulse"
+                        : "size-4"
+                  }
+                />
+                {refreshButtonActionLabel}
+              </Button>
+            </div>
+          </div>
+          <div
+            aria-live="polite"
+            className={`min-h-5 text-right text-xs transition-all duration-300 ${
+              isLoading || showRefreshFeedback
+                ? "translate-y-0 text-sky-700 opacity-100"
+                : "-translate-y-1 text-slate-500 opacity-70"
+            }`}
+          >
+            {refreshFeedbackMessage}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   if (isLoading) {
     if (isSearchMode) {
-      return <p className="text-muted-foreground py-8 text-center">{"\u641c\u7d22\u4e2d..."}</p>;
+      return (
+        <div className="space-y-4">
+          {renderRefreshPanel()}
+          <p className="text-muted-foreground py-8 text-center">{"\u641c\u7d22\u4e2d..."}</p>
+        </div>
+      );
     }
 
     return (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-        {Array.from({ length: 10 }).map((_, index) => (
-          <div
-            key={`reco-skeleton-${index}`}
-            className="border-border bg-card h-44 animate-pulse rounded-lg border p-4"
-          >
-            <div className="bg-muted h-4 w-2/3 rounded" />
-            <div className="bg-muted mt-4 h-3 w-full rounded" />
-            <div className="bg-muted mt-2 h-3 w-5/6 rounded" />
-            <div className="bg-muted mt-6 h-3 w-1/3 rounded" />
-          </div>
-        ))}
+      <div className="space-y-4">
+        {renderRefreshPanel()}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+          {Array.from({ length: 10 }).map((_, index) => (
+            <div
+              key={`reco-skeleton-${index}`}
+              className="border-border bg-card h-44 animate-pulse rounded-lg border p-4"
+            >
+              <div className="bg-muted h-4 w-2/3 rounded" />
+              <div className="bg-muted mt-4 h-3 w-full rounded" />
+              <div className="bg-muted mt-2 h-3 w-5/6 rounded" />
+              <div className="bg-muted mt-6 h-3 w-1/3 rounded" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
   if (fetchErrorMessage) {
-    return <p className="text-destructive py-8 text-center">{fetchErrorMessage}</p>;
+    return (
+      <div className="space-y-4">
+        {renderRefreshPanel()}
+        <p className="text-destructive py-8 text-center">{fetchErrorMessage}</p>
+      </div>
+    );
   }
 
   if (!posts.length) {
     return (
-      <p className="text-muted-foreground py-8 text-center">
-        {isSearchMode
-          ? "\u672a\u641c\u7d22\u5230\u76f8\u5173\u5185\u5bb9"
-          : "\u6682\u65e0\u6587\u7ae0\uff0c\u5feb\u53bb\u53d1\u5e03\u7b2c\u4e00\u7bc7\u5427\u3002"}
-      </p>
+      <div className="space-y-4">
+        {renderRefreshPanel()}
+        <p className="text-muted-foreground py-8 text-center">
+          {isSearchMode
+            ? normalizedQuery
+              ? "\u672a\u641c\u7d22\u5230\u76f8\u5173\u5185\u5bb9"
+              : "\u5f53\u524d\u5206\u533a\u6682\u65e0\u76f8\u5173\u6587\u7ae0"
+            : "\u6682\u65e0\u6587\u7ae0\uff0c\u5feb\u53bb\u53d1\u5e03\u7b2c\u4e00\u7bc7\u5427\u3002"}
+        </p>
+      </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {actionMessage && <p className="text-destructive text-sm">{actionMessage}</p>}
+      {renderRefreshPanel()}
+      {actionMessage && (
+        <p className={`text-sm ${actionMessageIsError ? "text-destructive" : "text-primary"}`}>
+          {actionMessage}
+        </p>
+      )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
         {posts.map((post) => {
           const meta = likeMetaMap[post.id];
+          const favoriteMeta = favoriteMetaMap[post.id];
           return (
             <Card
               key={post.id}
@@ -847,13 +1308,53 @@ export const CardList = ({ query = "" }: CardListProps) => {
               dislikeCount={meta?.dislikeCount ?? 0}
               isLiked={meta?.likeState === LIKE_STATE.LIKED}
               isDisliked={meta?.likeState === LIKE_STATE.DISLIKED}
+              isFavorited={favoriteMeta?.favorited ?? false}
               actionDisabled={meta?.busy}
+              favoriteDisabled={favoriteMeta?.busy}
               onLike={handleLike}
               onDislike={handleDislike}
+              onFavorite={handleFavorite}
             />
           );
         })}
       </div>
+
+      <FavoritePickerDialog
+        open={favoriteDialogPost !== null}
+        token={token}
+        target={
+          favoriteDialogPost
+            ? {
+                targetId: favoriteDialogPost.id,
+                title: favoriteDialogPost.title,
+                cover: favoriteDialogPost.image,
+              }
+            : null
+        }
+        onOpenChange={(open) => {
+          if (!open) {
+            setFavoriteDialogPost(null);
+          }
+        }}
+        onSaved={(favorite) => {
+          if (!favoriteDialogPost) {
+            return;
+          }
+
+          setFavoriteMetaMap((prev) => ({
+            ...prev,
+            [favoriteDialogPost.id]: {
+              favorited: true,
+              favoriteIds: Array.from(
+                new Set([...(prev[favoriteDialogPost.id]?.favoriteIds ?? []), favorite.favoriteId]),
+              ),
+              busy: false,
+            },
+          }));
+          setActionMessage("已加入收藏夹");
+          setFavoriteDialogPost(null);
+        }}
+      />
     </div>
   );
 };
