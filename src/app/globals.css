@@ -256,8 +256,8 @@
   background: transparent;
 }
 
-.article-markdown .bytemd-body,
-.article-markdown .bytemd-preview {
+.article-markdown .bytemd .bytemd-body,
+.article-markdown .bytemd .bytemd-preview {
   height: auto;
   overflow: visible;
 }
