@@ -10,7 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getAuthToken } from "@/services/auth";
+import {
+  ADMIN_FRONTEND_SESSION_MESSAGE,
+  getFrontendAccessState,
+} from "@/services/auth";
 import {
   getConversationMessages,
   getUnreadSummary,
@@ -95,12 +98,20 @@ export default function MessagesPage() {
   const [newChatContent, setNewChatContent] = useState("");
 
   useEffect(() => {
-    const currentToken = getAuthToken();
-    if (!currentToken) {
+    const { hasFrontendAccess, userToken } = getFrontendAccessState();
+    if (!hasFrontendAccess) {
       router.replace("/login?next=/messages");
       return;
     }
-    setToken(currentToken);
+
+    if (!userToken) {
+      setErrorMessage(ADMIN_FRONTEND_SESSION_MESSAGE);
+      setIsBootstrapping(false);
+      return;
+    }
+
+    setToken(userToken);
+    setErrorMessage(null);
   }, [router]);
 
   const loadOverview = async (
