@@ -21,7 +21,11 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { ProfileThemeShell } from "@/components/profile/ProfileThemeShell";
 import { Button } from "@/components/ui/button";
 import { type ArticleItem, deleteArticle, listArticles } from "@/services/article";
-import { getAuthToken, getUserProfile } from "@/services/auth";
+import {
+  ADMIN_FRONTEND_SESSION_MESSAGE,
+  getFrontendAccessState,
+  getUserProfile,
+} from "@/services/auth";
 
 const PAGE_SIZE = 12;
 
@@ -207,12 +211,20 @@ export default function ProfileArticlesPage() {
   const [deleteTarget, setDeleteTarget] = useState<ArticleItem | null>(null);
 
   useEffect(() => {
-    const currentToken = getAuthToken();
-    if (!currentToken) {
+    const { hasFrontendAccess, userToken } = getFrontendAccessState();
+    if (!hasFrontendAccess) {
       router.replace("/login?next=/profile/articles");
       return;
     }
-    setToken(currentToken);
+
+    if (!userToken) {
+      setErrorMessage(ADMIN_FRONTEND_SESSION_MESSAGE);
+      setIsLoading(false);
+      return;
+    }
+
+    setToken(userToken);
+    setErrorMessage(null);
   }, [router]);
 
   const loadArticles = useCallback(async (currentToken: string, nextPage: number) => {
