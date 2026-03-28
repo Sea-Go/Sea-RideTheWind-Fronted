@@ -257,6 +257,20 @@ export const getAdminAuthToken = (): string | null => {
   return decodeURIComponent(value) || null;
 };
 
+export const syncAdminAuthCookieFromStorage = (): string | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const localToken = window.localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY);
+  if (!localToken) {
+    return null;
+  }
+
+  document.cookie = `${ADMIN_TOKEN_COOKIE_KEY}=${encodeURIComponent(localToken)}; Path=/; Max-Age=${ADMIN_TOKEN_COOKIE_MAX_AGE}; SameSite=Lax`;
+  return localToken;
+};
+
 export const clearAdminAuthToken = (): void => {
   if (typeof window === "undefined") {
     return;
