@@ -8,7 +8,10 @@ import { Layout } from "@/components/layout/layout";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { ProfileThemeShell } from "@/components/profile/ProfileThemeShell";
 import { Button } from "@/components/ui/button";
-import { getAuthToken } from "@/services/auth";
+import {
+  ADMIN_FRONTEND_SESSION_MESSAGE,
+  getFrontendAccessState,
+} from "@/services/auth";
 import { getUserLikeList, getUserTotalLike, type UserLikeItem } from "@/services/like";
 
 const PAGE_SIZE = 20;
@@ -36,12 +39,20 @@ export default function ProfileLikesPage() {
   const [isEnd, setIsEnd] = useState(false);
 
   useEffect(() => {
-    const currentToken = getAuthToken();
-    if (!currentToken) {
+    const { hasFrontendAccess, userToken } = getFrontendAccessState();
+    if (!hasFrontendAccess) {
       router.replace("/login?next=/profile/likes");
       return;
     }
-    setToken(currentToken);
+
+    if (!userToken) {
+      setErrorMessage(ADMIN_FRONTEND_SESSION_MESSAGE);
+      setIsLoading(false);
+      return;
+    }
+
+    setToken(userToken);
+    setErrorMessage(null);
   }, [router]);
 
   useEffect(() => {
