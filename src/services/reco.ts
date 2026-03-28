@@ -30,21 +30,57 @@ export interface RecommendArticlesResponse {
   [key: string]: unknown;
 }
 
-export interface SearchPayload {
-  request_id: string;
+export interface ContentSearchPayload {
+  search_request_id: string;
   user_id: string;
   session_id: string;
   query: string;
-  top_k: number;
-  need_answer: boolean;
+  topk: number;
+  need_answer?: boolean;
   explain: boolean;
+}
+
+export interface StructuredSearchPayload {
+  search_request_id: string;
+  query: string;
+  topk: number;
 }
 
 export interface SearchRecoHit {
   article_id?: string | number;
   id?: string | number;
   target_id?: string | number;
+  author_id?: string | number;
+  author_name?: string;
+  title?: string;
+  brief?: string;
+  cover?: string;
+  manual_type_tag?: string;
+  secondary_tags?: string[];
+  snippet?: string;
+  chunk_id?: string;
+  type_tags?: string;
+  tags?: string;
+  article_score?: number;
+  vector_score?: number;
+  rerank_score?: number;
+  match_score?: number;
   [key: string]: unknown;
+}
+
+export interface SearchRecoAuthorHit {
+  author_id?: string | number;
+  author_name?: string;
+  article_count?: number;
+  latest_article_id?: string | number;
+  latest_article_title?: string;
+  latest_article_time?: string;
+  [key: string]: unknown;
+}
+
+export interface SearchExplainTraceItem {
+  name?: string;
+  data?: Record<string, unknown>;
 }
 
 export interface SearchRecoData {
@@ -53,10 +89,30 @@ export interface SearchRecoData {
   search_request_id?: string;
   status?: string;
   answer?: string;
+  intent?: Record<string, unknown>;
   hits?: SearchRecoHit[];
   items?: SearchRecoHit[];
   explanation?: string;
+  explain_trace?: SearchExplainTraceItem[];
   debug?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface SearchRecoArticleData {
+  trace_id?: string;
+  request_id?: string;
+  search_request_id?: string;
+  status?: string;
+  items?: SearchRecoHit[];
+  [key: string]: unknown;
+}
+
+export interface SearchRecoAuthorData {
+  trace_id?: string;
+  request_id?: string;
+  search_request_id?: string;
+  status?: string;
+  authors?: SearchRecoAuthorHit[];
   [key: string]: unknown;
 }
 
@@ -64,6 +120,20 @@ export interface SearchResponse {
   code?: number;
   msg?: string;
   data?: SearchRecoData;
+  [key: string]: unknown;
+}
+
+export interface SearchArticleResponse {
+  code?: number;
+  msg?: string;
+  data?: SearchRecoArticleData;
+  [key: string]: unknown;
+}
+
+export interface SearchAuthorResponse {
+  code?: number;
+  msg?: string;
+  data?: SearchRecoAuthorData;
   [key: string]: unknown;
 }
 
@@ -98,8 +168,26 @@ export const recommendArticles = (
     body: JSON.stringify(payload),
   });
 
-export const searchReco = (payload: SearchPayload): Promise<SearchResponse> =>
+export const searchRecoByContent = (payload: ContentSearchPayload): Promise<SearchResponse> =>
   request<SearchResponse>(RECO_API_PATHS.search, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    responseMode: "raw",
+  });
+
+export const searchRecoByTitle = (
+  payload: StructuredSearchPayload,
+): Promise<SearchArticleResponse> =>
+  request<SearchArticleResponse>(RECO_API_PATHS.searchTitle, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    responseMode: "raw",
+  });
+
+export const searchRecoByAuthor = (
+  payload: StructuredSearchPayload,
+): Promise<SearchAuthorResponse> =>
+  request<SearchAuthorResponse>(RECO_API_PATHS.searchAuthors, {
     method: "POST",
     body: JSON.stringify(payload),
     responseMode: "raw",
