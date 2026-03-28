@@ -1,17 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { RefreshCcwIcon, SearchIcon, SparklesIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { DEFAULT_DASHBOARD_SEARCH_MODE } from "@/app/dashboard/_constants/search-mode";
 import {
-  DEFAULT_DASHBOARD_TAB,
   buildDashboardTabSearchText,
   type DashboardTabSlug,
+  DEFAULT_DASHBOARD_TAB,
 } from "@/app/dashboard/_constants/tabs";
 import { FavoritePickerDialog } from "@/components/favorite/FavoritePickerDialog";
 import { Button } from "@/components/ui/button";
 import { type ArticleItem, getArticle } from "@/services/article";
-import { getAuthToken, getUserProfile } from "@/services/auth";
+import { getAuthToken, getUserProfile, normalizeUserUid } from "@/services/auth";
 import { deleteFavoriteItems, loadFavoriteInventory } from "@/services/favorite";
 import {
   applyReactionStep,
@@ -25,7 +27,7 @@ import {
   resolveReactionFinalState,
   toLikeState,
 } from "@/services/like";
-import { searchReco } from "@/services/reco";
+import { searchRecoByAuthor, searchRecoByContent, searchRecoByTitle } from "@/services/reco";
 import {
   buildGuestRecoUserId,
   buildUserRecoKey,
@@ -33,10 +35,10 @@ import {
   getOrCreateRecoSessionId,
   readRecommendSnapshotCache,
   readRecommendViewCache,
-  saveRecommendViewCache,
   type RecommendSnapshot,
+  saveRecommendViewCache,
 } from "@/services/reco-snapshot";
-import type { DashboardPost } from "@/types";
+import type { DashboardAuthorSearchResult, DashboardPost, DashboardSearchMode } from "@/types";
 
 import { Card } from "./Card";
 
@@ -69,6 +71,24 @@ interface FavoriteMeta {
 interface CardListProps {
   query?: string;
   tabSlug?: DashboardTabSlug;
+  mode?: DashboardSearchMode;
+}
+
+interface SearchTraceStageView {
+  name: string;
+  summary: string;
+  details: string[];
+}
+
+interface SearchEvidenceViewState {
+  traceId: string;
+  searchRequestId: string;
+  status: string;
+  searchText: string;
+  intentLabel: string;
+  intentConfidence: number | null;
+  keywords: string[];
+  steps: SearchTraceStageView[];
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -76,6 +96,64 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 
 const toNumber = (value: unknown, fallback = 0): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
+const toFiniteNumber = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
+};
+
+const toTrimmedString = (value: unknown): string => {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.trim();
+};
+
+const toStringArray = (value: unknown): string[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => (item === undefined || item === null ? "" : String(item).trim()))
+    .filter(Boolean);
+};
+
+const splitTagText = (value: unknown): string[] => {
+  const text = toTrimmedString(value);
+  if (!text) {
+    return [];
+  }
+
+  return text
+    .split(/[，,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
+const joinPreviewValues = (values: string[], maxCount = 3): string => {
+  if (!values.length) {
+    return "";
+  }
+
+  const picked = values.slice(0, maxCount);
+  return values.length > maxCount
+    ? `${picked.join("、")} 等 ${values.length} 项`
+    : picked.join("、");
+};
+
+const formatLatencyText = (value: unknown): string => {
+  const latency = toFiniteNumber(value);
+  return latency === null ? "" : `${latency}ms`;
+};
 
 const pickFirstArray = (value: unknown): unknown[] => {
   if (Array.isArray(value)) {
@@ -235,12 +313,272 @@ const pickSearchItemArticleId = (item: Record<string, unknown>): string => {
   );
 };
 
+const extractAuthorSearchItems = (payload: unknown): Record<string, unknown>[] => {
+  const payloadRecord = asRecord(payload);
+  if (!payloadRecord) {
+    return [];
+  }
+
+  const dataRecord = asRecord(payloadRecord.data) ?? payloadRecord;
+  const rawItems = pickFirstArray(dataRecord.authors ?? dataRecord.items ?? dataRecord.list);
+  return rawItems
+    .map((item) => asRecord(item))
+    .filter((item): item is Record<string, unknown> => Boolean(item));
+};
+
+const toTitleSearchPost = (item: Record<string, unknown>, index: number): DashboardPost => {
+  const articleId = pickSearchItemArticleId(item) || `${INVALID_ID_PREFIX}title-${index}`;
+  const title = toTrimmedString(item.title) || FALLBACK_TITLE;
+  const content = toTrimmedString(item.brief) || FALLBACK_CONTENT;
+  const image = toTrimmedString(item.cover) || null;
+  const author = toTrimmedString(item.author_name) || resolveAuthorText(item as ArticleItem);
+  const publishedAt = toTrimmedString(item.created_at);
+
+  return {
+    id: articleId,
+    title,
+    content,
+    image,
+    author,
+    likes: 0,
+    publishedAt,
+  };
+};
+
+const toDashboardAuthorSearchResult = (
+  item: Record<string, unknown>,
+  index: number,
+): DashboardAuthorSearchResult => {
+  const authorId =
+    toTrimmedString(item.author_id) ||
+    toTrimmedString(item.id) ||
+    `${INVALID_ID_PREFIX}author-${index}`;
+  const authorName = toTrimmedString(item.author_name) || `作者 ${index + 1}`;
+
+  return {
+    id: `${authorId}-${index}`,
+    authorId,
+    authorName,
+    articleCount: toNumber(item.article_count, 0),
+    latestArticleId: toTrimmedString(item.latest_article_id) || undefined,
+    latestArticleTitle: toTrimmedString(item.latest_article_title) || undefined,
+    latestArticleTime: toTrimmedString(item.latest_article_time) || undefined,
+  };
+};
+
 const canFetchArticleDetail = (articleId: string): boolean => {
   if (!articleId) {
     return false;
   }
 
   return !articleId.startsWith("art_") && !articleId.startsWith("chk_");
+};
+
+const extractSearchDataRecord = (payload: unknown): Record<string, unknown> | null => {
+  const payloadRecord = asRecord(payload);
+  if (!payloadRecord) {
+    return null;
+  }
+
+  return asRecord(payloadRecord.data) ?? payloadRecord;
+};
+
+const buildSearchEvidence = (
+  item: Record<string, unknown>,
+): NonNullable<DashboardPost["searchEvidence"]> => ({
+  chunkId:
+    toTrimmedString(item.chunk_id) ||
+    toTrimmedString(item.chunkId) ||
+    toTrimmedString(asRecord(item.hit)?.chunk_id),
+  snippet:
+    toTrimmedString(item.snippet) ||
+    toTrimmedString(item.content) ||
+    toTrimmedString(asRecord(item.hit)?.snippet),
+  typeTags: toTrimmedString(item.type_tags) || toTrimmedString(item.typeTags),
+  tags: splitTagText(item.tags),
+  articleScore: toFiniteNumber(item.article_score),
+  vectorScore: toFiniteNumber(item.vector_score),
+  rerankScore: toFiniteNumber(item.rerank_score),
+  matchScore: toFiniteNumber(item.match_score),
+});
+
+const withSearchEvidence = (post: DashboardPost, item: Record<string, unknown>): DashboardPost => ({
+  ...post,
+  searchEvidence: buildSearchEvidence(item),
+});
+
+const summarizeSearchTraceStep = (
+  name: string,
+  data: Record<string, unknown>,
+): SearchTraceStageView => {
+  switch (name) {
+    case "invoke":
+      return {
+        name,
+        summary: "请求参数已写入搜索链路",
+        details: [
+          toFiniteNumber(data.coarse_recall_k) !== null
+            ? `粗召回 ${toFiniteNumber(data.coarse_recall_k)}`
+            : "",
+          toFiniteNumber(data.recall_k) !== null ? `精召回 ${toFiniteNumber(data.recall_k)}` : "",
+          toFiniteNumber(data.topk) !== null ? `返回 ${toFiniteNumber(data.topk)}` : "",
+        ].filter(Boolean),
+      };
+    case "intent.parse":
+      return {
+        name,
+        summary: `识别为 ${toTrimmedString(data.label) || "unknown"} 搜索意图`,
+        details: [
+          toStringArray(data.keywords).length
+            ? `关键词：${toStringArray(data.keywords).join("、")}`
+            : "",
+          toFiniteNumber(data.confidence) !== null
+            ? `置信度 ${((toFiniteNumber(data.confidence) ?? 0) * 100).toFixed(0)}%`
+            : "",
+          formatLatencyText(data.latency_ms) ? `耗时 ${formatLatencyText(data.latency_ms)}` : "",
+        ].filter(Boolean),
+      };
+    case "retrieval.embed_query":
+      return {
+        name,
+        summary: "先把查询改写成语义向量",
+        details: [
+          toTrimmedString(data.semantic_query)
+            ? `语义查询：${toTrimmedString(data.semantic_query)}`
+            : "",
+          toFiniteNumber(data.vector_dim) !== null
+            ? `向量维度 ${toFiniteNumber(data.vector_dim)}`
+            : "",
+          formatLatencyText(data.latency_ms) ? `耗时 ${formatLatencyText(data.latency_ms)}` : "",
+        ].filter(Boolean),
+      };
+    case "retrieval.coarse_recall":
+      return {
+        name,
+        summary: `粗召回拿到 ${toFiniteNumber(data.candidate_count) ?? 0} 个候选`,
+        details: [
+          formatLatencyText(data.latency_ms) ? `耗时 ${formatLatencyText(data.latency_ms)}` : "",
+          toStringArray(data.top_article_ids).length
+            ? `Top Article：${joinPreviewValues(toStringArray(data.top_article_ids))}`
+            : "",
+        ].filter(Boolean),
+      };
+    case "retrieval.fine_recall":
+      return {
+        name,
+        summary: `精召回收敛到 ${toFiniteNumber(data.candidate_count) ?? 0} 个片段`,
+        details: [
+          formatLatencyText(data.latency_ms) ? `耗时 ${formatLatencyText(data.latency_ms)}` : "",
+          toStringArray(data.top_chunk_ids).length
+            ? `Top Chunk：${joinPreviewValues(toStringArray(data.top_chunk_ids), 2)}`
+            : "",
+        ].filter(Boolean),
+      };
+    case "rerank.dashscope_skill":
+      return {
+        name,
+        summary: `重排模型筛过 ${toFiniteNumber(data.hit_count) ?? 0} 个候选`,
+        details: [
+          toTrimmedString(data.model) ? `模型 ${toTrimmedString(data.model)}` : "",
+          formatLatencyText(data.latency_ms) ? `耗时 ${formatLatencyText(data.latency_ms)}` : "",
+          toStringArray(data.top_chunk_ids).length
+            ? `优先片段：${joinPreviewValues(toStringArray(data.top_chunk_ids), 2)}`
+            : "",
+        ].filter(Boolean),
+      };
+    case "rank.pass_filter":
+      return {
+        name,
+        summary: `过滤后保留 ${toFiniteNumber(data.candidate_out) ?? 0} 个候选`,
+        details: [
+          toFiniteNumber(data.candidate_in) !== null
+            ? `输入 ${toFiniteNumber(data.candidate_in)}`
+            : "",
+          toFiniteNumber(data.min_pass_score) !== null
+            ? `阈值 ${toFiniteNumber(data.min_pass_score)?.toFixed(2)}`
+            : "",
+        ].filter(Boolean),
+      };
+    case "assemble.response":
+      return {
+        name,
+        summary: `最终返回 ${toFiniteNumber(data.returned_article_count) ?? 0} 篇内容`,
+        details: [
+          toStringArray(data.article_ids).length
+            ? `文章：${joinPreviewValues(toStringArray(data.article_ids), 3)}`
+            : "",
+        ].filter(Boolean),
+      };
+    default: {
+      const detailEntries = Object.entries(data)
+        .filter(([, value]) => {
+          if (value === undefined || value === null) {
+            return false;
+          }
+          if (Array.isArray(value)) {
+            return value.length > 0;
+          }
+          if (typeof value === "string") {
+            return value.trim().length > 0;
+          }
+          return typeof value === "number" || typeof value === "boolean";
+        })
+        .slice(0, 3)
+        .map(([key, value]) => {
+          if (Array.isArray(value)) {
+            return `${key}: ${joinPreviewValues(toStringArray(value), 2)}`;
+          }
+          return `${key}: ${String(value)}`;
+        });
+
+      return {
+        name,
+        summary: "该阶段已参与本次检索",
+        details: detailEntries,
+      };
+    }
+  }
+};
+
+const buildSearchEvidenceViewState = (
+  payload: unknown,
+  fallbackQuery: string,
+): SearchEvidenceViewState | null => {
+  const dataRecord = extractSearchDataRecord(payload);
+  if (!dataRecord) {
+    return null;
+  }
+
+  const intentRecord = asRecord(dataRecord.intent);
+  const rawExplainTrace = Array.isArray(dataRecord.explain_trace) ? dataRecord.explain_trace : [];
+  const steps = rawExplainTrace
+    .map((step) => {
+      const stepRecord = asRecord(step);
+      if (!stepRecord) {
+        return null;
+      }
+
+      const name = toTrimmedString(stepRecord.name);
+      const data = asRecord(stepRecord.data);
+      if (!name || !data) {
+        return null;
+      }
+
+      return summarizeSearchTraceStep(name, data);
+    })
+    .filter((item): item is SearchTraceStageView => Boolean(item));
+
+  return {
+    traceId: toTrimmedString(dataRecord.trace_id),
+    searchRequestId:
+      toTrimmedString(dataRecord.search_request_id) || toTrimmedString(dataRecord.request_id),
+    status: toTrimmedString(dataRecord.status) || "ok",
+    searchText: toTrimmedString(intentRecord?.search_text) || fallbackQuery,
+    intentLabel: toTrimmedString(intentRecord?.label) || "unknown",
+    intentConfidence: toFiniteNumber(intentRecord?.confidence),
+    keywords: toStringArray(intentRecord?.keywords),
+    steps,
+  };
 };
 
 const toSearchFallbackPost = (
@@ -427,7 +765,11 @@ const resolveRecommendPosts = async (
   };
 };
 
-export const CardList = ({ query = "", tabSlug = DEFAULT_DASHBOARD_TAB }: CardListProps) => {
+export const CardList = ({
+  query = "",
+  tabSlug = DEFAULT_DASHBOARD_TAB,
+  mode = DEFAULT_DASHBOARD_SEARCH_MODE,
+}: CardListProps) => {
   const normalizedQuery = useMemo(() => query.trim(), [query]);
   const presetTabQuery = useMemo(() => {
     if (tabSlug === DEFAULT_DASHBOARD_TAB || normalizedQuery) {
@@ -436,11 +778,15 @@ export const CardList = ({ query = "", tabSlug = DEFAULT_DASHBOARD_TAB }: CardLi
     return buildDashboardTabSearchText(tabSlug).trim();
   }, [normalizedQuery, tabSlug]);
   const effectiveQuery = useMemo(
-    () => (normalizedQuery || presetTabQuery).trim(),
-    [normalizedQuery, presetTabQuery],
+    () => (mode === "content" ? normalizedQuery || presetTabQuery : normalizedQuery).trim(),
+    [mode, normalizedQuery, presetTabQuery],
   );
   const isSearchMode = effectiveQuery.length > 0;
   const [posts, setPosts] = useState<DashboardPost[]>([]);
+  const [authorResults, setAuthorResults] = useState<DashboardAuthorSearchResult[]>([]);
+  const [searchEvidenceView, setSearchEvidenceView] = useState<SearchEvidenceViewState | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [fetchErrorMessage, setFetchErrorMessage] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -556,34 +902,97 @@ export const CardList = ({ query = "", tabSlug = DEFAULT_DASHBOARD_TAB }: CardLi
         setLikeMetaMap({});
         setFavoriteMetaMap({});
         setAuthorIdMap({});
+        setSearchEvidenceView(null);
+        setAuthorResults([]);
 
         const currentToken = getAuthToken();
         setToken(currentToken);
 
         if (effectiveQuery) {
+          setAuthorResults([]);
+
+          if (mode === "author") {
+            const authorPayload = await searchRecoByAuthor({
+              search_request_id: createSearchRequestId(),
+              query: effectiveQuery,
+              topk: SEARCH_TOP_K,
+            });
+            const nextAuthorResults = extractAuthorSearchItems(authorPayload).map(
+              toDashboardAuthorSearchResult,
+            );
+
+            if (cancelled) {
+              return;
+            }
+            setPosts([]);
+            setAuthorIdMap({});
+            setAuthorResults(nextAuthorResults);
+            setIsLoading(false);
+            return;
+          }
+
+          if (mode === "title") {
+            const titlePayload = await searchRecoByTitle({
+              search_request_id: createSearchRequestId(),
+              query: effectiveQuery,
+              topk: SEARCH_TOP_K,
+            });
+            const titleItems = extractSearchItems(titlePayload);
+            const nextPosts = titleItems.map((item, index) => toTitleSearchPost(item, index));
+            const nextAuthorIdMap: Record<string, string> = {};
+            for (const [index, item] of titleItems.entries()) {
+              const authorId = toTrimmedString(item.author_id);
+              if (authorId && nextPosts[index]) {
+                nextAuthorIdMap[nextPosts[index].id] = authorId;
+              }
+            }
+
+            if (cancelled) {
+              return;
+            }
+            setPosts(nextPosts);
+            setAuthorIdMap(nextAuthorIdMap);
+            setAuthorResults([]);
+            setIsLoading(false);
+
+            if (currentToken && nextPosts.length) {
+              void loadLikeStates(currentToken, nextPosts);
+              void loadFavoriteStates(currentToken, nextPosts);
+            }
+            return;
+          }
+
           const sessionId = getOrCreateSearchSessionId();
           let searchUserId = `guest:${sessionId}`;
 
           if (currentToken) {
             try {
               const profile = await getUserProfile(currentToken);
-              if (profile.user.uid?.trim()) {
-                searchUserId = profile.user.uid.trim();
+              const resolvedUid = normalizeUserUid(profile.user.uid);
+              if (resolvedUid) {
+                searchUserId = resolvedUid;
               }
             } catch (error) {
               console.warn("Search fallback to guest user_id:", error);
             }
           }
 
-          const searchPayload = await searchReco({
-            request_id: createSearchRequestId(),
+          const searchPayload = await searchRecoByContent({
+            search_request_id: createSearchRequestId(),
             user_id: searchUserId,
             session_id: sessionId,
             query: effectiveQuery,
-            top_k: SEARCH_TOP_K,
+            topk: SEARCH_TOP_K,
             need_answer: false,
-            explain: false,
+            explain: true,
           });
+          const nextSearchEvidenceView = buildSearchEvidenceViewState(
+            searchPayload,
+            effectiveQuery,
+          );
+          if (!cancelled) {
+            setSearchEvidenceView(nextSearchEvidenceView);
+          }
           const searchItems = extractSearchItems(searchPayload);
 
           if (!searchItems.length) {
@@ -591,6 +1000,7 @@ export const CardList = ({ query = "", tabSlug = DEFAULT_DASHBOARD_TAB }: CardLi
               return;
             }
             setPosts([]);
+            setAuthorResults([]);
             setAuthorIdMap({});
             setIsLoading(false);
             return;
@@ -616,7 +1026,10 @@ export const CardList = ({ query = "", tabSlug = DEFAULT_DASHBOARD_TAB }: CardLi
                       id: article.id ?? article.article_id ?? articleId,
                       article_id: article.article_id ?? article.id ?? articleId,
                     };
-                    const post = toDashboardPost(normalizedArticle, index);
+                    const post = withSearchEvidence(
+                      toDashboardPost(normalizedArticle, index),
+                      item,
+                    );
                     const authorId = article.author_id;
                     if (authorId !== undefined && authorId !== null && String(authorId).trim()) {
                       nextAuthorIdMap[post.id] = String(authorId).trim();
@@ -628,7 +1041,7 @@ export const CardList = ({ query = "", tabSlug = DEFAULT_DASHBOARD_TAB }: CardLi
                 }
               }
 
-              return toSearchFallbackPost(item, index, articleId);
+              return withSearchEvidence(toSearchFallbackPost(item, index, articleId), item);
             }),
           );
 
@@ -637,6 +1050,7 @@ export const CardList = ({ query = "", tabSlug = DEFAULT_DASHBOARD_TAB }: CardLi
             return;
           }
           setPosts(finalPosts);
+          setAuthorResults([]);
           setAuthorIdMap(nextAuthorIdMap);
           setIsLoading(false);
 
@@ -804,7 +1218,7 @@ export const CardList = ({ query = "", tabSlug = DEFAULT_DASHBOARD_TAB }: CardLi
           resolvingUserId = (async () => {
             try {
               const profile = await getUserProfile(currentToken);
-              const uid = profile.user.uid?.trim();
+              const uid = normalizeUserUid(profile.user.uid);
               resolvedUserId = uid || null;
               return resolvedUserId;
             } catch (error) {
@@ -908,6 +1322,7 @@ export const CardList = ({ query = "", tabSlug = DEFAULT_DASHBOARD_TAB }: CardLi
               : "\u63a8\u8350\u5185\u5bb9\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5",
         );
         setPosts([]);
+        setAuthorResults([]);
         setIsLoading(false);
       }
     };
@@ -920,7 +1335,15 @@ export const CardList = ({ query = "", tabSlug = DEFAULT_DASHBOARD_TAB }: CardLi
         disposeRecommendListeners();
       }
     };
-  }, [effectiveQuery, loadFavoriteStates, loadLikeStates, normalizedQuery, refreshNonce]);
+  }, [
+    effectiveQuery,
+    isSearchMode,
+    loadFavoriteStates,
+    loadLikeStates,
+    mode,
+    normalizedQuery,
+    refreshNonce,
+  ]);
 
   const getCurrentMeta = (postId: string): LikeMeta => {
     const cachedMeta = likeMetaMap[postId];
@@ -1157,6 +1580,100 @@ export const CardList = ({ query = "", tabSlug = DEFAULT_DASHBOARD_TAB }: CardLi
       actionMessage.includes("不支持") ||
       actionMessage.includes("同步"));
 
+  const renderSearchEvidencePanel = () => {
+    if (!isSearchMode || mode !== "content" || !searchEvidenceView) {
+      return null;
+    }
+
+    return (
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(240,249,255,0.96))] p-4 shadow-sm">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+              检索证据链
+            </span>
+            {searchEvidenceView.traceId ? (
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-[11px] text-slate-600">
+                trace {searchEvidenceView.traceId}
+              </span>
+            ) : null}
+            {searchEvidenceView.searchRequestId ? (
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-[11px] text-slate-600">
+                request {searchEvidenceView.searchRequestId}
+              </span>
+            ) : null}
+            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-700">
+              状态 {searchEvidenceView.status || "ok"}
+            </span>
+          </div>
+          <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+            <div className="space-y-3 rounded-2xl border border-sky-100 bg-white/85 p-4">
+              <div>
+                <p className="text-[11px] font-semibold tracking-[0.18em] text-slate-500 uppercase">
+                  Query
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {searchEvidenceView.searchText || effectiveQuery}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-sky-700">
+                  意图 {searchEvidenceView.intentLabel}
+                </span>
+                {searchEvidenceView.intentConfidence !== null ? (
+                  <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-slate-600">
+                    置信度 {(searchEvidenceView.intentConfidence * 100).toFixed(0)}%
+                  </span>
+                ) : null}
+              </div>
+              {searchEvidenceView.keywords.length ? (
+                <div className="space-y-2">
+                  <p className="text-[11px] font-semibold tracking-[0.18em] text-slate-500 uppercase">
+                    Keywords
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {searchEvidenceView.keywords.map((keyword) => (
+                      <span
+                        key={`search-keyword-${keyword}`}
+                        className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700"
+                      >
+                        {keyword}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              <p className="text-xs leading-5 text-slate-500">
+                每张结果卡片下方的“命中证据”展示的是这次搜索真正命中的 chunk 片段，不是文章摘要。
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+              {searchEvidenceView.steps.map((step, index) => (
+                <div
+                  key={`${step.name}-${index}`}
+                  className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm"
+                >
+                  <p className="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase">
+                    Step {index + 1}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{step.name}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-700">{step.summary}</p>
+                  {step.details.length ? (
+                    <div className="mt-3 space-y-1 text-xs leading-5 text-slate-500">
+                      {step.details.map((detail) => (
+                        <p key={`${step.name}-${detail}`}>{detail}</p>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  };
+
   const renderRefreshPanel = () => (
     <div className="relative overflow-hidden rounded-2xl border border-sky-200/70 bg-[linear-gradient(135deg,rgba(240,249,255,0.96),rgba(236,253,245,0.92))] p-4 shadow-sm shadow-sky-100/60">
       <div className="pointer-events-none absolute inset-y-0 right-0 w-36 bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.18),transparent_70%)]" />
@@ -1234,6 +1751,60 @@ export const CardList = ({ query = "", tabSlug = DEFAULT_DASHBOARD_TAB }: CardLi
     </div>
   );
 
+  const renderAuthorResultGrid = () => (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {authorResults.map((authorResult) => (
+        <Link
+          key={authorResult.id}
+          href={`/author/${encodeURIComponent(authorResult.authorId)}?name=${encodeURIComponent(authorResult.authorName)}`}
+          className="group rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md"
+        >
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1">
+                  作者检索
+                </span>
+                <span className="font-mono">{authorResult.authorId}</span>
+              </div>
+              <h3 className="text-lg font-semibold tracking-tight text-slate-900 transition-colors group-hover:text-sky-700">
+                {authorResult.authorName}
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
+                <p className="text-[11px] tracking-[0.18em] text-slate-500 uppercase">文章数</p>
+                <p className="mt-2 text-xl font-semibold text-slate-900">
+                  {authorResult.articleCount}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-sky-50/70 p-3">
+                <p className="text-[11px] tracking-[0.18em] text-slate-500 uppercase">最近文章</p>
+                <p className="mt-2 line-clamp-2 text-sm font-medium text-slate-800">
+                  {authorResult.latestArticleTitle || "暂无最近文章标题"}
+                </p>
+              </div>
+            </div>
+
+            {authorResult.latestArticleTime ? (
+              <p className="text-sm text-slate-500">
+                最近发布时间：{authorResult.latestArticleTime}
+              </p>
+            ) : null}
+
+            <div className="inline-flex items-center rounded-full bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors group-hover:bg-sky-700">
+              进入作者主页
+            </div>
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+
+  const hasAuthorResults = mode === "author" && authorResults.length > 0;
+  const hasRenderableResults = hasAuthorResults || posts.length > 0;
+
   if (isLoading) {
     if (isSearchMode) {
       return (
@@ -1268,19 +1839,25 @@ export const CardList = ({ query = "", tabSlug = DEFAULT_DASHBOARD_TAB }: CardLi
     return (
       <div className="space-y-4">
         {renderRefreshPanel()}
+        {renderSearchEvidencePanel()}
         <p className="text-destructive py-8 text-center">{fetchErrorMessage}</p>
       </div>
     );
   }
 
-  if (!posts.length) {
+  if (!hasRenderableResults) {
     return (
       <div className="space-y-4">
         {renderRefreshPanel()}
+        {renderSearchEvidencePanel()}
         <p className="text-muted-foreground py-8 text-center">
           {isSearchMode
             ? normalizedQuery
-              ? "\u672a\u641c\u7d22\u5230\u76f8\u5173\u5185\u5bb9"
+              ? mode === "author"
+                ? "未搜索到相关作者"
+                : mode === "title"
+                  ? "未搜索到相关标题"
+                  : "\u672a\u641c\u7d22\u5230\u76f8\u5173\u5185\u5bb9"
               : "\u5f53\u524d\u5206\u533a\u6682\u65e0\u76f8\u5173\u6587\u7ae0"
             : "\u6682\u65e0\u6587\u7ae0\uff0c\u5feb\u53bb\u53d1\u5e03\u7b2c\u4e00\u7bc7\u5427\u3002"}
         </p>
@@ -1291,33 +1868,38 @@ export const CardList = ({ query = "", tabSlug = DEFAULT_DASHBOARD_TAB }: CardLi
   return (
     <div className="space-y-4">
       {renderRefreshPanel()}
+      {renderSearchEvidencePanel()}
       {actionMessage && (
         <p className={`text-sm ${actionMessageIsError ? "text-destructive" : "text-primary"}`}>
           {actionMessage}
         </p>
       )}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-        {posts.map((post) => {
-          const meta = likeMetaMap[post.id];
-          const favoriteMeta = favoriteMetaMap[post.id];
-          return (
-            <Card
-              key={post.id}
-              {...post}
-              likeCount={meta?.likeCount ?? post.likes}
-              dislikeCount={meta?.dislikeCount ?? 0}
-              isLiked={meta?.likeState === LIKE_STATE.LIKED}
-              isDisliked={meta?.likeState === LIKE_STATE.DISLIKED}
-              isFavorited={favoriteMeta?.favorited ?? false}
-              actionDisabled={meta?.busy}
-              favoriteDisabled={favoriteMeta?.busy}
-              onLike={handleLike}
-              onDislike={handleDislike}
-              onFavorite={handleFavorite}
-            />
-          );
-        })}
-      </div>
+      {hasAuthorResults ? (
+        renderAuthorResultGrid()
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+          {posts.map((post) => {
+            const meta = likeMetaMap[post.id];
+            const favoriteMeta = favoriteMetaMap[post.id];
+            return (
+              <Card
+                key={post.id}
+                {...post}
+                likeCount={meta?.likeCount ?? post.likes}
+                dislikeCount={meta?.dislikeCount ?? 0}
+                isLiked={meta?.likeState === LIKE_STATE.LIKED}
+                isDisliked={meta?.likeState === LIKE_STATE.DISLIKED}
+                isFavorited={favoriteMeta?.favorited ?? false}
+                actionDisabled={meta?.busy}
+                favoriteDisabled={favoriteMeta?.busy}
+                onLike={handleLike}
+                onDislike={handleDislike}
+                onFavorite={handleFavorite}
+              />
+            );
+          })}
+        </div>
+      )}
 
       <FavoritePickerDialog
         open={favoriteDialogPost !== null}
