@@ -18,6 +18,20 @@ interface CardProps extends DashboardPost {
   onFavorite?: (post: Pick<DashboardPost, "id" | "title" | "image">) => void;
 }
 
+const formatScore = (value?: number | null, digits = 3): string | null => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+  return value.toFixed(digits);
+};
+
+const formatPercent = (value?: number | null): string | null => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+  return `${(value * 100).toFixed(1)}%`;
+};
+
 export const Card = ({
   id,
   title,
@@ -25,6 +39,7 @@ export const Card = ({
   author,
   likes,
   content,
+  searchEvidence,
   likeCount = likes,
   dislikeCount = 0,
   isLiked = false,
@@ -38,6 +53,7 @@ export const Card = ({
 }: CardProps) => {
   const canOpenDetail =
     !id.startsWith("article-") && !id.startsWith("art_") && !id.startsWith("chk_");
+  const searchTags = searchEvidence?.tags?.filter(Boolean) ?? [];
 
   return (
     <UICard className="gap-0 overflow-hidden p-0 transition-shadow hover:shadow-md">
@@ -64,6 +80,65 @@ export const Card = ({
           )}
         </h3>
         <p className="text-muted-foreground line-clamp-2 text-xs">{content}</p>
+        {searchEvidence ? (
+          <div className="space-y-3 rounded-2xl border border-sky-200/80 bg-[linear-gradient(135deg,rgba(240,249,255,0.96),rgba(248,250,252,0.94))] p-3">
+            <div className="flex flex-wrap items-center gap-2 text-[11px]">
+              <span className="rounded-full bg-sky-600 px-2 py-1 font-semibold text-white">
+                命中证据
+              </span>
+              {searchEvidence.chunkId ? (
+                <span className="rounded-full border border-sky-200 bg-white/85 px-2 py-1 font-mono text-sky-700">
+                  {searchEvidence.chunkId}
+                </span>
+              ) : null}
+              {searchEvidence.matchScore != null ? (
+                <span className="rounded-full border border-sky-200 bg-white/85 px-2 py-1 text-slate-600">
+                  匹配 {formatPercent(searchEvidence.matchScore)}
+                </span>
+              ) : null}
+              {searchEvidence.rerankScore != null ? (
+                <span className="rounded-full border border-sky-200 bg-white/85 px-2 py-1 text-slate-600">
+                  重排 {formatScore(searchEvidence.rerankScore, 1)}
+                </span>
+              ) : null}
+              {searchEvidence.vectorScore != null ? (
+                <span className="rounded-full border border-sky-200 bg-white/85 px-2 py-1 text-slate-600">
+                  向量 {formatScore(searchEvidence.vectorScore)}
+                </span>
+              ) : null}
+              {searchEvidence.articleScore != null ? (
+                <span className="rounded-full border border-sky-200 bg-white/85 px-2 py-1 text-slate-600">
+                  文章 {formatScore(searchEvidence.articleScore)}
+                </span>
+              ) : null}
+            </div>
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
+                Snippet
+              </p>
+              <p className="line-clamp-5 text-xs leading-5 text-slate-700">
+                {searchEvidence.snippet || "后端这次没有返回具体片段文本。"}
+              </p>
+            </div>
+            {searchEvidence.typeTags || searchTags.length ? (
+              <div className="flex flex-wrap gap-2 text-[11px]">
+                {searchEvidence.typeTags ? (
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-700">
+                    分类 {searchEvidence.typeTags}
+                  </span>
+                ) : null}
+                {searchTags.map((tag) => (
+                  <span
+                    key={`${id}-evidence-tag-${tag}`}
+                    className="rounded-full border border-slate-200 bg-white/90 px-2 py-1 text-slate-600"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <div className="text-muted-foreground flex items-center justify-between text-xs">
           <span>{author}</span>
           <Button
