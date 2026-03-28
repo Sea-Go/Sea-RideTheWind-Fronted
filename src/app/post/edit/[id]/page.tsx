@@ -12,7 +12,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { deleteArticle, getArticle, type ArticleItem, updateArticle } from "@/services/article";
-import { getAuthToken, getUserProfile } from "@/services/auth";
+import {
+  ADMIN_FRONTEND_SESSION_MESSAGE,
+  getFrontendAccessState,
+  getUserProfile,
+} from "@/services/auth";
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" ? (value as Record<string, unknown>) : null;
@@ -58,12 +62,20 @@ export default function EditPostPage() {
   const [secondaryTags, setSecondaryTags] = useState<string[]>([]);
 
   useEffect(() => {
-    const currentToken = getAuthToken();
-    if (!currentToken) {
+    const { hasFrontendAccess, userToken } = getFrontendAccessState();
+    if (!hasFrontendAccess) {
       router.replace(`/login?next=/post/edit/${encodeURIComponent(articleId)}`);
       return;
     }
-    setToken(currentToken);
+
+    if (!userToken) {
+      setErrorMessage(ADMIN_FRONTEND_SESSION_MESSAGE);
+      setIsLoading(false);
+      return;
+    }
+
+    setToken(userToken);
+    setErrorMessage(null);
   }, [articleId, router]);
 
   useEffect(() => {
