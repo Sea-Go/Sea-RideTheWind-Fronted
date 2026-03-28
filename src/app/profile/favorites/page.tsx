@@ -20,7 +20,10 @@ import { ProfileThemeShell } from "@/components/profile/ProfileThemeShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getAuthToken } from "@/services/auth";
+import {
+  ADMIN_FRONTEND_SESSION_MESSAGE,
+  getFrontendAccessState,
+} from "@/services/auth";
 import {
   createFavoriteFolder,
   deleteFavoriteFolder,
@@ -59,13 +62,20 @@ export default function ProfileFavoritesPage() {
   );
 
   useEffect(() => {
-    const currentToken = getAuthToken();
-    if (!currentToken) {
+    const { hasFrontendAccess, userToken } = getFrontendAccessState();
+    if (!hasFrontendAccess) {
       router.replace("/login?next=/profile/favorites");
       return;
     }
 
-    setToken(currentToken);
+    if (!userToken) {
+      setErrorMessage(ADMIN_FRONTEND_SESSION_MESSAGE);
+      setIsLoading(false);
+      return;
+    }
+
+    setToken(userToken);
+    setErrorMessage(null);
   }, [router]);
 
   useEffect(() => {
