@@ -9,7 +9,11 @@ import { ProfileThemeShell } from "@/components/profile/ProfileThemeShell";
 import { Layout } from "@/components/layout/layout";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
-import { getAuthToken, getUserProfile } from "@/services/auth";
+import {
+  ADMIN_FRONTEND_SESSION_MESSAGE,
+  getFrontendAccessState,
+  getUserProfile,
+} from "@/services/auth";
 import { getTaskProgressByUserId, type TaskProgressItem } from "@/services/task";
 
 export default function ProfileTasksPage() {
@@ -22,12 +26,20 @@ export default function ProfileTasksPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const currentToken = getAuthToken();
-    if (!currentToken) {
+    const { hasFrontendAccess, userToken } = getFrontendAccessState();
+    if (!hasFrontendAccess) {
       router.replace("/login?next=/profile/tasks");
       return;
     }
-    setToken(currentToken);
+
+    if (!userToken) {
+      setErrorMessage(ADMIN_FRONTEND_SESSION_MESSAGE);
+      setIsLoading(false);
+      return;
+    }
+
+    setToken(userToken);
+    setErrorMessage(null);
   }, [router]);
 
   useEffect(() => {
