@@ -9,7 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createArticle, MAX_COVER_UPLOAD_SIZE_LABEL, uploadArticleCover } from "@/services/article";
-import { getAuthToken } from "@/services/auth";
+import {
+  ADMIN_FRONTEND_SESSION_MESSAGE,
+  getFrontendAccessState,
+} from "@/services/auth";
 
 import MarkdownEditor from "./_components/MarkdownEditor";
 import SecondaryTagsInput from "./_components/SecondaryTagsInput";
@@ -72,12 +75,19 @@ export default function PostPage() {
   };
 
   useEffect(() => {
-    const currentToken = getAuthToken();
-    if (!currentToken) {
+    const { hasFrontendAccess, userToken } = getFrontendAccessState();
+    if (!hasFrontendAccess) {
       router.replace("/login?next=/post");
       return;
     }
-    setToken(currentToken);
+
+    if (!userToken) {
+      setErrorMessage(ADMIN_FRONTEND_SESSION_MESSAGE);
+      return;
+    }
+
+    setToken(userToken);
+    setErrorMessage(null);
   }, [router]);
 
   const handleUploadCover = async (event: ChangeEvent<HTMLInputElement>) => {
