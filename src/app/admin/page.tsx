@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout/layout";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
+import { buildLoginPath } from "@/lib/auth-entry";
 import {
   type AdminProfile,
   clearAdminAuthToken,
@@ -14,6 +15,7 @@ import {
   getAdminSelf,
   logoutAdmin,
 } from "@/services/admin";
+import { clearAuthToken, getAuthToken, logoutUser } from "@/services/auth";
 
 export default function AdminHomePage() {
   const router = useRouter();
@@ -26,7 +28,7 @@ export default function AdminHomePage() {
   useEffect(() => {
     const currentToken = getAdminAuthToken();
     if (!currentToken) {
-      router.replace("/admin/login?next=/admin");
+      router.replace(buildLoginPath({ role: "admin", next: "/admin" }));
       return;
     }
     setToken(currentToken);
@@ -54,21 +56,28 @@ export default function AdminHomePage() {
   }, [token]);
 
   const handleLogout = async () => {
+    const userToken = getAuthToken();
+
     if (!token) {
       clearAdminAuthToken();
-      router.push("/admin/login");
+      clearAuthToken();
+      router.push(buildLoginPath({ role: "admin" }));
       return;
     }
 
     setIsLoggingOut(true);
     try {
-      await logoutAdmin(token);
+      await Promise.allSettled([
+        logoutAdmin(token),
+        userToken ? logoutUser(userToken) : Promise.resolve({ success: true }),
+      ]);
     } catch (error) {
       console.warn("admin logout request failed:", error);
     } finally {
       clearAdminAuthToken();
+      clearAuthToken();
       setIsLoggingOut(false);
-      router.push("/admin/login");
+      router.push(buildLoginPath({ role: "admin" }));
     }
   };
 
