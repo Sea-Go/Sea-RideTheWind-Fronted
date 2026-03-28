@@ -9,7 +9,13 @@ import { Layout } from "@/components/layout/layout";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { ProfileThemeShell } from "@/components/profile/ProfileThemeShell";
 import { Button } from "@/components/ui/button";
-import { clearAuthToken, deleteCurrentUser, getAuthToken, logoutUser } from "@/services/auth";
+import {
+  ADMIN_FRONTEND_SESSION_MESSAGE,
+  clearAuthToken,
+  deleteCurrentUser,
+  getFrontendAccessState,
+  logoutUser,
+} from "@/services/auth";
 
 export default function ProfileSecurityPage() {
   const router = useRouter();
@@ -22,12 +28,20 @@ export default function ProfileSecurityPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const currentToken = getAuthToken();
-    if (!currentToken) {
+    const { hasFrontendAccess, userToken } = getFrontendAccessState();
+    if (!hasFrontendAccess) {
       router.replace("/login?next=/profile/security");
       return;
     }
-    setToken(currentToken);
+
+    if (!userToken) {
+      setErrorMessage(ADMIN_FRONTEND_SESSION_MESSAGE);
+      setIsLoading(false);
+      return;
+    }
+
+    setToken(userToken);
+    setErrorMessage(null);
     setIsLoading(false);
   }, [router]);
 
