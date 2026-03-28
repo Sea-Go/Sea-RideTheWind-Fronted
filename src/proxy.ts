@@ -4,6 +4,7 @@ const USER_TOKEN_COOKIE_KEY = "user_center_token";
 const ADMIN_TOKEN_COOKIE_KEY = "admin_center_token";
 const USER_LOGIN_ROUTE = "/login";
 const USER_HOME_ROUTE = "/dashboard";
+const ADMIN_HOME_ROUTE = "/admin";
 
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
@@ -17,7 +18,7 @@ export function proxy(request: NextRequest) {
   if (isAdminRoute) {
     if (isAdminLoginRoute || isAdminRegisterRoute) {
       if (adminToken) {
-        return NextResponse.redirect(new URL("/admin", request.url));
+        return NextResponse.redirect(new URL(ADMIN_HOME_ROUTE, request.url));
       }
       return NextResponse.next();
     }
@@ -26,7 +27,8 @@ export function proxy(request: NextRequest) {
       return NextResponse.next();
     }
 
-    const adminLoginUrl = new URL("/admin/login", request.url);
+    const adminLoginUrl = new URL(USER_LOGIN_ROUTE, request.url);
+    adminLoginUrl.searchParams.set("role", "admin");
     adminLoginUrl.searchParams.set("next", `${pathname}${search}`);
     return NextResponse.redirect(adminLoginUrl);
   }
@@ -38,7 +40,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (userToken) {
+  if (userToken || adminToken) {
     return NextResponse.next();
   }
 
