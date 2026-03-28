@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { getAuthToken, getUserProfile } from "@/services/auth";
+import { getAuthToken, getUserProfile, normalizeUserUid } from "@/services/auth";
 import {
   buildGuestRecoUserId,
   buildUserRecoKey,
@@ -53,7 +53,7 @@ export const RecoPrewarm = () => {
 
       try {
         const profile = await getUserProfile(token);
-        const uid = profile.user.uid?.trim();
+        const uid = normalizeUserUid(profile.user.uid);
         if (!uid || cancelled) {
           return;
         }
