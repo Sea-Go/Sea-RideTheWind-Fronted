@@ -8,6 +8,7 @@ import { Layout } from "@/components/layout/layout";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { buildLoginPath } from "@/lib/auth-entry";
 import {
   type AdminGetUserListResponse,
   type AdminUserProfile,
@@ -103,7 +104,7 @@ export default function AdminUsersPage() {
   useEffect(() => {
     const currentToken = getAdminAuthToken();
     if (!currentToken) {
-      router.replace("/admin/login?next=/admin/users");
+      router.replace(buildLoginPath({ role: "admin", next: "/admin/users" }));
       return;
     }
     setToken(currentToken);
