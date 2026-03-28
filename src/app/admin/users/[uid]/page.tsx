@@ -10,6 +10,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { buildLoginPath } from "@/lib/auth-entry";
 import {
   type AdminUserProfile,
   banAdminUser,
@@ -42,7 +43,9 @@ export default function AdminUserDetailPage() {
   useEffect(() => {
     const currentToken = getAdminAuthToken();
     if (!currentToken) {
-      router.replace(`/admin/login?next=/admin/users/${encodeURIComponent(uid)}`);
+      router.replace(
+        buildLoginPath({ role: "admin", next: `/admin/users/${encodeURIComponent(uid)}` }),
+      );
       return;
     }
     setToken(currentToken);
