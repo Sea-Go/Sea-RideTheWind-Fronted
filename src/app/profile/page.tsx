@@ -12,7 +12,12 @@ import { TaskProgressBoard } from "@/components/profile/TaskProgressBoard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getAuthToken, getUserProfile, updateUserProfile } from "@/services/auth";
+import {
+  ADMIN_FRONTEND_SESSION_MESSAGE,
+  getFrontendAccessState,
+  getUserProfile,
+  updateUserProfile,
+} from "@/services/auth";
 import { getTaskProgressByUserId, type TaskProgressItem } from "@/services/task";
 
 export default function ProfilePage() {
@@ -38,12 +43,23 @@ export default function ProfilePage() {
   const [tasks, setTasks] = useState<TaskProgressItem[]>([]);
 
   useEffect(() => {
-    const currentToken = getAuthToken();
-    if (!currentToken) {
+    const { hasFrontendAccess, userToken } = getFrontendAccessState();
+    if (!hasFrontendAccess) {
       router.replace("/login?next=/profile");
       return;
     }
-    setToken(currentToken);
+
+    if (!userToken) {
+      setErrorMessage(ADMIN_FRONTEND_SESSION_MESSAGE);
+      setTaskErrorMessage(ADMIN_FRONTEND_SESSION_MESSAGE);
+      setIsLoading(false);
+      setIsTasksLoading(false);
+      return;
+    }
+
+    setToken(userToken);
+    setErrorMessage(null);
+    setTaskErrorMessage(null);
   }, [router]);
 
   useEffect(() => {
