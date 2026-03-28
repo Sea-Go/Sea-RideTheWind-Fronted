@@ -10,16 +10,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { buildLoginPath } from "@/lib/auth-entry";
 import { getAdminAuthToken } from "@/services/admin";
 import {
+  type ChatMessageItem,
+  type ConversationItem,
+  type ConversationMessagesResult,
   getAdminConversationMessages,
   listAdminConversations,
   markAdminConversationRead,
   sendAdminChatMessage,
   sendAdminNotification,
-  type ChatMessageItem,
-  type ConversationItem,
-  type ConversationMessagesResult,
 } from "@/services/message";
 
 const CONVERSATION_LIMIT = 20;
@@ -64,7 +65,9 @@ export default function AdminMessagesPage() {
 
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState("");
-  const [conversationDetail, setConversationDetail] = useState<ConversationMessagesResult | null>(null);
+  const [conversationDetail, setConversationDetail] = useState<ConversationMessagesResult | null>(
+    null,
+  );
   const [draft, setDraft] = useState("");
   const [newChatUserId, setNewChatUserId] = useState("");
   const [newChatContent, setNewChatContent] = useState("");
@@ -72,7 +75,7 @@ export default function AdminMessagesPage() {
   useEffect(() => {
     const currentToken = getAdminAuthToken();
     if (!currentToken) {
-      router.replace("/admin/login?next=/admin/messages");
+      router.replace(buildLoginPath({ role: "admin", next: "/admin/messages" }));
       return;
     }
     setToken(currentToken);
@@ -83,7 +86,8 @@ export default function AdminMessagesPage() {
     options?: { nextSelectedConversationId?: string; preserveSelection?: boolean },
   ): Promise<void> => {
     const preserveSelection = options?.preserveSelection ?? true;
-    const nextSelectedConversationId = options?.nextSelectedConversationId ?? selectedConversationId;
+    const nextSelectedConversationId =
+      options?.nextSelectedConversationId ?? selectedConversationId;
 
     setIsRefreshing(true);
     setErrorMessage(null);
@@ -270,13 +274,13 @@ export default function AdminMessagesPage() {
       <div key={message.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
         <div
           className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${
-            isMine
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted text-foreground border"
+            isMine ? "bg-primary text-primary-foreground" : "bg-muted text-foreground border"
           }`}
         >
-          <p className="whitespace-pre-wrap break-words">{message.content}</p>
-          <p className={`mt-2 text-xs ${isMine ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+          <p className="break-words whitespace-pre-wrap">{message.content}</p>
+          <p
+            className={`mt-2 text-xs ${isMine ? "text-primary-foreground/80" : "text-muted-foreground"}`}
+          >
             {formatTime(message.created_at)}
           </p>
         </div>
@@ -296,7 +300,12 @@ export default function AdminMessagesPage() {
             <Button asChild variant="outline" size="sm">
               <Link href="/admin">返回管理首页</Link>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => void handleRefresh()} disabled={isRefreshing}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleRefresh()}
+              disabled={isRefreshing}
+            >
               {isRefreshing ? "刷新中..." : "刷新会话"}
             </Button>
           </div>
@@ -376,8 +385,15 @@ export default function AdminMessagesPage() {
                       />
                     </div>
 
-                    <Button onClick={() => void handleSendNotification()} disabled={isSendingNotification}>
-                      {isSendingNotification ? "发送中..." : broadcast ? "发送全服公告" : "发送单人通知"}
+                    <Button
+                      onClick={() => void handleSendNotification()}
+                      disabled={isSendingNotification}
+                    >
+                      {isSendingNotification
+                        ? "发送中..."
+                        : broadcast
+                          ? "发送全服公告"
+                          : "发送单人通知"}
                     </Button>
                   </CardContent>
                 </Card>
@@ -441,7 +457,9 @@ export default function AdminMessagesPage() {
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <p className="font-medium">{item.peer_name || `用户 ${item.peer_id}`}</p>
+                              <p className="font-medium">
+                                {item.peer_name || `用户 ${item.peer_id}`}
+                              </p>
                               <p className="text-muted-foreground text-xs">
                                 用户编号 {item.peer_id} · {conversationStatusLabel(item.status)}
                               </p>
@@ -483,7 +501,9 @@ export default function AdminMessagesPage() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {!selectedConversation || !conversationDetail ? (
-                      <p className="text-muted-foreground text-sm">请选择一个会话查看完整聊天记录。</p>
+                      <p className="text-muted-foreground text-sm">
+                        请选择一个会话查看完整聊天记录。
+                      </p>
                     ) : (
                       <>
                         <div className="bg-muted/30 space-y-3 rounded-xl border p-4">
@@ -510,7 +530,9 @@ export default function AdminMessagesPage() {
                         <div className="flex flex-wrap gap-3">
                           <Button
                             onClick={() => void handleSendMessage()}
-                            disabled={!conversationDetail.can_send || isSendingChat || !draft.trim()}
+                            disabled={
+                              !conversationDetail.can_send || isSendingChat || !draft.trim()
+                            }
                           >
                             {isSendingChat ? "发送中..." : "发送消息"}
                           </Button>
