@@ -11,7 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getAuthToken, getUserProfile } from "@/services/auth";
+import {
+  ADMIN_FRONTEND_SESSION_MESSAGE,
+  getFrontendAccessState,
+  getUserProfile,
+} from "@/services/auth";
 import {
   blockUser,
   followUser,
@@ -44,12 +48,20 @@ export default function ProfileFollowPage() {
   const [recommendations, setRecommendations] = useState<RecommendUser[]>([]);
 
   useEffect(() => {
-    const currentToken = getAuthToken();
-    if (!currentToken) {
+    const { hasFrontendAccess, userToken } = getFrontendAccessState();
+    if (!hasFrontendAccess) {
       router.replace("/login?next=/profile/follow");
       return;
     }
-    setToken(currentToken);
+
+    if (!userToken) {
+      setErrorMessage(ADMIN_FRONTEND_SESSION_MESSAGE);
+      setIsLoading(false);
+      return;
+    }
+
+    setToken(userToken);
+    setErrorMessage(null);
   }, [router]);
 
   const loadData = async (currentToken: string): Promise<void> => {
