@@ -1,3 +1,4 @@
+import { getAdminAuthToken } from "@/services/admin";
 import { USER_CENTER_API_PATHS } from "@/constants/api-paths";
 import { request, withBearerAuthorization } from "@/services/request";
 
@@ -23,6 +24,24 @@ export interface LoginUserPayload {
 
 export interface LoginUserResponse {
   token: string;
+}
+
+export interface EnsureUserSessionPayload {
+  username: string;
+  password: string;
+  email?: string;
+}
+
+export interface EnsureUserSessionResult {
+  token: string;
+  created: boolean;
+}
+
+export interface FrontendAccessState {
+  userToken: string | null;
+  adminToken: string | null;
+  hasFrontendAccess: boolean;
+  needsUserSession: boolean;
 }
 
 export interface UserProfile {
@@ -68,6 +87,50 @@ export const loginUser = (payload: LoginUserPayload): Promise<LoginUserResponse>
     method: "POST",
     body: JSON.stringify(payload),
   });
+
+export const ensureUserSession = async (
+  payload: EnsureUserSessionPayload,
+): Promise<EnsureUserSessionResult> => {
+  try {
+    const { token } = await loginUser({
+      username: payload.username,
+      password: payload.password,
+    });
+    saveAuthToken(token);
+    return { token, created: false };
+  } catch (loginError) {
+    try {
+      await registerUser({
+        username: payload.username,
+        password: payload.password,
+        email: payload.email,
+      });
+      const { token } = await loginUser({
+        username: payload.username,
+        password: payload.password,
+      });
+      saveAuthToken(token);
+      return { token, created: true };
+    } catch (registerError) {
+      throw registerError instanceof Error ? registerError : loginError;
+    }
+  }
+};
+
+export const ADMIN_FRONTEND_SESSION_MESSAGE =
+  "当前管理员会话还没有同步前台用户凭证，请重新登录一次管理员账号。";
+
+export const normalizeUserUid = (value: unknown): string => {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return "";
+};
 
 export const getUserProfile = (token: string): Promise<GetUserResponse> =>
   request<GetUserResponse>(USER_CENTER_API_PATHS.getUser, {
@@ -125,6 +188,32 @@ export const getAuthToken = (): string | null => {
 
   const [, value = ""] = cookieToken.split("=");
   return decodeURIComponent(value) || null;
+};
+
+export const syncAuthCookieFromStorage = (): string | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const localToken = window.localStorage.getItem(TOKEN_STORAGE_KEY);
+  if (!localToken) {
+    return null;
+  }
+
+  document.cookie = `${TOKEN_COOKIE_KEY}=${encodeURIComponent(localToken)}; Path=/; Max-Age=${TOKEN_COOKIE_MAX_AGE}; SameSite=Lax`;
+  return localToken;
+};
+
+export const getFrontendAccessState = (): FrontendAccessState => {
+  const userToken = getAuthToken();
+  const adminToken = getAdminAuthToken();
+
+  return {
+    userToken,
+    adminToken,
+    hasFrontendAccess: Boolean(userToken || adminToken),
+    needsUserSession: Boolean(adminToken && !userToken),
+  };
 };
 
 export const clearAuthToken = (): void => {
