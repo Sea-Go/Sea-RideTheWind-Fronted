@@ -9,6 +9,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { buildLoginPath } from "@/lib/auth-entry";
 import {
   type AdminProfile,
   clearAdminAuthToken,
@@ -18,6 +19,7 @@ import {
   logoutAdmin,
   updateAdminSelf,
 } from "@/services/admin";
+import { clearAuthToken, getAuthToken, logoutUser, registerUser } from "@/services/auth";
 
 export default function AdminProfilePage() {
   const router = useRouter();
@@ -44,7 +46,7 @@ export default function AdminProfilePage() {
   useEffect(() => {
     const currentToken = getAdminAuthToken();
     if (!currentToken) {
-      router.replace("/admin/login?next=/admin/profile");
+      router.replace(buildLoginPath({ role: "admin", next: "/admin/profile" }));
       return;
     }
     setToken(currentToken);
@@ -128,6 +130,17 @@ export default function AdminProfilePage() {
         invite_code: newAdminInviteCode.trim(),
         extra_info: newAdminPosition.trim() ? { position: newAdminPosition.trim() } : undefined,
       });
+
+      try {
+        await registerUser({
+          username: newAdminUsername.trim(),
+          password: newAdminPassword.trim(),
+          email: newAdminEmail.trim() || undefined,
+        });
+      } catch (syncError) {
+        console.warn("admin-created account user-session sync failed:", syncError);
+      }
+
       setNewAdminUsername("");
       setNewAdminPassword("");
       setNewAdminEmail("");
@@ -142,21 +155,28 @@ export default function AdminProfilePage() {
   };
 
   const handleLogout = async () => {
+    const userToken = getAuthToken();
+
     if (!token) {
       clearAdminAuthToken();
-      router.push("/admin/login");
+      clearAuthToken();
+      router.push(buildLoginPath({ role: "admin" }));
       return;
     }
 
     setIsLoggingOut(true);
     try {
-      await logoutAdmin(token);
+      await Promise.allSettled([
+        logoutAdmin(token),
+        userToken ? logoutUser(userToken) : Promise.resolve({ success: true }),
+      ]);
     } catch (error) {
       console.warn("admin logout request failed:", error);
     } finally {
       clearAdminAuthToken();
+      clearAuthToken();
       setIsLoggingOut(false);
-      router.push("/admin/login");
+      router.push(buildLoginPath({ role: "admin" }));
     }
   };
 
