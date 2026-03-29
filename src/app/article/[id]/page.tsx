@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { FavoritePickerDialog } from "@/components/favorite/FavoritePickerDialog";
 import { MarkdownArticle } from "@/components/article/MarkdownArticle";
+import { FavoritePickerDialog } from "@/components/favorite/FavoritePickerDialog";
 import { Layout } from "@/components/layout/layout";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,12 @@ import {
   getRootComments,
 } from "@/services/comment";
 import {
+  deleteArticleFavorites,
+  type FavoriteItem,
+  getArticleFavorites,
+  loadFavoriteInventory,
+} from "@/services/favorite";
+import {
   applyReactionStep,
   buildReactionSteps,
   getLikeCount,
@@ -32,12 +38,6 @@ import {
   resolveReactionFinalState,
   toLikeState,
 } from "@/services/like";
-import {
-  deleteArticleFavorites,
-  getArticleFavorites,
-  loadFavoriteInventory,
-  type FavoriteItem,
-} from "@/services/favorite";
 
 const PAGE_SIZE = 10;
 
@@ -682,9 +682,9 @@ export default function ArticleDetailPage() {
 
   return (
     <Layout>
-      <PageContainer className="space-y-8 py-8">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <PageContainer className="space-y-6 py-5 sm:space-y-8 sm:py-8">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <Button asChild variant="outline">
               <Link href="/dashboard/recommend">返回推荐页</Link>
             </Button>
@@ -694,7 +694,7 @@ export default function ArticleDetailPage() {
               </Button>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant={favoriteItems.length > 0 ? "default" : "outline"}
               onClick={() => void handleToggleFavorite()}
@@ -724,9 +724,9 @@ export default function ArticleDetailPage() {
         {reactionMessage && <p className="text-destructive text-sm">{reactionMessage}</p>}
         {favoriteMessage && <p className="text-primary text-sm">{favoriteMessage}</p>}
 
-        <article className="space-y-6 rounded-xl border p-6">
+        <article className="space-y-5 rounded-[1.75rem] border bg-white/90 p-4 shadow-sm sm:p-6">
           <header className="space-y-3">
-            <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
             <p className="text-muted-foreground text-sm">
               作者：
               {authorSpaceHref ? (
@@ -744,20 +744,20 @@ export default function ArticleDetailPage() {
             </p>
             {brief && <p className="text-muted-foreground">{brief}</p>}
             {!!cover && (
-              <div className="overflow-hidden rounded-lg border">
+              <div className="overflow-hidden rounded-[1.5rem] border">
                 <Image
                   src={cover}
                   alt={title}
                   width={1200}
                   height={720}
                   unoptimized
-                  className="max-h-[420px] w-full object-cover"
+                  className="max-h-[280px] w-full object-cover sm:max-h-[420px]"
                 />
               </div>
             )}
           </header>
 
-          <div className="text-muted-foreground flex gap-4 text-sm">
+          <div className="text-muted-foreground flex flex-wrap gap-3 text-sm">
             <span>点赞：{likeCount}</span>
             <span>点踩：{dislikeCount}</span>
           </div>
@@ -767,15 +767,15 @@ export default function ArticleDetailPage() {
           </section>
         </article>
 
-        <section className="space-y-4 rounded-xl border p-6">
-          <div className="flex items-center justify-between">
+        <section className="space-y-4 rounded-[1.75rem] border bg-white/90 p-4 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <h2 className="text-xl font-semibold">
                 评论
                 {token && !commentError ? `（${rootCommentCount}）` : ""}
               </h2>
               {token && !commentError && (
-                <p className="text-muted-foreground text-xs">
+                <p className="text-muted-foreground text-xs leading-5">
                   总评论（含回复）：{totalCommentCount}
                 </p>
               )}
@@ -785,6 +785,7 @@ export default function ArticleDetailPage() {
               variant="outline"
               onClick={() => void handleSubmitComment()}
               disabled={!token || isSubmittingComment || !commentDraft.trim()}
+              className="w-full sm:w-auto"
             >
               {isSubmittingComment ? "发布中..." : "发布评论"}
             </Button>
