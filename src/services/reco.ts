@@ -46,6 +46,31 @@ export interface StructuredSearchPayload {
   topk: number;
 }
 
+export interface OnboardingQuestionnairePayload {
+  user_id: string;
+  username?: string;
+  interests: string[];
+  primary_purpose: string;
+  preferred_article_types: string[];
+  preferred_article_length: string;
+  preferred_style: string;
+  backgrounds: string[];
+  difficulty_preference: string;
+  excluded_contents?: string[];
+  reading_time_slots?: string[];
+  personalized_recommendation_types: string[];
+}
+
+export interface OnboardingQuestionnaireResponse {
+  trace_id?: string;
+  status?: string;
+  user_id?: string;
+  period_bucket?: string;
+  memory_types?: string[];
+  updated_at?: string;
+  warnings?: string[];
+}
+
 export interface SearchRecoHit {
   article_id?: string | number;
   id?: string | number;
@@ -191,6 +216,14 @@ export const searchRecoByAuthor = (
     method: "POST",
     body: JSON.stringify(payload),
     responseMode: "raw",
+  });
+
+export const submitOnboardingQuestionnaire = (
+  payload: OnboardingQuestionnairePayload,
+): Promise<OnboardingQuestionnaireResponse> =>
+  request<OnboardingQuestionnaireResponse>(RECO_API_PATHS.onboardingQuestionnaire, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 
 export const ingestDocument = (payload: IngestDocumentPayload): Promise<IngestDocumentResponse> =>
