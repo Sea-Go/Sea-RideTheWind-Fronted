@@ -1,6 +1,5 @@
 "use client";
 
-// Dashboard 标签切换组件，基于路由高亮并支持直接跳转子页面。
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -16,7 +15,7 @@ export const Tabs = ({ tabs }: TabsProps) => {
   const pathname = usePathname();
 
   return (
-    <div className="scrollbar-hide mb-6 flex space-x-2 overflow-x-auto pb-2">
+    <div className="scrollbar-hide mb-5 flex gap-2 overflow-x-auto pb-2">
       {tabs.map((tab) => {
         const href = `/dashboard/${tab.slug}`;
         const isActive = pathname === href;
@@ -27,7 +26,7 @@ export const Tabs = ({ tabs }: TabsProps) => {
             variant={isActive ? "default" : "ghost"}
             size="sm"
             className={cn(
-              "rounded-full px-3",
+              "shrink-0 rounded-full px-3.5 py-2 text-xs sm:text-sm",
               isActive ? "shadow-sm" : "text-muted-foreground hover:text-foreground",
             )}
             asChild
