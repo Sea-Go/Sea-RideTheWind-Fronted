@@ -2,8 +2,40 @@ import { ARTICLE_API_PATHS, COVER_API_PATHS } from "@/constants/api-paths";
 import { extractUploadError, extractUploadUrl } from "@/lib/upload-response";
 import { type ApiResponse, request, withBearerAuthorization } from "@/services/request";
 
-export const MAX_COVER_UPLOAD_SIZE_BYTES = 900 * 1024;
-export const MAX_COVER_UPLOAD_SIZE_LABEL = "900 千字节";
+export const MAX_COVER_UPLOAD_SIZE_BYTES = Math.floor(2.5 * 1024 * 1024);
+export const MAX_COVER_UPLOAD_SIZE_LABEL = "2.5 MB";
+
+const normalizeServerUrl = (value?: string): string | null => {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed.replace(/\/+$/, "");
+};
+
+const DIRECT_ARTICLE_UPLOAD_BASE_URL = normalizeServerUrl(
+  process.env.NEXT_PUBLIC_ARTICLE_API_SERVER_URL,
+);
+
+interface UploadTarget {
+  endpoint: string;
+  includeAuthorization: boolean;
+}
+
+const resolveUploadTarget = (fallbackEndpoint: string): UploadTarget => {
+  if (!DIRECT_ARTICLE_UPLOAD_BASE_URL) {
+    return {
+      endpoint: fallbackEndpoint,
+      includeAuthorization: true,
+    };
+  }
+
+  return {
+    endpoint: `${DIRECT_ARTICLE_UPLOAD_BASE_URL}/v1/upload`,
+    includeAuthorization: false,
+  };
+};
 
 export interface ArticlePayload {
   title?: string;
@@ -109,7 +141,7 @@ const appendQueryParams = (
 };
 
 const uploadArticleAsset = async (
-  endpoint: string,
+  target: UploadTarget,
   token: string,
   file: File,
   maxBytes?: number,
@@ -121,9 +153,9 @@ const uploadArticleAsset = async (
   const formData = new FormData();
   formData.append("image", file);
 
-  const response = await fetch(endpoint, {
+  const response = await fetch(target.endpoint, {
     method: "POST",
-    headers: withBearerAuthorization(token),
+    headers: target.includeAuthorization ? withBearerAuthorization(token) : undefined,
     body: formData,
   });
 
@@ -140,17 +172,17 @@ const uploadArticleAsset = async (
 
   const uploadedUrl = extractUploadUrl(payload);
   if (!uploadedUrl) {
-    throw new Error("图片上传成功，但未返回有效地址。");
+    throw new Error("上传成功但未返回封面地址，请稍后重试。");
   }
 
   return uploadedUrl;
 };
 
 export const uploadArticleCover = async (token: string, file: File): Promise<string> =>
-  uploadArticleAsset(COVER_API_PATHS.upload, token, file, MAX_COVER_UPLOAD_SIZE_BYTES);
+  uploadArticleAsset(resolveUploadTarget(COVER_API_PATHS.upload), token, file, MAX_COVER_UPLOAD_SIZE_BYTES);
 
 export const uploadArticleInlineImage = async (token: string, file: File): Promise<string> =>
-  uploadArticleAsset(ARTICLE_API_PATHS.upload, token, file);
+  uploadArticleAsset(resolveUploadTarget(ARTICLE_API_PATHS.upload), token, file);
 
 export const createArticle = (
   token: string,
