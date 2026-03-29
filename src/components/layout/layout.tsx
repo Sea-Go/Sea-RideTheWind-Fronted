@@ -1,8 +1,8 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
 
 import {
   DEFAULT_PROFILE_THEME_ID,
@@ -64,12 +64,12 @@ export const Layout = ({ children }: LayoutProps) => {
 
   return (
     <div
-      className="bg-background text-foreground flex min-h-screen transition-[background-color,border-color,color] duration-300"
+      className="bg-background text-foreground flex min-h-screen flex-col transition-[background-color,border-color,color] duration-300 lg:flex-row"
       style={theme?.style}
     >
       <Header />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <main className="flex-1">{children}</main>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <main className="min-h-0 min-w-0 flex-1">{children}</main>
         <Footer />
       </div>
     </div>
