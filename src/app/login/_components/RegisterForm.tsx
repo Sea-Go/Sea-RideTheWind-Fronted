@@ -8,13 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { type AuthRole, getSafeNextPath } from "@/lib/auth-entry";
-import {
-  clearAdminAuthToken,
-  createAdmin,
-  loginAdmin,
-  saveAdminAuthToken,
-} from "@/services/admin";
+import { buildOnboardingQuestionnairePath, type AuthRole, getSafeNextPath } from "@/lib/auth-entry";
+import { clearAdminAuthToken, createAdmin, loginAdmin, saveAdminAuthToken } from "@/services/admin";
 import {
   clearAuthToken,
   ensureUserSession,
@@ -126,7 +121,9 @@ export function RegisterForm({ role, onRoleChange }: RegisterFormProps) {
         });
         clearAdminAuthToken();
         saveAuthToken(token);
-        router.push(getSafeNextPath("user", searchParams.get("next")));
+        router.push(
+          buildOnboardingQuestionnairePath(getSafeNextPath("user", searchParams.get("next"))),
+        );
         return;
       } catch {
         setSuccessMessage("注册成功，请使用新账号登录。");
@@ -142,10 +139,12 @@ export function RegisterForm({ role, onRoleChange }: RegisterFormProps) {
   };
 
   return (
-    <Card className="w-[360px]">
+    <Card className="w-full max-w-[360px]">
       <CardHeader className="pb-3">
         <CardTitle className="text-3xl">注册</CardTitle>
-        <p className="text-muted-foreground text-sm">注册时就能决定身份，管理员会自动补齐前台能力。</p>
+        <p className="text-muted-foreground text-sm">
+          注册时就能决定身份，管理员会自动补齐前台能力。
+        </p>
       </CardHeader>
       <CardContent>
         <form className="grid gap-4" onSubmit={handleSubmit}>
