@@ -45,3 +45,17 @@ export const buildLoginPath = ({
   const query = params.toString();
   return query ? `/login?${query}` : "/login";
 };
+
+export const buildOnboardingQuestionnairePath = (next?: string | null): string => {
+  const params = new URLSearchParams();
+  const safeNext = getSafeNextPath("user", next);
+
+  if (safeNext && safeNext !== "/dashboard") {
+    params.set("next", safeNext);
+  } else {
+    params.set("next", "/dashboard/recommend");
+  }
+
+  const query = params.toString();
+  return query ? `/onboarding/questionnaire?${query}` : "/onboarding/questionnaire";
+};
