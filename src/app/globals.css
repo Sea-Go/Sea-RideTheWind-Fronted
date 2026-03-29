@@ -192,6 +192,7 @@
     @apply bg-background text-foreground;
 
     letter-spacing: var(--tracking-normal);
+    overflow-x: hidden;
   }
 
   input[type="password"]::-ms-reveal,
@@ -392,4 +393,45 @@
 .article-markdown .markdown-body th {
   background: color-mix(in oklab, var(--accent) 82%, white);
   font-weight: 600;
+}
+
+@media (max-width: 1023px) {
+  .bytemd.bytemd {
+    min-height: 360px;
+  }
+
+  .bytemd.bytemd .bytemd-body {
+    flex-direction: column;
+  }
+
+  .bytemd.bytemd .bytemd-preview {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .bytemd-toolbar {
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+}
+
+@media (max-width: 767px) {
+  .article-markdown .markdown-body {
+    font-size: 0.95rem;
+    line-height: 1.85;
+  }
+
+  .article-markdown .markdown-body h1 {
+    font-size: 1.65rem;
+  }
+
+  .article-markdown .markdown-body h2 {
+    font-size: 1.35rem;
+  }
+
+  .article-markdown .markdown-body table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
 }
