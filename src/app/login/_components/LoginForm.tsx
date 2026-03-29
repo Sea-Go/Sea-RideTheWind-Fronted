@@ -96,7 +96,7 @@ export function LoginForm({ role, onRoleChange }: LoginFormProps) {
   };
 
   return (
-    <Card className="w-[360px]">
+    <Card className="w-full max-w-[360px]">
       <CardHeader className="pb-3">
         <CardTitle className="text-3xl">登录</CardTitle>
         <p className="text-muted-foreground text-sm">先选择身份，再进入对应空间。</p>
