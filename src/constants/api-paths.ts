@@ -45,6 +45,7 @@ const COVER_BFF_PREFIX = "/api/cover";
 
 export const COVER_API_PATHS = {
   upload: `${COVER_BFF_PREFIX}/upload`,
+  preview: `${COVER_BFF_PREFIX}/preview`,
 } as const;
 
 // ─── 评论服务（通过 BFF: /api/comment/*）───────────────────────────────────
@@ -135,6 +136,7 @@ export const RECO_API_PATHS = {
   search: `${RECO_V1_PREFIX}/search`,
   searchTitle: `${RECO_V1_PREFIX}/search/title`,
   searchAuthors: `${RECO_V1_PREFIX}/search/authors`,
+  onboardingQuestionnaire: `${RECO_V1_PREFIX}/onboarding/questionnaire`,
   ingest: `${RECO_V1_PREFIX}/docs/ingest`,
   tools: `${RECO_V1_PREFIX}/tools`,
   health: `${RECO_BFF_PREFIX}/health`,
