@@ -6,6 +6,26 @@ import {
   resolveAuthorizationHeader,
 } from "@/app/api/_shared/article-upload";
 
+const BODYLESS_METHODS = new Set(["GET", "HEAD"]);
+
+const buildUpstreamHeaders = (request: NextRequest, authorization: string | null): Headers => {
+  const headers = new Headers();
+  const contentType = request.headers.get("content-type");
+  const accept = request.headers.get("accept");
+
+  if (contentType) {
+    headers.set("content-type", contentType);
+  }
+  if (accept) {
+    headers.set("accept", accept);
+  }
+  if (authorization) {
+    headers.set("authorization", authorization);
+  }
+
+  return headers;
+};
+
 const buildResponseHeaders = (upstreamResponse: Response): Headers => {
   const headers = new Headers();
   const contentType = upstreamResponse.headers.get("content-type");
@@ -18,30 +38,16 @@ const buildResponseHeaders = (upstreamResponse: Response): Headers => {
 export async function POST(request: NextRequest): Promise<Response> {
   try {
     const authorization = resolveAuthorizationHeader(request);
-    if (!authorization) {
-      return NextResponse.json({ success: false, error: "未授权访问" }, { status: 401 });
-    }
-
-    const formData = await request.formData();
-    const image = formData.get("image");
-    if (!(image instanceof File)) {
-      return NextResponse.json(
-        { success: false, error: "缺少封面图片" },
-        { status: 400 },
-      );
-    }
-
-    const upstreamFormData = new FormData();
-    upstreamFormData.append("image", image, image.name);
+    const body = BODYLESS_METHODS.has(request.method.toUpperCase())
+      ? undefined
+      : await request.arrayBuffer();
 
     const upstreamResponse = await fetch(
       `${getRequiredArticleServerUrl()}${ARTICLE_UPLOAD_UPSTREAM_PATH}`,
       {
         method: "POST",
-        headers: {
-          Authorization: authorization,
-        },
-        body: upstreamFormData,
+        headers: buildUpstreamHeaders(request, authorization),
+        body: body && body.byteLength > 0 ? body : undefined,
         cache: "no-store",
       },
     );
@@ -53,6 +59,9 @@ export async function POST(request: NextRequest): Promise<Response> {
     });
   } catch (error) {
     console.error("Failed to upload cover:", error);
-    return NextResponse.json({ success: false, error: "封面上传失败" }, { status: 502 });
+    return NextResponse.json(
+      { success: false, error: "封面上传失败，请稍后重试。" },
+      { status: 502 },
+    );
   }
 }
