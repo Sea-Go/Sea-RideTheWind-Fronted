@@ -58,8 +58,8 @@ const baseNavItems = [
 ];
 
 const aboutContentLines = [
-  "欢迎加入识海社区！",
-  "qq群：750807478",
+  "欢迎加入识海社区。",
+  "QQ群：750807478",
   "开源推荐系统：https://github.com/Sea-Go/Sea-BreakTheWaves",
   "开源后端：https://github.com/Sea-Go/Sea-BreakTheWaves",
   "开源前端：https://github.com/Sea-Go/Sea-RideTheWind-Fronted",
@@ -234,14 +234,20 @@ export const Header = () => {
   const renderMenuActions = (mode: "desktop" | "mobile") => (
     <div className={cn("space-y-2", mode === "desktop" ? "" : "mt-6")}>
       <Button
+        asChild
         variant="ghost"
         className={cn(
           "text-muted-foreground hover:bg-accent hover:text-foreground justify-start rounded-2xl",
           mode === "desktop" ? "h-auto w-full px-4 py-3 text-sm" : "h-12 w-full px-4 text-base",
         )}
       >
-        <Settings2Icon className="h-5 w-5" />
-        设置
+        <Link
+          href="/settings"
+          onClick={mode === "mobile" ? () => setIsMobileMenuOpen(false) : undefined}
+        >
+          <Settings2Icon className="h-5 w-5" />
+          设置
+        </Link>
       </Button>
       <Button
         variant="ghost"
@@ -410,7 +416,7 @@ export const Header = () => {
                 </AlertDialogDescription>
               </div>
               <div className="rounded-2xl border border-sky-100 bg-white/80 px-4 py-3 text-xs leading-6 text-slate-500">
-                点击右上角的 × 就可以立刻关闭这个窗口。
+                点击右上角的关闭按钮，就可以立刻收起这个窗口。
               </div>
             </div>
           </div>

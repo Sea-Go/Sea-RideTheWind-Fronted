@@ -8,10 +8,7 @@ import { Layout } from "@/components/layout/layout";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { ProfileThemeShell } from "@/components/profile/ProfileThemeShell";
 import { Button } from "@/components/ui/button";
-import {
-  ADMIN_FRONTEND_SESSION_MESSAGE,
-  getFrontendAccessState,
-} from "@/services/auth";
+import { ADMIN_FRONTEND_SESSION_MESSAGE, getFrontendAccessState } from "@/services/auth";
 import { getUserLikeList, getUserTotalLike, type UserLikeItem } from "@/services/like";
 
 const PAGE_SIZE = 20;
@@ -117,7 +114,9 @@ export default function ProfileLikesPage() {
         <ProfileThemeShell className="space-y-6">
           <header className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">我的点赞</h1>
-            <p className="text-muted-foreground text-sm">查看我点过赞的内容与累计获赞统计。</p>
+            <p className="text-muted-foreground text-sm">
+              查看我点过赞的文章，也可以直接回到原文继续阅读。
+            </p>
             <div>
               <Button asChild variant="outline" size="sm">
                 <Link href="/profile">返回个人中心</Link>
@@ -136,38 +135,53 @@ export default function ProfileLikesPage() {
 
               <section className="space-y-4 rounded-xl border p-6">
                 <h2 className="text-xl font-semibold">点赞记录</h2>
-                {errorMessage && <p className="text-destructive text-sm">{errorMessage}</p>}
+                {errorMessage ? <p className="text-destructive text-sm">{errorMessage}</p> : null}
 
-                {!errorMessage && items.length === 0 && (
+                {!errorMessage && items.length === 0 ? (
                   <p className="text-muted-foreground text-sm">暂无点赞记录</p>
-                )}
+                ) : null}
 
-                {items.length > 0 && (
+                {items.length > 0 ? (
                   <div className="space-y-3">
-                    {items.map((item, index) => (
-                      <div
-                        key={`${item.target_id}-${item.timestamp}-${index}`}
-                        className="rounded-lg border p-4"
-                      >
-                        <p className="text-sm">
-                          目标类型：<span className="font-medium">{item.target_type}</span>
-                        </p>
-                        <p className="text-sm">
-                          目标编号：<span className="font-mono">{item.target_id}</span>
-                        </p>
-                        <p className="text-muted-foreground mt-1 text-xs">
-                          点赞时间：{formatTimestamp(item.timestamp)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                    {items.map((item, index) => {
+                      const articleHref =
+                        item.target_type === "article" && item.target_id
+                          ? `/article/${encodeURIComponent(item.target_id)}`
+                          : null;
 
-                {!isEnd && items.length > 0 && (
+                      return (
+                        <div
+                          key={`${item.target_id}-${item.timestamp}-${index}`}
+                          className="space-y-3 rounded-lg border p-4"
+                        >
+                          <div className="space-y-1">
+                            <p className="text-sm">
+                              目标类型：<span className="font-medium">{item.target_type}</span>
+                            </p>
+                            <p className="text-sm">
+                              目标编号：<span className="font-mono">{item.target_id}</span>
+                            </p>
+                            <p className="text-muted-foreground mt-1 text-xs">
+                              点赞时间：{formatTimestamp(item.timestamp)}
+                            </p>
+                          </div>
+
+                          {articleHref ? (
+                            <Button asChild variant="outline" size="sm">
+                              <Link href={articleHref}>进入文章</Link>
+                            </Button>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
+
+                {!isEnd && items.length > 0 ? (
                   <Button variant="secondary" onClick={handleLoadMore} disabled={isLoadingMore}>
                     {isLoadingMore ? "加载中..." : "加载更多"}
                   </Button>
-                )}
+                ) : null}
               </section>
             </>
           )}

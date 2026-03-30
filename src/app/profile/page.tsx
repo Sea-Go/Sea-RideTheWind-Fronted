@@ -1,17 +1,29 @@
 "use client";
 
-import { Eye, EyeOff, Paintbrush2Icon, SparklesIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+  ArrowRightIcon,
+  BookmarkIcon,
+  Eye,
+  EyeOff,
+  HeartIcon,
+  Paintbrush2Icon,
+  Settings2Icon,
+  SparklesIcon,
+  UsersIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { Layout } from "@/components/layout/layout";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { ProfileThemePicker, ProfileThemeShell } from "@/components/profile/ProfileThemeShell";
+import { ProfileThemeShell } from "@/components/profile/ProfileThemeShell";
 import { TaskProgressBoard } from "@/components/profile/TaskProgressBoard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import {
   ADMIN_FRONTEND_SESSION_MESSAGE,
   getFrontendAccessState,
@@ -19,6 +31,81 @@ import {
   updateUserProfile,
 } from "@/services/auth";
 import { getTaskProgressByUserId, type TaskProgressItem } from "@/services/task";
+
+const QuickActionCard = ({
+  href,
+  title,
+  description,
+  icon: Icon,
+  badge,
+  featured = false,
+}: {
+  href: string;
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  badge: string;
+  featured?: boolean;
+}) => (
+  <Link
+    href={href}
+    className={cn(
+      "group border-border/80 bg-card/82 relative overflow-hidden rounded-[1.75rem] border shadow-sm backdrop-blur transition-all duration-200 hover:-translate-y-1 hover:shadow-lg",
+      featured ? "min-h-[220px] p-6" : "min-h-[148px] p-5",
+    )}
+  >
+    <div
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute inset-x-0 top-0 opacity-90",
+        featured ? "h-28" : "h-20",
+      )}
+      style={{
+        backgroundImage: featured
+          ? "linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(255, 255, 255, 0.03))"
+          : "linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(255, 255, 255, 0.02))",
+      }}
+    />
+    <div
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute rounded-full blur-3xl",
+        featured ? "-top-10 right-0 h-36 w-36" : "-top-8 right-0 h-28 w-28",
+      )}
+      style={{
+        backgroundColor: featured ? "rgba(59, 130, 246, 0.18)" : "rgba(59, 130, 246, 0.14)",
+      }}
+    />
+
+    <div className="relative flex h-full flex-col">
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-3">
+          <span className="text-muted-foreground border-border/80 bg-background/80 inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-medium tracking-[0.18em] uppercase">
+            {badge}
+          </span>
+          <span
+            className={cn(
+              "bg-primary/12 text-primary inline-flex items-center justify-center rounded-[1.4rem] shadow-sm ring-1 ring-white/60",
+              featured ? "h-16 w-16" : "h-12 w-12",
+            )}
+          >
+            <Icon className={featured ? "h-8 w-8" : "h-6 w-6"} />
+          </span>
+        </div>
+        <span className="text-muted-foreground group-hover:text-primary mt-1 transition-colors">
+          <ArrowRightIcon className={featured ? "h-6 w-6" : "h-5 w-5"} />
+        </span>
+      </div>
+
+      <div className={cn("mt-auto space-y-2", featured ? "pt-10" : "pt-6")}>
+        <h2 className={cn("font-semibold tracking-tight", featured ? "text-2xl" : "text-lg")}>
+          {title}
+        </h2>
+        <p className="text-muted-foreground text-sm leading-6">{description}</p>
+      </div>
+    </div>
+  </Link>
+);
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -187,9 +274,9 @@ export default function ProfilePage() {
                 个人中心
               </div>
               <div className="space-y-2">
-                <h1 className="text-3xl font-bold tracking-tight">把个人中心调成你喜欢的样子</h1>
+                <h1 className="text-3xl font-bold tracking-tight">把常用内容放在更顺手的位置</h1>
                 <p className="text-muted-foreground max-w-3xl text-sm leading-6">
-                  这里不仅能查看账号资料和任务完成情况，也可以切换个人中心主题。蓝白、粉白、黑白、黄底四种配色会一起应用到任务页、收藏页、文章管理等子页面。
+                  这里保留你最常点开的入口，并把视觉重点集中到点赞和关注管理。主题配色已经移到设置页统一管理，个人中心会更轻一些，也更聚焦你每天要看的内容。
                 </p>
               </div>
             </div>
@@ -214,27 +301,40 @@ export default function ProfilePage() {
             </div>
           </header>
 
-          <ProfileThemePicker />
+          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1.15fr)_320px]">
+            <QuickActionCard
+              href="/profile/likes"
+              title="我的点赞"
+              description="集中查看你点过赞的内容，快速回到最近认可过的文章和互动。"
+              icon={HeartIcon}
+              badge="重点入口"
+              featured
+            />
+            <QuickActionCard
+              href="/profile/follow"
+              title="关注管理"
+              description="统一整理你关注的人和内容关系，方便继续追踪熟悉的作者与主题。"
+              icon={UsersIcon}
+              badge="重点入口"
+              featured
+            />
 
-          <section className="border-border/80 bg-card/80 grid grid-cols-1 gap-3 rounded-[1.75rem] border p-4 shadow-sm backdrop-blur sm:grid-cols-2 xl:grid-cols-6">
-            <Button asChild variant="outline" className="justify-start">
-              <Link href="/profile/likes">我的点赞</Link>
-            </Button>
-            <Button asChild variant="outline" className="justify-start">
-              <Link href="/profile/favorites">我的收藏</Link>
-            </Button>
-            <Button asChild variant="outline" className="justify-start">
-              <Link href="/profile/follow">关注管理</Link>
-            </Button>
-            <Button asChild variant="outline" className="justify-start">
-              <Link href="/profile/articles">文章管理</Link>
-            </Button>
-            <Button asChild variant="outline" className="justify-start">
-              <Link href="/profile/tasks">任务详情</Link>
-            </Button>
-            <Button asChild variant="outline" className="justify-start">
-              <Link href="/profile/security">安全设置</Link>
-            </Button>
+            <div className="grid gap-4">
+              <QuickActionCard
+                href="/profile/favorites"
+                title="我的收藏"
+                description="保留你已经收藏的内容，随时回看。"
+                icon={BookmarkIcon}
+                badge="常用"
+              />
+              <QuickActionCard
+                href="/settings"
+                title="设置"
+                description="主题配色和账户偏好已经挪到这里统一管理。"
+                icon={Settings2Icon}
+                badge="已迁移"
+              />
+            </div>
           </section>
 
           <TaskProgressBoard
@@ -257,7 +357,7 @@ export default function ProfilePage() {
               <div className="space-y-1">
                 <h2 className="text-2xl font-semibold tracking-tight">账号资料</h2>
                 <p className="text-muted-foreground text-sm leading-6">
-                  你可以在这里更新用户名、邮箱和兴趣信息。主题只影响页面展示，不会改动账号数据。
+                  你可以在这里更新用户名、邮箱和兴趣信息。页面主题和安全相关操作已经移到设置页，账号资料区会更专注于基础信息编辑。
                 </p>
               </div>
 
@@ -359,9 +459,12 @@ export default function ProfilePage() {
               {errorMessage ? <p className="text-destructive text-sm">{errorMessage}</p> : null}
               {successMessage ? <p className="text-primary text-sm">{successMessage}</p> : null}
 
-              <div className="flex flex-wrap gap-3 pt-2">
+              <div className="flex flex-wrap items-center gap-3 pt-2">
                 <Button onClick={handleSave} disabled={!canSubmit}>
                   {isSaving ? "保存中..." : "保存资料"}
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href="/settings">前往设置</Link>
                 </Button>
               </div>
             </section>

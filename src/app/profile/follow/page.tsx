@@ -23,14 +23,16 @@ import {
   getFollowerList,
   getFollowList,
   getRecommendations,
+  type RecommendUser,
   unblockUser,
   unfollowUser,
-  type RecommendUser,
 } from "@/services/follow";
 
 const PAGE_SIZE = 20;
 
 const formatUserId = (userId: number): string => `${userId}`;
+const buildAuthorHref = (userId: number): string =>
+  `/author/${encodeURIComponent(formatUserId(userId))}`;
 
 export default function ProfileFollowPage() {
   const router = useRouter();
@@ -139,21 +141,35 @@ export default function ProfileFollowPage() {
     }
   };
 
-  const renderUserIdList = (items: number[], emptyText: string) => {
+  const renderUserIdList = (
+    items: number[],
+    emptyText: string,
+    options?: { clickable?: boolean },
+  ) => {
     if (items.length === 0) {
       return <p className="text-muted-foreground text-sm">{emptyText}</p>;
     }
 
     return (
       <div className="flex flex-wrap gap-2">
-        {items.map((userId) => (
-          <span
-            key={userId}
-            className="bg-muted text-muted-foreground rounded-full px-3 py-1 text-sm"
-          >
-            用户编号 {formatUserId(userId)}
-          </span>
-        ))}
+        {items.map((userId) =>
+          options?.clickable ? (
+            <Link
+              key={userId}
+              href={buildAuthorHref(userId)}
+              className="bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground rounded-full px-3 py-1 text-sm transition-colors"
+            >
+              用户编号 {formatUserId(userId)}
+            </Link>
+          ) : (
+            <span
+              key={userId}
+              className="bg-muted text-muted-foreground rounded-full px-3 py-1 text-sm"
+            >
+              用户编号 {formatUserId(userId)}
+            </span>
+          ),
+        )}
       </div>
     );
   };
@@ -231,8 +247,8 @@ export default function ProfileFollowPage() {
                     </Button>
                   </div>
 
-                  {actionMessage && <p className="text-primary text-sm">{actionMessage}</p>}
-                  {errorMessage && <p className="text-destructive text-sm">{errorMessage}</p>}
+                  {actionMessage ? <p className="text-primary text-sm">{actionMessage}</p> : null}
+                  {errorMessage ? <p className="text-destructive text-sm">{errorMessage}</p> : null}
                 </CardContent>
               </Card>
 
@@ -240,17 +256,25 @@ export default function ProfileFollowPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle>我的关注</CardTitle>
-                    <CardDescription>最近 {PAGE_SIZE} 条关注关系</CardDescription>
+                    <CardDescription>
+                      最近 {PAGE_SIZE} 条关注关系，可点击进入对方主页
+                    </CardDescription>
                   </CardHeader>
-                  <CardContent>{renderUserIdList(followIds, "暂无关注记录")}</CardContent>
+                  <CardContent>
+                    {renderUserIdList(followIds, "暂无关注记录", { clickable: true })}
+                  </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader>
                     <CardTitle>我的粉丝</CardTitle>
-                    <CardDescription>最近 {PAGE_SIZE} 条粉丝关系</CardDescription>
+                    <CardDescription>
+                      最近 {PAGE_SIZE} 条粉丝关系，也支持点击查看主页
+                    </CardDescription>
                   </CardHeader>
-                  <CardContent>{renderUserIdList(followerIds, "暂无粉丝记录")}</CardContent>
+                  <CardContent>
+                    {renderUserIdList(followerIds, "暂无粉丝记录", { clickable: true })}
+                  </CardContent>
                 </Card>
 
                 <Card>
@@ -272,11 +296,16 @@ export default function ProfileFollowPage() {
                     ) : (
                       <div className="space-y-3">
                         {recommendations.map((item) => (
-                          <div key={item.target_id} className="rounded-lg border p-4">
-                            <p className="font-medium">用户编号 {formatUserId(item.target_id)}</p>
-                            <p className="text-muted-foreground mt-1 text-sm">
-                              共同关注分数：{item.mutual_score}
-                            </p>
+                          <div key={item.target_id} className="space-y-3 rounded-lg border p-4">
+                            <div>
+                              <p className="font-medium">用户编号 {formatUserId(item.target_id)}</p>
+                              <p className="text-muted-foreground mt-1 text-sm">
+                                共同关注分数：{item.mutual_score}
+                              </p>
+                            </div>
+                            <Button asChild variant="outline" size="sm">
+                              <Link href={buildAuthorHref(item.target_id)}>进入主页</Link>
+                            </Button>
                           </div>
                         ))}
                       </div>
