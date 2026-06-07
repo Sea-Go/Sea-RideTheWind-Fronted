@@ -157,7 +157,6 @@ export default function AdminUsersPage() {
       <PageContainer className="space-y-6 py-8">
         <header className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">用户管理</h1>
-          <p className="text-muted-foreground text-sm">支持分页检索与用户详情跳转。</p>
           <Button asChild variant="outline" size="sm">
             <Link href="/admin">返回管理首页</Link>
           </Button>
