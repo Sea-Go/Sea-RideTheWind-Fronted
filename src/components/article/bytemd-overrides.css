@@ -1,0 +1,260 @@
+.bytemd.bytemd {
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+  height: auto !important;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
+  color: var(--foreground);
+  background: var(--app-editor-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.bytemd.bytemd .bytemd-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.bytemd-toolbar {
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground);
+  background: var(--app-editor-toolbar-surface);
+}
+
+.bytemd-toolbar-icon,
+.bytemd-toolbar-tab {
+  color: var(--muted-foreground);
+}
+
+.bytemd-toolbar-icon:hover,
+.bytemd-toolbar-tab:hover,
+.bytemd-toolbar-tab-active {
+  color: var(--foreground);
+  background: var(--app-surface-soft);
+}
+
+.bytemd-editor,
+.bytemd-preview,
+.bytemd-sidebar {
+  color: var(--foreground);
+  background: var(--app-editor-surface);
+}
+
+.bytemd [class~="CodeMirror"] {
+  color: var(--foreground);
+  background: transparent;
+}
+
+.bytemd [class~="CodeMirror-gutters"] {
+  background: var(--app-editor-toolbar-surface);
+  border-color: var(--border);
+}
+
+.bytemd [class~="CodeMirror-linenumber"] {
+  color: var(--muted-foreground);
+}
+
+.bytemd [class~="CodeMirror-cursor"] {
+  border-left-color: var(--foreground);
+}
+
+.bytemd [class~="CodeMirror-selected"] {
+  background: color-mix(in oklab, var(--primary) 24%, transparent);
+}
+
+.bytemd-split .bytemd-preview {
+  border-left: 1px solid var(--border);
+}
+
+.bytemd-status {
+  border-top: 1px solid var(--border);
+  color: var(--muted-foreground);
+  background: var(--app-editor-toolbar-surface);
+}
+
+.article-markdown .bytemd {
+  height: auto !important;
+  border: 0;
+  background: transparent;
+}
+
+.article-markdown .bytemd .bytemd-body,
+.article-markdown .bytemd .bytemd-preview {
+  height: auto;
+  overflow: visible;
+}
+
+.article-markdown .markdown-body {
+  max-width: none;
+  padding: 0;
+  color: var(--foreground);
+  background: transparent;
+  font-size: 1rem;
+  line-height: 1.95;
+}
+
+.article-markdown .markdown-body > *:first-child {
+  margin-top: 0;
+}
+
+.article-markdown .markdown-body > *:last-child {
+  margin-bottom: 0;
+}
+
+.article-markdown .markdown-body h1,
+.article-markdown .markdown-body h2,
+.article-markdown .markdown-body h3,
+.article-markdown .markdown-body h4,
+.article-markdown .markdown-body h5,
+.article-markdown .markdown-body h6 {
+  color: var(--foreground);
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+  margin: 2rem 0 1rem;
+}
+
+.article-markdown .markdown-body h1 {
+  font-size: 2rem;
+}
+
+.article-markdown .markdown-body h2 {
+  font-size: 1.5rem;
+}
+
+.article-markdown .markdown-body h3 {
+  font-size: 1.25rem;
+}
+
+.article-markdown .markdown-body p,
+.article-markdown .markdown-body ul,
+.article-markdown .markdown-body ol,
+.article-markdown .markdown-body blockquote,
+.article-markdown .markdown-body pre,
+.article-markdown .markdown-body table {
+  margin: 1rem 0;
+}
+
+.article-markdown .markdown-body ul,
+.article-markdown .markdown-body ol {
+  padding-left: 1.5rem;
+}
+
+.article-markdown .markdown-body li + li {
+  margin-top: 0.4rem;
+}
+
+.article-markdown .markdown-body blockquote {
+  border-left: 4px solid color-mix(in oklab, var(--primary) 48%, var(--border));
+  padding: 0.25rem 0 0.25rem 1rem;
+  color: var(--muted-foreground);
+  background: color-mix(in oklab, var(--accent) 60%, transparent);
+  border-radius: 0 1rem 1rem 0;
+}
+
+.article-markdown .markdown-body a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.article-markdown .markdown-body hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 2rem 0;
+}
+
+.article-markdown .markdown-body code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--app-code-surface);
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.4rem;
+}
+
+.article-markdown .markdown-body pre {
+  background: var(--app-code-surface);
+  color: var(--foreground);
+  padding: 1rem 1.1rem;
+  border-radius: 1rem;
+  overflow-x: auto;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.article-markdown .markdown-body pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.article-markdown .markdown-body img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.5rem auto;
+  border-radius: 1rem;
+  box-shadow: 0 12px 30px rgb(15 23 42 / 10%);
+}
+
+.article-markdown .markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 0.9rem;
+  border: 1px solid var(--border);
+}
+
+.article-markdown .markdown-body th,
+.article-markdown .markdown-body td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.8rem 0.9rem;
+  text-align: left;
+}
+
+.article-markdown .markdown-body th {
+  background: var(--app-surface-soft);
+  font-weight: 600;
+}
+
+@media (width <= 1023px) {
+  .bytemd.bytemd {
+    min-height: 360px;
+  }
+
+  .bytemd.bytemd .bytemd-body {
+    flex-direction: column;
+  }
+
+  .bytemd.bytemd .bytemd-preview {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .bytemd-toolbar {
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+}
+
+@media (width <= 767px) {
+  .article-markdown .markdown-body {
+    font-size: 0.95rem;
+    line-height: 1.85;
+  }
+
+  .article-markdown .markdown-body h1 {
+    font-size: 1.65rem;
+  }
+
+  .article-markdown .markdown-body h2 {
+    font-size: 1.35rem;
+  }
+
+  .article-markdown .markdown-body table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
