@@ -8,6 +8,7 @@ import {
   buildUserRecoKey,
   fetchRecommendSnapshot,
   getOrCreateRecoSessionId,
+  readRecommendSnapshotCache,
 } from "@/services/reco-snapshot";
 
 const RECOMMEND_SURFACE = "dashboard_recommend";
@@ -25,6 +26,11 @@ export const RecoPrewarm = () => {
     const win = window as BrowserWindow;
 
     const prewarmByUser = async (userId: string, userKey: string, sessionId: string) => {
+      const cached = readRecommendSnapshotCache(userKey);
+      if (cached.freshness === "fresh") {
+        return;
+      }
+
       try {
         await fetchRecommendSnapshot({
           userId,
