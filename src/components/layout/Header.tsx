@@ -3,23 +3,24 @@
 import {
   BookmarkIcon,
   FileTextIcon,
-  FlameIcon,
   HomeIcon,
   InfoIcon,
   LogInIcon,
   LogOutIcon,
+  MapIcon,
   MenuIcon,
   MessageSquareIcon,
   PenBoxIcon,
-  Settings2Icon,
   SettingsIcon,
   UserIcon,
   XIcon,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { markNavigationStart } from "@/components/motion/navigation-timing";
 import {
   DEFAULT_PROFILE_THEME_ID,
   PROFILE_THEME_EVENT_NAME,
@@ -28,14 +29,8 @@ import {
   resolveProfileThemeId,
   shouldApplyFrontendTheme,
 } from "@/components/profile/profile-theme-config";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { buildLoginPath } from "@/lib/auth-entry";
+import { buildLoginPath, USER_HOME_PATH } from "@/lib/auth-entry";
 import { cn } from "@/lib/utils";
 import {
   clearAdminAuthToken,
@@ -47,9 +42,16 @@ import { clearAuthToken, getAuthToken, syncAuthCookieFromStorage } from "@/servi
 const USER_TOKEN_STORAGE_KEY = "user_center_token";
 const ADMIN_TOKEN_STORAGE_KEY = "admin_center_token";
 
+const HeaderAboutDialog = dynamic(
+  () => import("@/components/layout/HeaderAboutDialog").then((mod) => mod.HeaderAboutDialog),
+  {
+    ssr: false,
+  },
+);
+
 const baseNavItems = [
-  { href: "/dashboard", label: "首页", icon: HomeIcon },
-  { href: "/hot", label: "热榜", icon: FlameIcon },
+  { href: USER_HOME_PATH, label: "首页", icon: HomeIcon },
+  { href: "/dashboard/travel-agent", label: "旅行 Agent", icon: MapIcon },
   { href: "/post", label: "发布", icon: PenBoxIcon },
   { href: "/profile/articles", label: "文章管理", icon: FileTextIcon },
   { href: "/messages", label: "消息", icon: MessageSquareIcon },
@@ -57,13 +59,14 @@ const baseNavItems = [
   { href: "/profile", label: "个人中心", icon: UserIcon },
 ];
 
-const aboutContentLines = [
-  "欢迎加入识海社区。",
-  "QQ群：750807478",
-  "开源推荐系统：https://github.com/Sea-Go/Sea-BreakTheWaves",
-  "开源后端：https://github.com/Sea-Go/Sea-BreakTheWaves",
-  "开源前端：https://github.com/Sea-Go/Sea-RideTheWind-Fronted",
-];
+const PRIMARY_PREFETCH_PATHS = [
+  USER_HOME_PATH,
+  "/dashboard/hot",
+  "/dashboard/travel-agent",
+  "/post",
+  "/profile",
+] as const;
+const SECONDARY_PREFETCH_PATHS = ["/profile/articles", "/messages", "/profile/favorites"] as const;
 
 interface HeaderAuthState {
   hasAdminSession: boolean;
@@ -78,6 +81,13 @@ const EMPTY_AUTH_STATE: HeaderAuthState = {
 };
 
 const matchRoute = (pathname: string, href: string) => {
+  if (href === USER_HOME_PATH) {
+    return (
+      pathname === "/dashboard" ||
+      (pathname.startsWith("/dashboard/") && pathname !== "/dashboard/travel-agent")
+    );
+  }
+
   if (href === "/profile") {
     return (
       pathname === href ||
@@ -188,6 +198,22 @@ export const Header = () => {
     };
   }, [isMobileMenuOpen]);
 
+  useEffect(() => {
+    PRIMARY_PREFETCH_PATHS.forEach((href) => {
+      router.prefetch(href);
+    });
+  }, [router]);
+
+  useEffect(() => {
+    if (!isMobileMenuOpen) {
+      return;
+    }
+
+    SECONDARY_PREFETCH_PATHS.forEach((href) => {
+      router.prefetch(href);
+    });
+  }, [isMobileMenuOpen, router]);
+
   const profileTheme = shouldApplyTheme ? profileThemeMap[profileThemeId] : null;
 
   const handleLogout = () => {
@@ -200,11 +226,14 @@ export const Header = () => {
     clearAdminAuthToken();
     setAuthState(EMPTY_AUTH_STATE);
     setIsMobileMenuOpen(false);
+    markNavigationStart(nextLoginPath);
     router.push(nextLoginPath);
   };
 
   const renderBrand = (className?: string) => (
-    <div className={cn("text-primary font-bold tracking-tight", className)}>识海社区</div>
+    <div className={cn("text-primary font-extrabold tracking-tight drop-shadow-sm", className)}>
+      识海社区
+    </div>
   );
 
   const renderNavLinks = (mode: "desktop" | "mobile") =>
@@ -217,11 +246,11 @@ export const Header = () => {
           key={`${mode}-${item.href}`}
           href={item.href}
           className={cn(
-            "flex items-center gap-3 rounded-2xl transition-colors",
+            "flex items-center gap-3 rounded-2xl transition-all duration-200",
             mode === "desktop" ? "px-4 py-3 text-sm" : "px-4 py-3.5 text-base",
             isActive
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:bg-accent hover:text-foreground",
+              ? "bg-primary text-primary-foreground shadow-primary/20 shadow-lg"
+              : "text-muted-foreground hover:bg-accent/80 hover:text-primary hover:shadow-sm",
           )}
           onClick={mode === "mobile" ? () => setIsMobileMenuOpen(false) : undefined}
         >
@@ -234,25 +263,9 @@ export const Header = () => {
   const renderMenuActions = (mode: "desktop" | "mobile") => (
     <div className={cn("space-y-2", mode === "desktop" ? "" : "mt-6")}>
       <Button
-        asChild
         variant="ghost"
         className={cn(
-          "text-muted-foreground hover:bg-accent hover:text-foreground justify-start rounded-2xl",
-          mode === "desktop" ? "h-auto w-full px-4 py-3 text-sm" : "h-12 w-full px-4 text-base",
-        )}
-      >
-        <Link
-          href="/settings"
-          onClick={mode === "mobile" ? () => setIsMobileMenuOpen(false) : undefined}
-        >
-          <Settings2Icon className="h-5 w-5" />
-          设置
-        </Link>
-      </Button>
-      <Button
-        variant="ghost"
-        className={cn(
-          "text-muted-foreground hover:bg-accent hover:text-foreground justify-start rounded-2xl",
+          "text-muted-foreground hover:text-primary hover:bg-accent/80 justify-start rounded-2xl hover:shadow-sm",
           mode === "desktop" ? "h-auto w-full px-4 py-3 text-sm" : "h-12 w-full px-4 text-base",
         )}
         onClick={() => {
@@ -295,8 +308,15 @@ export const Header = () => {
   return (
     <>
       <header
-        className="border-border bg-background sticky top-0 z-50 border-b shadow-sm transition-[background-color,border-color,color] duration-300 lg:hidden"
-        style={profileTheme?.style}
+        className="border-border/75 bg-card/80 sticky top-0 z-50 border-b shadow-sm shadow-black/5 backdrop-blur-xl transition-[background-color,border-color,color] duration-300 lg:hidden"
+        style={
+          profileTheme
+            ? {
+                ...profileTheme.style,
+                background: "var(--app-header-background)",
+              }
+            : undefined
+        }
       >
         <div className="relative overflow-hidden">
           {profileTheme ? (
@@ -333,15 +353,22 @@ export const Header = () => {
         <div className="fixed inset-0 z-[70] lg:hidden" aria-modal="true" role="dialog">
           <button
             type="button"
-            className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/45 backdrop-blur-sm"
             aria-label="关闭菜单蒙层"
             onClick={() => setIsMobileMenuOpen(false)}
           />
           <div
-            className="bg-background border-border absolute inset-y-0 right-0 flex w-[min(88vw,22rem)] flex-col border-l shadow-2xl"
-            style={profileTheme?.style}
+            className="border-border/75 bg-card/95 absolute inset-y-0 right-0 flex w-[min(88vw,22rem)] flex-col border-l shadow-2xl shadow-black/15 backdrop-blur-xl"
+            style={
+              profileTheme
+                ? {
+                    ...profileTheme.style,
+                    background: "var(--app-menu-background)",
+                  }
+                : undefined
+            }
           >
-            <div className="border-border flex items-center justify-between border-b px-4 py-4">
+            <div className="border-border/70 flex items-center justify-between border-b px-4 py-4">
               {renderBrand("text-xl")}
               <Button
                 variant="ghost"
@@ -363,8 +390,15 @@ export const Header = () => {
       ) : null}
 
       <aside
-        className="border-border bg-background sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-hidden border-r py-6 shadow-sm transition-[background-color,border-color,color] duration-300 lg:flex"
-        style={profileTheme?.style}
+        className="border-border/80 bg-card/90 sticky top-0 hidden h-screen w-[16.75rem] shrink-0 flex-col overflow-hidden border-r py-6 shadow-xl shadow-black/10 backdrop-blur-xl transition-[background-color,border-color,color] duration-300 lg:flex"
+        style={
+          profileTheme
+            ? {
+                ...profileTheme.style,
+                background: "var(--app-sidebar-background)",
+              }
+            : undefined
+        }
       >
         {profileTheme ? (
           <>
@@ -383,45 +417,19 @@ export const Header = () => {
 
         <div className="relative z-10 px-8">{renderBrand("text-xl")}</div>
 
-        <nav className="relative z-10 mt-8 flex w-full flex-1 flex-col space-y-2 px-4 text-sm font-medium">
+        <nav className="relative z-10 mt-8 flex w-full flex-1 flex-col space-y-2 px-4 text-sm font-semibold">
           {renderNavLinks("desktop")}
           {renderMenuActions("desktop")}
         </nav>
       </aside>
 
-      <AlertDialog open={isAboutOpen} onOpenChange={setIsAboutOpen}>
-        <AlertDialogContent className="max-w-xl rounded-3xl border-sky-100 bg-[linear-gradient(135deg,rgba(248,250,252,0.98),rgba(239,246,255,0.96))] p-0 shadow-2xl shadow-sky-100/70">
-          <div className="relative overflow-hidden rounded-3xl p-6">
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.25),transparent_55%)]"
-            />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-4 right-4 z-10 rounded-full"
-              onClick={() => setIsAboutOpen(false)}
-              aria-label="关闭关于弹窗"
-            >
-              <XIcon className="size-4" />
-            </Button>
-
-            <div className="relative space-y-4 pr-10">
-              <div className="space-y-2">
-                <AlertDialogTitle className="text-2xl font-semibold tracking-tight text-slate-900">
-                  关于识海社区
-                </AlertDialogTitle>
-                <AlertDialogDescription className="text-sm leading-7 whitespace-pre-line text-slate-600">
-                  {aboutContentLines.join("\n")}
-                </AlertDialogDescription>
-              </div>
-              <div className="rounded-2xl border border-sky-100 bg-white/80 px-4 py-3 text-xs leading-6 text-slate-500">
-                点击右上角的关闭按钮，就可以立刻收起这个窗口。
-              </div>
-            </div>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
+      {isAboutOpen ? (
+        <HeaderAboutDialog
+          open={isAboutOpen}
+          onOpenChange={setIsAboutOpen}
+          themeStyle={profileTheme?.style}
+        />
+      ) : null}
     </>
   );
 };
