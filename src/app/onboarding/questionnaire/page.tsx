@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 
 import {
   ARTICLE_LENGTH_OPTIONS,
@@ -12,15 +12,15 @@ import {
   INTEREST_OPTIONS,
   PURPOSE_OPTIONS,
   QUESTIONNAIRE_MAX_SELECTIONS,
+  type QuestionnaireOption,
   READING_TIME_OPTIONS,
   RECOMMENDATION_TYPE_OPTIONS,
   STYLE_OPTIONS,
-  type QuestionnaireOption,
 } from "@/app/onboarding/questionnaire/_constants/questionnaire";
 import { Layout } from "@/components/layout/layout";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { buildLoginPath, getSafeNextPath } from "@/lib/auth-entry";
@@ -101,13 +101,11 @@ function ChoiceButton({
 function QuestionSection({
   index,
   title,
-  description,
   helper,
   children,
 }: {
   index: number;
   title: string;
-  description: string;
   helper?: string;
   children: React.ReactNode;
 }) {
@@ -115,7 +113,6 @@ function QuestionSection({
     <Card className="border-border/60 shadow-sm">
       <CardHeader className="pb-4">
         <CardTitle className="text-xl">{`${index}. ${title}`}</CardTitle>
-        <CardDescription className="text-sm leading-6">{description}</CardDescription>
         {helper ? <p className="text-muted-foreground text-xs">{helper}</p> : null}
       </CardHeader>
       <CardContent>{children}</CardContent>
@@ -343,10 +340,6 @@ function OnboardingQuestionnairePageContent() {
                   冷启动偏好问卷
                 </p>
                 <h1 className="text-3xl font-semibold sm:text-4xl">先告诉我你想看什么</h1>
-                <p className="max-w-3xl text-sm leading-7 text-white/80 sm:text-base">
-                  这份问卷只需要 1 到 2
-                  分钟。提交后，我们会把它写入推荐系统，作为你的初始推荐记忆，帮助首页更快给出贴近兴趣的内容。
-                </p>
               </div>
               <div className="grid gap-3 text-sm text-white/85 sm:grid-cols-3">
                 <div className="rounded-2xl border border-white/15 bg-white/8 px-4 py-3">
@@ -371,7 +364,6 @@ function OnboardingQuestionnairePageContent() {
           <QuestionSection
             index={1}
             title="你最感兴趣的内容方向是什么？"
-            description="多选，最多 5 个。这个答案会成为最基础的主题偏好。"
             helper={selectionCountLabel(interests.length, QUESTIONNAIRE_MAX_SELECTIONS.interests)}
           >
             <OptionGrid
@@ -400,11 +392,7 @@ function OnboardingQuestionnairePageContent() {
             ) : null}
           </QuestionSection>
 
-          <QuestionSection
-            index={2}
-            title="你使用这个产品的主要目的是什么？"
-            description="单选。这个答案会帮助我们区分学习型、资讯型和娱乐型的推荐目标。"
-          >
+          <QuestionSection index={2} title="你使用这个产品的主要目的是什么？">
             <OptionGrid
               options={PURPOSE_OPTIONS}
               selected={purpose ? [purpose] : []}
@@ -429,7 +417,6 @@ function OnboardingQuestionnairePageContent() {
           <QuestionSection
             index={3}
             title="你更喜欢哪种文章类型？"
-            description="多选，最多 3 个。它会影响推荐结果的内容形式，而不只是主题。"
             helper={selectionCountLabel(
               articleTypes.length,
               QUESTIONNAIRE_MAX_SELECTIONS.articleTypes,
@@ -450,11 +437,7 @@ function OnboardingQuestionnairePageContent() {
             />
           </QuestionSection>
 
-          <QuestionSection
-            index={4}
-            title="你通常喜欢多长的文章？"
-            description="单选。这个答案会帮助我们控制推荐长度，提升阅读完成率。"
-          >
+          <QuestionSection index={4} title="你通常喜欢多长的文章？">
             <OptionGrid
               options={ARTICLE_LENGTH_OPTIONS}
               selected={articleLength ? [articleLength] : []}
@@ -465,11 +448,7 @@ function OnboardingQuestionnairePageContent() {
             />
           </QuestionSection>
 
-          <QuestionSection
-            index={5}
-            title="你希望推荐内容更偏向哪种风格？"
-            description="单选。它会帮助我们更快匹配你能读下去的表达方式。"
-          >
+          <QuestionSection index={5} title="你希望推荐内容更偏向哪种风格？">
             <OptionGrid
               options={STYLE_OPTIONS}
               selected={style ? [style] : []}
@@ -483,7 +462,6 @@ function OnboardingQuestionnairePageContent() {
           <QuestionSection
             index={6}
             title="你的专业背景或熟悉领域是什么？"
-            description="多选，最多 4 个。它会帮助我们估计内容难度和行业相关性。"
             helper={selectionCountLabel(
               backgrounds.length,
               QUESTIONNAIRE_MAX_SELECTIONS.backgrounds,
@@ -515,11 +493,7 @@ function OnboardingQuestionnairePageContent() {
             ) : null}
           </QuestionSection>
 
-          <QuestionSection
-            index={7}
-            title="你对内容难度的偏好是？"
-            description="单选。这个答案可以避免新用户一开始被太难或太浅的内容劝退。"
-          >
+          <QuestionSection index={7} title="你对内容难度的偏好是？">
             <OptionGrid
               options={DIFFICULTY_OPTIONS}
               selected={difficulty ? [difficulty] : []}
@@ -533,7 +507,6 @@ function OnboardingQuestionnairePageContent() {
           <QuestionSection
             index={8}
             title="哪些内容你不想看到？"
-            description="多选，可跳过。负反馈通常比正反馈更能帮助推荐快速收敛。"
             helper={selectionCountLabel(
               excludedContents.length,
               QUESTIONNAIRE_MAX_SELECTIONS.excludedContents,
@@ -568,7 +541,6 @@ function OnboardingQuestionnairePageContent() {
           <QuestionSection
             index={9}
             title="你更常在什么时间阅读？"
-            description="多选，可跳过。这个答案会帮助我们匹配推荐节奏和内容长度。"
             helper={selectionCountLabel(
               readingTimes.length,
               QUESTIONNAIRE_MAX_SELECTIONS.readingTimes,
@@ -592,7 +564,6 @@ function OnboardingQuestionnairePageContent() {
           <QuestionSection
             index={10}
             title="你是否愿意接收以下类型的个性化推荐？"
-            description="多选。这个答案会同时服务首页推荐和后续通知分流。"
             helper={selectionCountLabel(
               recommendationTypes.length,
               QUESTIONNAIRE_MAX_SELECTIONS.recommendationTypes,
@@ -617,9 +588,6 @@ function OnboardingQuestionnairePageContent() {
             <CardContent className="flex flex-col gap-4 px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-2">
                 <h2 className="text-lg font-semibold">准备好了就提交</h2>
-                <p className="text-muted-foreground text-sm leading-6">
-                  提交后会立即写入推荐系统，作为你的初始推荐记忆。随后会直接跳转到首页推荐流。
-                </p>
               </div>
               <div className="flex flex-col gap-3 sm:w-auto sm:min-w-[220px]">
                 <Button onClick={() => void handleSubmit()} disabled={submitting}>
