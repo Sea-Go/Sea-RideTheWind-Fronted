@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { AppPromptProvider } from "@/components/common/AppPromptProvider";
-import { RecoPrewarm } from "@/components/common/RecoPrewarm";
+import { FrontendThemeProvider } from "@/components/profile/FrontendThemeProvider";
 
 import "./globals.css";
 
@@ -18,8 +18,9 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className="antialiased" suppressHydrationWarning>
-        <AppPromptProvider>{children}</AppPromptProvider>
-        <RecoPrewarm />
+        <FrontendThemeProvider>
+          <AppPromptProvider>{children}</AppPromptProvider>
+        </FrontendThemeProvider>
       </body>
     </html>
   );
