@@ -107,7 +107,6 @@ export default function ProfileSecurityPage() {
         <ProfileThemeShell className="space-y-6">
           <header className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">安全设置</h1>
-            <p className="text-muted-foreground text-sm">管理账号退出与注销等高风险操作。</p>
             <div>
               <Button asChild variant="outline" size="sm">
                 <Link href="/profile">返回个人中心</Link>
