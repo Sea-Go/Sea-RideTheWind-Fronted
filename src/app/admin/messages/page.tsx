@@ -329,7 +329,6 @@ export default function AdminMessagesPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle>发送系统通知</CardTitle>
-                    <CardDescription>支持全服公告和单人通知。</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <label className="flex items-center gap-3 text-sm">
@@ -401,7 +400,6 @@ export default function AdminMessagesPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle>发起管理员会话</CardTitle>
-                    <CardDescription>管理员可以无条件向用户发起聊天。</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid gap-2">
@@ -435,7 +433,6 @@ export default function AdminMessagesPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle>会话列表</CardTitle>
-                    <CardDescription>查看管理员与用户之间的当前聊天窗口。</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {conversations.length === 0 ? (
@@ -489,21 +486,19 @@ export default function AdminMessagesPage() {
                         ? `与 ${selectedConversation.peer_name || `用户 ${selectedConversation.peer_id}`} 的聊天`
                         : "聊天窗口"}
                     </CardTitle>
-                    <CardDescription>
-                      {selectedConversation
-                        ? `${conversationStatusLabel(conversationDetail?.status ?? selectedConversation.status)} · ${
-                            (conversationDetail?.can_send ?? selectedConversation.can_send)
-                              ? "当前可继续发送"
-                              : "当前不可发送"
-                          }`
-                        : "从左侧选择一条会话查看详情。"}
-                    </CardDescription>
+                    {selectedConversation ? (
+                      <CardDescription>
+                        {`${conversationStatusLabel(conversationDetail?.status ?? selectedConversation.status)} · ${
+                          (conversationDetail?.can_send ?? selectedConversation.can_send)
+                            ? "当前可继续发送"
+                            : "当前不可发送"
+                        }`}
+                      </CardDescription>
+                    ) : null}
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {!selectedConversation || !conversationDetail ? (
-                      <p className="text-muted-foreground text-sm">
-                        请选择一个会话查看完整聊天记录。
-                      </p>
+                      <p className="text-muted-foreground text-sm">请选择会话</p>
                     ) : (
                       <>
                         <div className="bg-muted/30 space-y-3 rounded-xl border p-4">
