@@ -7,10 +7,10 @@ import {
   RefreshCcwIcon,
   TargetIcon,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { TaskProgressItem } from "@/services/task";
 
@@ -21,7 +21,6 @@ interface TaskProgressBoardProps {
   errorMessage?: string | null;
   currentUserId?: string | null;
   title?: string;
-  description?: string;
   onRefresh?: (() => void) | null;
 }
 
@@ -60,13 +59,11 @@ const TaskSummaryCard = ({
 
 const TaskSection = ({
   title,
-  description,
   emptyMessage,
   tasks,
   completed,
 }: {
   title: string;
-  description: string;
   emptyMessage: string;
   tasks: TaskProgressItem[];
   completed: boolean;
@@ -74,7 +71,6 @@ const TaskSection = ({
   <Card className="border-border/80 bg-card/85 shadow-sm backdrop-blur">
     <CardHeader className="space-y-2">
       <CardTitle className="text-xl">{title}</CardTitle>
-      <CardDescription>{description}</CardDescription>
     </CardHeader>
     <CardContent>
       {tasks.length === 0 ? (
@@ -150,7 +146,6 @@ export const TaskProgressBoard = ({
   errorMessage = null,
   currentUserId = null,
   title = "任务进度",
-  description = "系统会根据当前登录账号自动同步任务完成情况。",
   onRefresh = null,
 }: TaskProgressBoardProps) => {
   const [activeFilter, setActiveFilter] = useState<TaskFilter>("pending");
@@ -160,9 +155,6 @@ export const TaskProgressBoard = ({
   const isShowingCompleted = activeFilter === "completed";
   const visibleTasks = isShowingCompleted ? completedTasks : pendingTasks;
   const sectionTitle = isShowingCompleted ? "已完成任务" : "未完成任务";
-  const sectionDescription = isShowingCompleted
-    ? "这里展示已经达成目标的任务记录。"
-    : "这里展示当前还可以继续推进的任务。";
   const emptyMessage = isShowingCompleted ? "当前还没有已完成任务。" : "当前没有未完成任务。";
 
   return (
@@ -175,10 +167,6 @@ export const TaskProgressBoard = ({
           </div>
           <div className="space-y-1">
             <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
-            <p className="text-muted-foreground text-sm leading-6">{description}</p>
-            {currentUserId ? (
-              <p className="text-muted-foreground text-xs">当前任务用户编号：{currentUserId}</p>
-            ) : null}
           </div>
         </div>
         {onRefresh ? (
@@ -276,7 +264,6 @@ export const TaskProgressBoard = ({
 
           <TaskSection
             title={sectionTitle}
-            description={sectionDescription}
             emptyMessage={emptyMessage}
             tasks={visibleTasks}
             completed={isShowingCompleted}
@@ -288,7 +275,7 @@ export const TaskProgressBoard = ({
         <Card className="border-border/80 bg-card/85 shadow-sm backdrop-blur">
           <CardContent className="text-muted-foreground flex items-center gap-3 p-6 text-sm">
             <TargetIcon className="text-primary/75 h-5 w-5" />
-            当前还没有可展示的任务数据，完成互动后这里会自动更新。
+            暂无任务数据
           </CardContent>
         </Card>
       ) : null}
