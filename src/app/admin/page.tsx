@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout/layout";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { buildLoginPath } from "@/lib/auth-entry";
 import {
   type AdminProfile,
@@ -84,9 +85,13 @@ export default function AdminHomePage() {
   return (
     <Layout>
       <PageContainer className="space-y-6 py-8">
-        <header className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">管理后台</h1>
-          <p className="text-muted-foreground text-sm">执行用户管理与管理员资料维护。</p>
+        <header className="app-hero-surface rounded-[1.75rem] p-6">
+          <div className="space-y-2">
+            <p className="app-pill inline-flex rounded-full px-3 py-1 text-xs font-medium">
+              管理后台
+            </p>
+            <h1 className="text-3xl font-bold tracking-tight">管理识海社区</h1>
+          </div>
         </header>
 
         {isLoading ? (
@@ -96,14 +101,28 @@ export default function AdminHomePage() {
             {errorMessage && <p className="text-destructive text-sm">{errorMessage}</p>}
 
             {admin && (
-              <section className="space-y-2 rounded-xl border p-6">
-                <h2 className="text-xl font-semibold">管理员信息</h2>
-                <p className="text-sm">
-                  用户编号：<span className="font-mono">{admin.uid}</span>
-                </p>
-                <p className="text-sm">用户名：{admin.username}</p>
-                <p className="text-sm">邮箱：{admin.email || "--"}</p>
-              </section>
+              <Card>
+                <CardContent className="grid gap-4 p-6 sm:grid-cols-3">
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground text-xs tracking-[0.18em] uppercase">
+                      用户编号
+                    </p>
+                    <p className="font-mono text-sm break-all">{admin.uid}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground text-xs tracking-[0.18em] uppercase">
+                      用户名
+                    </p>
+                    <p className="text-sm font-semibold">{admin.username}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground text-xs tracking-[0.18em] uppercase">
+                      邮箱
+                    </p>
+                    <p className="text-sm font-semibold">{admin.email || "--"}</p>
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
