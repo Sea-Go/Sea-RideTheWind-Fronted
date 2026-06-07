@@ -1,20 +1,9 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Toaster } from "@/components/ui/sonner";
-
-type ConfirmOptions = {
+export type ConfirmOptions = {
   title: string;
   description: string;
   confirmText?: string;
@@ -26,9 +15,19 @@ type PromptContextValue = {
   confirm: (options: ConfirmOptions) => Promise<boolean>;
 };
 
-type ConfirmState = ConfirmOptions & {
+export type ConfirmState = ConfirmOptions & {
   open: boolean;
 };
+
+const AppPromptDialog = dynamic(
+  () =>
+    import("@/components/common/AppPromptDialog").then((module) => module.AppPromptDialog),
+  { ssr: false },
+);
+const AppToaster = dynamic(
+  () => import("@/components/common/AppToaster").then((module) => module.AppToaster),
+  { ssr: false },
+);
 
 const PromptContext = createContext<PromptContextValue | null>(null);
 
@@ -44,6 +43,22 @@ const defaultConfirmState: ConfirmState = {
 export function AppPromptProvider({ children }: { children: React.ReactNode }) {
   const [confirmState, setConfirmState] = useState<ConfirmState>(defaultConfirmState);
   const [resolver, setResolver] = useState<((result: boolean) => void) | null>(null);
+  const [showToaster, setShowToaster] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const requestIdle = window.requestIdleCallback;
+    if (requestIdle) {
+      const idleId = requestIdle(() => setShowToaster(true), { timeout: 3000 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timer = window.setTimeout(() => setShowToaster(true), 1200);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const resetDialog = useCallback(() => {
     setConfirmState(defaultConfirmState);
@@ -85,35 +100,10 @@ export function AppPromptProvider({ children }: { children: React.ReactNode }) {
   return (
     <PromptContext.Provider value={contextValue}>
       {children}
-      <Toaster richColors closeButton position="top-center" />
-      <AlertDialog
-        open={confirmState.open}
-        onOpenChange={(open) => {
-          if (!open) {
-            closeDialog(false);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{confirmState.title}</AlertDialogTitle>
-            <AlertDialogDescription>{confirmState.description}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => closeDialog(false)}>
-              {confirmState.cancelText}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className={
-                confirmState.destructive ? "bg-destructive text-destructive-foreground" : ""
-              }
-              onClick={() => closeDialog(true)}
-            >
-              {confirmState.confirmText}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {showToaster ? <AppToaster /> : null}
+      {confirmState.open ? (
+        <AppPromptDialog confirmState={confirmState} onClose={closeDialog} />
+      ) : null}
     </PromptContext.Provider>
   );
 }
@@ -121,7 +111,7 @@ export function AppPromptProvider({ children }: { children: React.ReactNode }) {
 export function useAppPrompt() {
   const context = useContext(PromptContext);
   if (!context) {
-  throw new Error("useAppPrompt 必须在 AppPromptProvider 内部使用");
+    throw new Error("useAppPrompt 必须在 AppPromptProvider 内部使用");
   }
   return context;
 }
