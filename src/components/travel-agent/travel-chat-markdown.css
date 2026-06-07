@@ -1,0 +1,105 @@
+.travel-chat-markdown.article-markdown .bytemd {
+  width: 100%;
+}
+
+.travel-chat-markdown.article-markdown .markdown-body {
+  color: inherit;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.travel-chat-markdown.article-markdown .markdown-body h1,
+.travel-chat-markdown.article-markdown .markdown-body h2,
+.travel-chat-markdown.article-markdown .markdown-body h3,
+.travel-chat-markdown.article-markdown .markdown-body h4,
+.travel-chat-markdown.article-markdown .markdown-body h5,
+.travel-chat-markdown.article-markdown .markdown-body h6 {
+  color: inherit;
+  margin-top: 0.75rem;
+  margin-bottom: 0.4rem;
+  letter-spacing: 0;
+}
+
+.travel-chat-markdown.article-markdown .markdown-body h1 {
+  font-size: 1.1rem;
+}
+
+.travel-chat-markdown.article-markdown .markdown-body h2 {
+  font-size: 1rem;
+}
+
+.travel-chat-markdown.article-markdown .markdown-body h3,
+.travel-chat-markdown.article-markdown .markdown-body h4,
+.travel-chat-markdown.article-markdown .markdown-body h5,
+.travel-chat-markdown.article-markdown .markdown-body h6 {
+  font-size: 0.95rem;
+}
+
+.travel-chat-markdown.article-markdown .markdown-body p,
+.travel-chat-markdown.article-markdown .markdown-body ul,
+.travel-chat-markdown.article-markdown .markdown-body ol,
+.travel-chat-markdown.article-markdown .markdown-body blockquote,
+.travel-chat-markdown.article-markdown .markdown-body pre,
+.travel-chat-markdown.article-markdown .markdown-body table {
+  margin-top: 0.45rem;
+  margin-bottom: 0.45rem;
+}
+
+.travel-chat-markdown.article-markdown .markdown-body ul,
+.travel-chat-markdown.article-markdown .markdown-body ol {
+  padding-left: 1.15rem;
+}
+
+.travel-chat-markdown.article-markdown .markdown-body li + li {
+  margin-top: 0.2rem;
+}
+
+.travel-chat-markdown.article-markdown .markdown-body pre {
+  max-width: 100%;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  overflow-x: auto;
+}
+
+.travel-chat-markdown.article-markdown .markdown-body code {
+  border-radius: 0.3rem;
+  font-size: 0.82em;
+}
+
+.travel-chat-markdown.article-markdown .markdown-body table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.travel-chat-markdown.article-markdown .markdown-body th,
+.travel-chat-markdown.article-markdown .markdown-body td {
+  padding: 0.45rem 0.55rem;
+}
+
+.travel-chat-markdown-user.article-markdown .markdown-body,
+.travel-chat-markdown-user.article-markdown .markdown-body h1,
+.travel-chat-markdown-user.article-markdown .markdown-body h2,
+.travel-chat-markdown-user.article-markdown .markdown-body h3,
+.travel-chat-markdown-user.article-markdown .markdown-body h4,
+.travel-chat-markdown-user.article-markdown .markdown-body h5,
+.travel-chat-markdown-user.article-markdown .markdown-body h6,
+.travel-chat-markdown-user.article-markdown .markdown-body a {
+  color: hsl(var(--primary-foreground));
+}
+
+.travel-chat-markdown-user.article-markdown .markdown-body code {
+  color: hsl(var(--primary-foreground));
+  background: rgb(255 255 255 / 0.18);
+}
+
+.travel-chat-markdown-user.article-markdown .markdown-body pre,
+.travel-chat-markdown-user.article-markdown .markdown-body blockquote,
+.travel-chat-markdown-user.article-markdown .markdown-body th,
+.travel-chat-markdown-user.article-markdown .markdown-body td {
+  border-color: rgb(255 255 255 / 0.28);
+  background: rgb(255 255 255 / 0.12);
+}
