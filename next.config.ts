@@ -23,6 +23,31 @@ const nextConfig: NextConfig = {
         port: "",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "sea-ridethewindbreakthewaves.xyz",
+        pathname: "/**",
+      },
+      {
+        protocol: "http",
+        hostname: "sea-ridethewindbreakthewaves.xyz",
+        pathname: "/**",
+      },
+      {
+        protocol: "http",
+        hostname: "localhost",
+        pathname: "/**",
+      },
+      {
+        protocol: "http",
+        hostname: "127.0.0.1",
+        pathname: "/**",
+      },
     ],
   },
   async redirects() {
