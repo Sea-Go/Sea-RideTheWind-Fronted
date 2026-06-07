@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Layout } from "@/components/layout/layout";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -10,11 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ADMIN_FRONTEND_SESSION_MESSAGE, getFrontendAccessState } from "@/services/auth";
 import {
-  ADMIN_FRONTEND_SESSION_MESSAGE,
-  getFrontendAccessState,
-} from "@/services/auth";
-import {
+  type ChatMessageItem,
+  type ConversationItem,
+  type ConversationMessagesResult,
   getConversationMessages,
   getUnreadSummary,
   listConversations,
@@ -22,11 +22,8 @@ import {
   markAllNotificationsRead,
   markConversationRead,
   markNotificationRead,
-  sendUserChatMessage,
-  type ChatMessageItem,
-  type ConversationItem,
-  type ConversationMessagesResult,
   type NotificationItem,
+  sendUserChatMessage,
   type UnreadSummaryResult,
 } from "@/services/message";
 
@@ -90,12 +87,66 @@ export default function MessagesPage() {
   });
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
+  const conversationsRef = useRef<ConversationItem[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string>("");
-  const [conversationDetail, setConversationDetail] = useState<ConversationMessagesResult | null>(null);
+  const selectedConversationIdRef = useRef("");
+  const [conversationDetail, setConversationDetail] = useState<ConversationMessagesResult | null>(
+    null,
+  );
 
   const [draft, setDraft] = useState("");
   const [newChatTargetId, setNewChatTargetId] = useState("");
   const [newChatContent, setNewChatContent] = useState("");
+
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
+
+  useEffect(() => {
+    selectedConversationIdRef.current = selectedConversationId;
+  }, [selectedConversationId]);
+
+  const decrementUnreadSummary = useCallback(
+    (kind: "notification" | "conversation", amount: number) => {
+      if (amount <= 0) {
+        return;
+      }
+
+      setSummary((current) => {
+        const notificationUnread =
+          kind === "notification"
+            ? Math.max(0, current.notification_unread - amount)
+            : current.notification_unread;
+        const conversationUnread =
+          kind === "conversation"
+            ? Math.max(0, current.conversation_unread - amount)
+            : current.conversation_unread;
+
+        return {
+          notification_unread: notificationUnread,
+          conversation_unread: conversationUnread,
+          total_unread: notificationUnread + conversationUnread,
+        };
+      });
+    },
+    [],
+  );
+
+  const clearConversationUnread = useCallback(
+    (conversationId: string, unreadCount: number) => {
+      if (unreadCount <= 0) {
+        return;
+      }
+
+      setConversations((current) =>
+        current.map((item) =>
+          item.conversation_id === conversationId ? { ...item, unread_count: 0 } : item,
+        ),
+      );
+      decrementUnreadSummary("conversation", unreadCount);
+    },
+    [decrementUnreadSummary],
+  );
 
   useEffect(() => {
     const { hasFrontendAccess, userToken } = getFrontendAccessState();
@@ -114,54 +165,60 @@ export default function MessagesPage() {
     setErrorMessage(null);
   }, [router]);
 
-  const loadOverview = async (
-    currentToken: string,
-    options?: { nextSelectedConversationId?: string; preserveSelection?: boolean },
-  ): Promise<void> => {
-    const preserveSelection = options?.preserveSelection ?? true;
-    const nextSelectedConversationId = options?.nextSelectedConversationId ?? selectedConversationId;
+  const loadOverview = useCallback(
+    async (
+      currentToken: string,
+      options?: { nextSelectedConversationId?: string; preserveSelection?: boolean },
+    ): Promise<void> => {
+      const preserveSelection = options?.preserveSelection ?? true;
+      const nextSelectedConversationId =
+        options?.nextSelectedConversationId ?? selectedConversationIdRef.current;
 
-    setIsRefreshing(true);
-    setErrorMessage(null);
+      setIsRefreshing(true);
+      setErrorMessage(null);
 
-    try {
-      const [summaryResult, notificationResult, conversationResult] = await Promise.all([
-        getUnreadSummary(currentToken),
-        listNotifications(currentToken, { offset: 0, limit: NOTIFICATION_LIMIT }),
-        listConversations(currentToken, { offset: 0, limit: CONVERSATION_LIMIT }),
-      ]);
+      try {
+        const [summaryResult, notificationResult, conversationResult] = await Promise.all([
+          getUnreadSummary(currentToken),
+          listNotifications(currentToken, { offset: 0, limit: NOTIFICATION_LIMIT }),
+          listConversations(currentToken, { offset: 0, limit: CONVERSATION_LIMIT }),
+        ]);
 
-      setSummary(summaryResult);
-      setNotifications(Array.isArray(notificationResult.items) ? notificationResult.items : []);
-      const nextConversations = Array.isArray(conversationResult.items) ? conversationResult.items : [];
-      setConversations(nextConversations);
+        setSummary(summaryResult);
+        setNotifications(Array.isArray(notificationResult.items) ? notificationResult.items : []);
+        const nextConversations = Array.isArray(conversationResult.items)
+          ? conversationResult.items
+          : [];
+        setConversations(nextConversations);
 
-      if (nextConversations.length === 0) {
-        setSelectedConversationId("");
-        setConversationDetail(null);
-      } else if (
-        preserveSelection &&
-        nextSelectedConversationId &&
-        nextConversations.some((item) => item.conversation_id === nextSelectedConversationId)
-      ) {
-        setSelectedConversationId(nextSelectedConversationId);
-      } else {
-        setSelectedConversationId(nextConversations[0]?.conversation_id ?? "");
+        if (nextConversations.length === 0) {
+          setSelectedConversationId("");
+          setConversationDetail(null);
+        } else if (
+          preserveSelection &&
+          nextSelectedConversationId &&
+          nextConversations.some((item) => item.conversation_id === nextSelectedConversationId)
+        ) {
+          setSelectedConversationId(nextSelectedConversationId);
+        } else {
+          setSelectedConversationId(nextConversations[0]?.conversation_id ?? "");
+        }
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "消息中心加载失败");
+      } finally {
+        setIsRefreshing(false);
+        setIsBootstrapping(false);
       }
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "消息中心加载失败");
-    } finally {
-      setIsRefreshing(false);
-      setIsBootstrapping(false);
-    }
-  };
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!token) {
       return;
     }
     void loadOverview(token, { preserveSelection: false });
-  }, [token]);
+  }, [loadOverview, token]);
 
   useEffect(() => {
     if (!token || !selectedConversationId) {
@@ -169,7 +226,7 @@ export default function MessagesPage() {
       return;
     }
 
-    const activeConversation = conversations.find(
+    const activeConversation = conversationsRef.current.find(
       (item) => item.conversation_id === selectedConversationId,
     );
 
@@ -184,7 +241,7 @@ export default function MessagesPage() {
 
         if ((activeConversation?.unread_count ?? 0) > 0) {
           await markConversationRead(token, { conversation_id: selectedConversationId });
-          await loadOverview(token, { nextSelectedConversationId: selectedConversationId });
+          clearConversationUnread(selectedConversationId, activeConversation?.unread_count ?? 0);
         }
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "会话消息加载失败");
@@ -192,7 +249,7 @@ export default function MessagesPage() {
     };
 
     void loadDetail();
-  }, [token, selectedConversationId, conversations]);
+  }, [clearConversationUnread, token, selectedConversationId]);
 
   const selectedConversation = useMemo(
     () => conversations.find((item) => item.conversation_id === selectedConversationId) ?? null,
@@ -210,9 +267,15 @@ export default function MessagesPage() {
     if (!token) {
       return;
     }
+    const wasUnread = notifications.some((item) => item.id === notificationId && !item.is_read);
     try {
       await markNotificationRead(token, { notification_id: notificationId });
-      await loadOverview(token);
+      if (wasUnread) {
+        setNotifications((current) =>
+          current.map((item) => (item.id === notificationId ? { ...item, is_read: true } : item)),
+        );
+        decrementUnreadSummary("notification", 1);
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "通知设为已读失败");
     }
@@ -222,9 +285,13 @@ export default function MessagesPage() {
     if (!token) {
       return;
     }
+    const unreadCount = notifications.filter((item) => !item.is_read).length;
     try {
       await markAllNotificationsRead(token);
-      await loadOverview(token);
+      if (unreadCount > 0) {
+        setNotifications((current) => current.map((item) => ({ ...item, is_read: true })));
+        decrementUnreadSummary("notification", unreadCount);
+      }
       setSuccessMessage("全部通知已设为已读");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "全部已读失败");
@@ -297,13 +364,13 @@ export default function MessagesPage() {
       <div key={message.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
         <div
           className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${
-            isMine
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted text-foreground border"
+            isMine ? "bg-primary text-primary-foreground" : "bg-muted text-foreground border"
           }`}
         >
-          <p className="whitespace-pre-wrap break-words">{message.content}</p>
-          <p className={`mt-2 text-xs ${isMine ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+          <p className="break-words whitespace-pre-wrap">{message.content}</p>
+          <p
+            className={`mt-2 text-xs ${isMine ? "text-primary-foreground/80" : "text-muted-foreground"}`}
+          >
             {formatTime(message.created_at)}
           </p>
         </div>
@@ -323,7 +390,12 @@ export default function MessagesPage() {
             <Button asChild variant="outline" size="sm">
               <Link href="/profile">返回个人中心</Link>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => void handleRefresh()} disabled={isRefreshing}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleRefresh()}
+              disabled={isRefreshing}
+            >
               {isRefreshing ? "刷新中..." : "刷新消息"}
             </Button>
           </div>
@@ -364,12 +436,20 @@ export default function MessagesPage() {
               <Card>
                 <CardContent className="space-y-2 pt-6">
                   {errorMessage && (
-                    <p id="message-feedback-error" data-status="error" className="text-destructive text-sm">
+                    <p
+                      id="message-feedback-error"
+                      data-status="error"
+                      className="text-destructive text-sm"
+                    >
                       {errorMessage}
                     </p>
                   )}
                   {successMessage && (
-                    <p id="message-feedback-success" data-status="success" className="text-primary text-sm">
+                    <p
+                      id="message-feedback-success"
+                      data-status="success"
+                      className="text-primary text-sm"
+                    >
                       {successMessage}
                     </p>
                   )}
@@ -382,7 +462,6 @@ export default function MessagesPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle>系统通知</CardTitle>
-                    <CardDescription>展示最近 {NOTIFICATION_LIMIT} 条消息提醒。</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <Button
@@ -417,7 +496,9 @@ export default function MessagesPage() {
                                 </Button>
                               )}
                             </div>
-                            <p className="mt-3 whitespace-pre-wrap break-words text-sm">{item.content}</p>
+                            <p className="mt-3 text-sm break-words whitespace-pre-wrap">
+                              {item.content}
+                            </p>
                           </div>
                         ))
                       )}
@@ -428,9 +509,6 @@ export default function MessagesPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle>发起新私信</CardTitle>
-                    <CardDescription>
-                      用户之间首条消息最多 50 字，发送后需等待对方回复才能继续发送。
-                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid gap-2">
@@ -470,7 +548,6 @@ export default function MessagesPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle>私信会话</CardTitle>
-                    <CardDescription>点击右侧查看完整聊天记录。</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {conversations.length === 0 ? (
@@ -524,19 +601,19 @@ export default function MessagesPage() {
                         ? `与 ${selectedConversation.peer_name || `用户 ${selectedConversation.peer_id}`} 的对话`
                         : "聊天窗口"}
                     </CardTitle>
-                    <CardDescription>
-                      {selectedConversation
-                        ? `${conversationStatusLabel(conversationDetail?.status ?? selectedConversation.status)} · ${
-                            (conversationDetail?.can_send ?? selectedConversation.can_send)
-                              ? "当前可发送消息"
-                              : "等待对方回复后才可继续发送"
-                          }`
-                        : "选择左侧会话或发起一条新的私信。"}
-                    </CardDescription>
+                    {selectedConversation ? (
+                      <CardDescription>
+                        {`${conversationStatusLabel(conversationDetail?.status ?? selectedConversation.status)} · ${
+                          (conversationDetail?.can_send ?? selectedConversation.can_send)
+                            ? "当前可发送消息"
+                            : "等待对方回复后才可继续发送"
+                        }`}
+                      </CardDescription>
+                    ) : null}
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {!selectedConversation || !conversationDetail ? (
-                      <p className="text-muted-foreground text-sm">请选择一条会话查看详细内容。</p>
+                      <p className="text-muted-foreground text-sm">请选择会话</p>
                     ) : (
                       <>
                         <div className="bg-muted/30 space-y-3 rounded-xl border p-4">
