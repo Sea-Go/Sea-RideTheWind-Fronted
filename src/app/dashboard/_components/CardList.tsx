@@ -1,8 +1,23 @@
 "use client";
 
+import {
+  ArrowRightIcon,
+  BookmarkIcon,
+  CheckCircle2Icon,
+  ClockIcon,
+  FileTextIcon,
+  RefreshCcwIcon,
+  SearchIcon,
+  SparklesIcon,
+  ThumbsDownIcon,
+  ThumbsUpIcon,
+  UserRoundIcon,
+} from "lucide-react";
+import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
-import { RefreshCcwIcon, SearchIcon, SparklesIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { DEFAULT_DASHBOARD_SEARCH_MODE } from "@/app/dashboard/_constants/search-mode";
 import {
@@ -10,10 +25,12 @@ import {
   type DashboardTabSlug,
   DEFAULT_DASHBOARD_TAB,
 } from "@/app/dashboard/_constants/tabs";
-import { FavoritePickerDialog } from "@/components/favorite/FavoritePickerDialog";
+import { InteractiveSurface } from "@/components/motion/InteractiveSurface";
+import { MotionList } from "@/components/motion/MotionList";
+import { markNavigationStart } from "@/components/motion/navigation-timing";
 import { Button } from "@/components/ui/button";
-import { type ArticleItem, getArticle } from "@/services/article";
-import { getAuthToken, getUserProfile, normalizeUserUid } from "@/services/auth";
+import { cn } from "@/lib/utils";
+import { getAuthToken } from "@/services/auth";
 import { deleteFavoriteItems, loadFavoriteInventory } from "@/services/favorite";
 import {
   applyReactionStep,
@@ -27,33 +44,181 @@ import {
   resolveReactionFinalState,
   toLikeState,
 } from "@/services/like";
-import { searchRecoByAuthor, searchRecoByContent, searchRecoByTitle } from "@/services/reco";
-import {
-  buildGuestRecoUserId,
-  buildUserRecoKey,
-  fetchRecommendSnapshot,
-  getOrCreateRecoSessionId,
-  readRecommendSnapshotCache,
-  readRecommendViewCache,
-  type RecommendSnapshot,
-  saveRecommendViewCache,
-} from "@/services/reco-snapshot";
-import type { DashboardAuthorSearchResult, DashboardPost, DashboardSearchMode } from "@/types";
+import type {
+  DashboardAuthorSearchResult,
+  DashboardFeedResponse,
+  DashboardPost,
+  DashboardSearchEvidenceViewState,
+  DashboardSearchMode,
+  DashboardSearchTraceStageView,
+} from "@/types";
 
 import { Card } from "./Card";
 
-const FALLBACK_TITLE = "\u672a\u547d\u540d\u6587\u7ae0";
-const FALLBACK_AUTHOR = "\u672a\u77e5\u4f5c\u8005";
-const FALLBACK_CONTENT = "\u6682\u65e0\u6458\u8981";
+const FavoritePickerDialog = dynamic(
+  () =>
+    import("@/components/favorite/FavoritePickerDialog").then((mod) => mod.FavoritePickerDialog),
+  {
+    loading: () => null,
+    ssr: false,
+  },
+);
+
 const INVALID_ID_PREFIX = "article-";
+const DASHBOARD_FEED_MEMORY_TTL_MS = 60_000;
+const PREFETCH_VISIBLE_CARD_LIMIT = 8;
 const SEARCH_TOP_K = 20;
 const SEARCH_SESSION_STORAGE_KEY = "dashboard_search_session_id";
+const SEARCH_MODE_LABEL_MAP: Record<DashboardSearchMode, string> = {
+  content: "内容搜索",
+  title: "标题搜索",
+  author: "作者名字搜索",
+};
+const SEARCH_MODE_RESULT_UNIT_MAP: Record<DashboardSearchMode, string> = {
+  content: "篇内容",
+  title: "个标题",
+  author: "位作者",
+};
+const CARD_CONTROL_SELECTOR = "a,button,input,textarea,select,label,[data-card-open-ignore]";
+
+const isCardControlTarget = (target: EventTarget | null): boolean =>
+  target instanceof HTMLElement && Boolean(target.closest(CARD_CONTROL_SELECTOR));
+
+const formatCompactCount = (value: number): string => {
+  if (!Number.isFinite(value)) {
+    return "0";
+  }
+  if (value >= 10000) {
+    return `${(value / 10000).toFixed(value >= 100000 ? 0 : 1)}w`;
+  }
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`;
+  }
+  return String(Math.max(0, Math.round(value)));
+};
+
+const formatPercentText = (value?: number | null, digits = 0): string | null => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+  return `${(value * 100).toFixed(digits)}%`;
+};
+
+const formatOptionalDate = (value?: string): string => {
+  if (!value) {
+    return "";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(parsed);
+};
+
+const createCurrentTimeLabel = (): string =>
+  new Intl.DateTimeFormat("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date());
+
+const getSearchResultUnit = (mode: DashboardSearchMode): string =>
+  SEARCH_MODE_RESULT_UNIT_MAP[mode];
 
 const createEmptyFavoriteMeta = (): FavoriteMeta => ({
   favorited: false,
   favoriteIds: [],
   busy: false,
 });
+
+interface DashboardFeedMemoryCacheEntry {
+  cachedAt: number;
+  response: DashboardFeedResponse;
+}
+
+const dashboardFeedMemoryCache = new Map<string, DashboardFeedMemoryCacheEntry>();
+
+const buildDashboardFeedCacheKey = ({
+  mode,
+  query,
+  tabSlug,
+  token,
+}: {
+  mode: DashboardSearchMode;
+  query: string;
+  tabSlug: DashboardTabSlug;
+  token: string | null;
+}): string => [token ?? "guest", tabSlug, mode, query].join("::");
+
+const readDashboardFeedMemoryCache = (cacheKey: string): DashboardFeedResponse | null => {
+  const cached = dashboardFeedMemoryCache.get(cacheKey);
+  if (!cached) {
+    return null;
+  }
+
+  if (Date.now() - cached.cachedAt > DASHBOARD_FEED_MEMORY_TTL_MS) {
+    dashboardFeedMemoryCache.delete(cacheKey);
+    return null;
+  }
+
+  return cached.response;
+};
+
+const saveDashboardFeedMemoryCache = (cacheKey: string, response: DashboardFeedResponse): void => {
+  dashboardFeedMemoryCache.set(cacheKey, {
+    cachedAt: Date.now(),
+    response,
+  });
+};
+
+const fetchDashboardFeed = async ({
+  tabSlug,
+  query,
+  mode,
+  force,
+  token,
+  sessionId,
+}: {
+  tabSlug: DashboardTabSlug;
+  query: string;
+  mode: DashboardSearchMode;
+  force: boolean;
+  token: string | null;
+  sessionId: string;
+}): Promise<DashboardFeedResponse> => {
+  const headers = new Headers({
+    "Content-Type": "application/json",
+  });
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch("/api/dashboard/feed", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      tabSlug,
+      query,
+      mode,
+      force,
+      sessionId,
+    }),
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | (DashboardFeedResponse & { error?: string })
+    | null;
+  if (!response.ok || !payload) {
+    throw new Error(payload?.error || "内容加载失败，请稍后重试");
+  }
+
+  return payload;
+};
 
 interface LikeMeta {
   likeCount: number;
@@ -74,57 +239,14 @@ interface CardListProps {
   mode?: DashboardSearchMode;
 }
 
-interface SearchTraceStageView {
-  name: string;
-  summary: string;
-  details: string[];
-}
-
-interface SearchEvidenceViewState {
-  traceId: string;
-  searchRequestId: string;
-  status: string;
-  searchText: string;
-  intentLabel: string;
-  intentConfidence: number | null;
-  keywords: string[];
-  steps: SearchTraceStageView[];
-}
-
-const asRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === "object" ? (value as Record<string, unknown>) : null;
-
 const toNumber = (value: unknown, fallback = 0): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
-
-const toFiniteNumber = (value: unknown): number | null => {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === "string" && value.trim()) {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-  return null;
-};
 
 const toTrimmedString = (value: unknown): string => {
   if (typeof value !== "string") {
     return "";
   }
   return value.trim();
-};
-
-const toStringArray = (value: unknown): string[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value
-    .map((item) => (item === undefined || item === null ? "" : String(item).trim()))
-    .filter(Boolean);
 };
 
 const splitTagText = (value: unknown): string[] => {
@@ -139,233 +261,6 @@ const splitTagText = (value: unknown): string[] => {
     .filter(Boolean);
 };
 
-const joinPreviewValues = (values: string[], maxCount = 3): string => {
-  if (!values.length) {
-    return "";
-  }
-
-  const picked = values.slice(0, maxCount);
-  return values.length > maxCount
-    ? `${picked.join("、")} 等 ${values.length} 项`
-    : picked.join("、");
-};
-
-const formatLatencyText = (value: unknown): string => {
-  const latency = toFiniteNumber(value);
-  return latency === null ? "" : `${latency}ms`;
-};
-
-const pickFirstArray = (value: unknown): unknown[] => {
-  if (Array.isArray(value)) {
-    return value;
-  }
-
-  const record = asRecord(value);
-  if (!record) {
-    return [];
-  }
-
-  const arrayKeys = ["list", "articles", "items", "records", "rows", "hits"] as const;
-  for (const key of arrayKeys) {
-    const candidate = record[key];
-    if (Array.isArray(candidate)) {
-      return candidate;
-    }
-  }
-
-  if (record.data) {
-    return pickFirstArray(record.data);
-  }
-
-  return [];
-};
-
-const pickArticleId = (item: ArticleItem, fallbackIndex: number): string => {
-  const candidates = [item.id, item.article_id];
-  for (const candidate of candidates) {
-    if (candidate !== undefined && candidate !== null && String(candidate).trim()) {
-      return String(candidate).trim();
-    }
-  }
-  return `${INVALID_ID_PREFIX}${fallbackIndex}`;
-};
-
-const resolveAuthorText = (item: ArticleItem): string => {
-  if (typeof item.author_name === "string" && item.author_name.trim()) {
-    return item.author_name.trim();
-  }
-  if (typeof item.username === "string" && item.username.trim()) {
-    return item.username.trim();
-  }
-  if (item.author_id !== undefined && item.author_id !== null && String(item.author_id).trim()) {
-    return `用户 ${String(item.author_id).trim()}`;
-  }
-  return FALLBACK_AUTHOR;
-};
-
-const toDashboardPost = (item: ArticleItem, index: number): DashboardPost => {
-  const title =
-    (typeof item.title === "string" && item.title.trim()) ||
-    (typeof item.brief === "string" && item.brief.trim()) ||
-    FALLBACK_TITLE;
-  const content =
-    (typeof item.brief === "string" && item.brief.trim()) ||
-    (typeof item.content === "string" && item.content.trim()) ||
-    FALLBACK_CONTENT;
-  const image =
-    (typeof item.cover_image_url === "string" && item.cover_image_url.trim()) ||
-    (typeof item.cover === "string" && item.cover.trim()) ||
-    null;
-  const author = resolveAuthorText(item);
-  const likes =
-    typeof item.like_count === "number"
-      ? item.like_count
-      : typeof item.likes === "number"
-        ? item.likes
-        : 0;
-  const publishedAt =
-    (typeof item.create_time === "string" && item.create_time) ||
-    (typeof item.created_at === "string" && item.created_at) ||
-    (typeof item.published_at === "string" && item.published_at) ||
-    "";
-
-  return {
-    id: pickArticleId(item, index),
-    title,
-    content,
-    image,
-    author,
-    likes,
-    publishedAt,
-  };
-};
-
-const toRecommendSnapshotPosts = (snapshot: RecommendSnapshot): DashboardPost[] =>
-  snapshot.ids.map((id, index) => toRecommendFallbackPost(id, index, snapshot.explanation ?? ""));
-
-const collectIdCandidates = (record: Record<string, unknown>): unknown[] => {
-  const values: unknown[] = [record.article_id, record.id, record.target_id, record.articleId];
-  const nestedKeys = ["doc", "article", "source", "payload", "item", "data", "hit"] as const;
-
-  for (const key of nestedKeys) {
-    const nestedRecord = asRecord(record[key]);
-    if (!nestedRecord) {
-      continue;
-    }
-    values.push(
-      nestedRecord.article_id,
-      nestedRecord.id,
-      nestedRecord.target_id,
-      nestedRecord.articleId,
-    );
-  }
-
-  return values;
-};
-
-const extractSearchItems = (payload: unknown): Record<string, unknown>[] => {
-  const payloadRecord = asRecord(payload);
-  if (!payloadRecord) {
-    return [];
-  }
-
-  const dataRecord = asRecord(payloadRecord.data) ?? payloadRecord;
-  const rawItems = pickFirstArray(dataRecord.items ?? dataRecord.hits ?? dataRecord.list);
-  if (!rawItems.length) {
-    return [];
-  }
-
-  const items: Record<string, unknown>[] = [];
-  const seen = new Set<string>();
-
-  for (const item of rawItems) {
-    const itemRecord = asRecord(item);
-    if (!itemRecord) {
-      continue;
-    }
-
-    const articleId = collectIdCandidates(itemRecord)
-      .map((value) => (value === undefined || value === null ? "" : String(value).trim()))
-      .find((value) => Boolean(value));
-    const chunkId =
-      (typeof itemRecord.chunk_id === "string" && itemRecord.chunk_id.trim()) ||
-      (typeof itemRecord.chunkId === "string" && itemRecord.chunkId.trim()) ||
-      "";
-    const key = articleId ? `article:${articleId}` : chunkId ? `chunk:${chunkId}` : "";
-    if (key && seen.has(key)) {
-      continue;
-    }
-
-    if (key) {
-      seen.add(key);
-    }
-    items.push(itemRecord);
-  }
-
-  return items;
-};
-
-const pickSearchItemArticleId = (item: Record<string, unknown>): string => {
-  return (
-    collectIdCandidates(item)
-      .map((value) => (value === undefined || value === null ? "" : String(value).trim()))
-      .find((value) => Boolean(value)) ?? ""
-  );
-};
-
-const extractAuthorSearchItems = (payload: unknown): Record<string, unknown>[] => {
-  const payloadRecord = asRecord(payload);
-  if (!payloadRecord) {
-    return [];
-  }
-
-  const dataRecord = asRecord(payloadRecord.data) ?? payloadRecord;
-  const rawItems = pickFirstArray(dataRecord.authors ?? dataRecord.items ?? dataRecord.list);
-  return rawItems
-    .map((item) => asRecord(item))
-    .filter((item): item is Record<string, unknown> => Boolean(item));
-};
-
-const toTitleSearchPost = (item: Record<string, unknown>, index: number): DashboardPost => {
-  const articleId = pickSearchItemArticleId(item) || `${INVALID_ID_PREFIX}title-${index}`;
-  const title = toTrimmedString(item.title) || FALLBACK_TITLE;
-  const content = toTrimmedString(item.brief) || FALLBACK_CONTENT;
-  const image = toTrimmedString(item.cover) || null;
-  const author = toTrimmedString(item.author_name) || resolveAuthorText(item as ArticleItem);
-  const publishedAt = toTrimmedString(item.created_at);
-
-  return {
-    id: articleId,
-    title,
-    content,
-    image,
-    author,
-    likes: 0,
-    publishedAt,
-  };
-};
-
-const toDashboardAuthorSearchResult = (
-  item: Record<string, unknown>,
-  index: number,
-): DashboardAuthorSearchResult => {
-  const authorId =
-    toTrimmedString(item.author_id) ||
-    toTrimmedString(item.id) ||
-    `${INVALID_ID_PREFIX}author-${index}`;
-  const authorName = toTrimmedString(item.author_name) || `作者 ${index + 1}`;
-
-  return {
-    id: `${authorId}-${index}`,
-    authorId,
-    authorName,
-    articleCount: toNumber(item.article_count, 0),
-    latestArticleId: toTrimmedString(item.latest_article_id) || undefined,
-    latestArticleTitle: toTrimmedString(item.latest_article_title) || undefined,
-    latestArticleTime: toTrimmedString(item.latest_article_time) || undefined,
-  };
-};
-
 const canFetchArticleDetail = (articleId: string): boolean => {
   if (!articleId) {
     return false;
@@ -374,276 +269,51 @@ const canFetchArticleDetail = (articleId: string): boolean => {
   return !articleId.startsWith("art_") && !articleId.startsWith("chk_");
 };
 
-const extractSearchDataRecord = (payload: unknown): Record<string, unknown> | null => {
-  const payloadRecord = asRecord(payload);
-  if (!payloadRecord) {
-    return null;
-  }
+const canOpenDashboardPost = (postId: string): boolean =>
+  !postId.startsWith(INVALID_ID_PREFIX) && canFetchArticleDetail(postId);
 
-  return asRecord(payloadRecord.data) ?? payloadRecord;
+const buildArticleDetailHref = (postId: string): string => `/article/${encodeURIComponent(postId)}`;
+
+const buildAuthorDetailHref = (authorResult: DashboardAuthorSearchResult): string =>
+  `/author/${encodeURIComponent(authorResult.authorId)}?name=${encodeURIComponent(authorResult.authorName)}`;
+
+const collectPostSearchTags = (post: DashboardPost): string[] => {
+  const tags = [
+    ...splitTagText(post.searchEvidence?.typeTags),
+    ...(post.searchEvidence?.tags?.filter(Boolean) ?? []),
+  ];
+
+  return Array.from(new Set(tags.map((tag) => tag.trim()).filter(Boolean))).slice(0, 5);
 };
 
-const buildSearchEvidence = (
-  item: Record<string, unknown>,
-): NonNullable<DashboardPost["searchEvidence"]> => ({
-  chunkId:
-    toTrimmedString(item.chunk_id) ||
-    toTrimmedString(item.chunkId) ||
-    toTrimmedString(asRecord(item.hit)?.chunk_id),
-  snippet:
-    toTrimmedString(item.snippet) ||
-    toTrimmedString(item.content) ||
-    toTrimmedString(asRecord(item.hit)?.snippet),
-  typeTags: toTrimmedString(item.type_tags) || toTrimmedString(item.typeTags),
-  tags: splitTagText(item.tags),
-  articleScore: toFiniteNumber(item.article_score),
-  vectorScore: toFiniteNumber(item.vector_score),
-  rerankScore: toFiniteNumber(item.rerank_score),
-  matchScore: toFiniteNumber(item.match_score),
-});
+const resolvePostMatchScore = (post: DashboardPost): number | null =>
+  typeof post.searchEvidence?.matchScore === "number" &&
+  Number.isFinite(post.searchEvidence.matchScore)
+    ? post.searchEvidence.matchScore
+    : null;
 
-const withSearchEvidence = (post: DashboardPost, item: Record<string, unknown>): DashboardPost => ({
-  ...post,
-  searchEvidence: buildSearchEvidence(item),
-});
-
-const summarizeSearchTraceStep = (
-  name: string,
-  data: Record<string, unknown>,
-): SearchTraceStageView => {
-  switch (name) {
-    case "invoke":
-      return {
-        name,
-        summary: "请求参数已写入搜索链路",
-        details: [
-          toFiniteNumber(data.coarse_recall_k) !== null
-            ? `粗召回 ${toFiniteNumber(data.coarse_recall_k)}`
-            : "",
-          toFiniteNumber(data.recall_k) !== null ? `精召回 ${toFiniteNumber(data.recall_k)}` : "",
-          toFiniteNumber(data.topk) !== null ? `返回 ${toFiniteNumber(data.topk)}` : "",
-        ].filter(Boolean),
-      };
-    case "intent.parse":
-      return {
-        name,
-        summary: `识别为 ${toTrimmedString(data.label) || "unknown"} 搜索意图`,
-        details: [
-          toStringArray(data.keywords).length
-            ? `关键词：${toStringArray(data.keywords).join("、")}`
-            : "",
-          toFiniteNumber(data.confidence) !== null
-            ? `置信度 ${((toFiniteNumber(data.confidence) ?? 0) * 100).toFixed(0)}%`
-            : "",
-          formatLatencyText(data.latency_ms) ? `耗时 ${formatLatencyText(data.latency_ms)}` : "",
-        ].filter(Boolean),
-      };
-    case "retrieval.embed_query":
-      return {
-        name,
-        summary: "先把查询改写成语义向量",
-        details: [
-          toTrimmedString(data.semantic_query)
-            ? `语义查询：${toTrimmedString(data.semantic_query)}`
-            : "",
-          toFiniteNumber(data.vector_dim) !== null
-            ? `向量维度 ${toFiniteNumber(data.vector_dim)}`
-            : "",
-          formatLatencyText(data.latency_ms) ? `耗时 ${formatLatencyText(data.latency_ms)}` : "",
-        ].filter(Boolean),
-      };
-    case "retrieval.coarse_recall":
-      return {
-        name,
-        summary: `粗召回拿到 ${toFiniteNumber(data.candidate_count) ?? 0} 个候选`,
-        details: [
-          formatLatencyText(data.latency_ms) ? `耗时 ${formatLatencyText(data.latency_ms)}` : "",
-          toStringArray(data.top_article_ids).length
-            ? `Top Article：${joinPreviewValues(toStringArray(data.top_article_ids))}`
-            : "",
-        ].filter(Boolean),
-      };
-    case "retrieval.fine_recall":
-      return {
-        name,
-        summary: `精召回收敛到 ${toFiniteNumber(data.candidate_count) ?? 0} 个片段`,
-        details: [
-          formatLatencyText(data.latency_ms) ? `耗时 ${formatLatencyText(data.latency_ms)}` : "",
-          toStringArray(data.top_chunk_ids).length
-            ? `Top Chunk：${joinPreviewValues(toStringArray(data.top_chunk_ids), 2)}`
-            : "",
-        ].filter(Boolean),
-      };
-    case "rerank.dashscope_skill":
-      return {
-        name,
-        summary: `重排模型筛过 ${toFiniteNumber(data.hit_count) ?? 0} 个候选`,
-        details: [
-          toTrimmedString(data.model) ? `模型 ${toTrimmedString(data.model)}` : "",
-          formatLatencyText(data.latency_ms) ? `耗时 ${formatLatencyText(data.latency_ms)}` : "",
-          toStringArray(data.top_chunk_ids).length
-            ? `优先片段：${joinPreviewValues(toStringArray(data.top_chunk_ids), 2)}`
-            : "",
-        ].filter(Boolean),
-      };
-    case "rank.pass_filter":
-      return {
-        name,
-        summary: `过滤后保留 ${toFiniteNumber(data.candidate_out) ?? 0} 个候选`,
-        details: [
-          toFiniteNumber(data.candidate_in) !== null
-            ? `输入 ${toFiniteNumber(data.candidate_in)}`
-            : "",
-          toFiniteNumber(data.min_pass_score) !== null
-            ? `阈值 ${toFiniteNumber(data.min_pass_score)?.toFixed(2)}`
-            : "",
-        ].filter(Boolean),
-      };
-    case "assemble.response":
-      return {
-        name,
-        summary: `最终返回 ${toFiniteNumber(data.returned_article_count) ?? 0} 篇内容`,
-        details: [
-          toStringArray(data.article_ids).length
-            ? `文章：${joinPreviewValues(toStringArray(data.article_ids), 3)}`
-            : "",
-        ].filter(Boolean),
-      };
-    default: {
-      const detailEntries = Object.entries(data)
-        .filter(([, value]) => {
-          if (value === undefined || value === null) {
-            return false;
-          }
-          if (Array.isArray(value)) {
-            return value.length > 0;
-          }
-          if (typeof value === "string") {
-            return value.trim().length > 0;
-          }
-          return typeof value === "number" || typeof value === "boolean";
-        })
-        .slice(0, 3)
-        .map(([key, value]) => {
-          if (Array.isArray(value)) {
-            return `${key}: ${joinPreviewValues(toStringArray(value), 2)}`;
-          }
-          return `${key}: ${String(value)}`;
-        });
-
-      return {
-        name,
-        summary: "该阶段已参与本次检索",
-        details: detailEntries,
-      };
-    }
-  }
-};
-
-const buildSearchEvidenceViewState = (
-  payload: unknown,
-  fallbackQuery: string,
-): SearchEvidenceViewState | null => {
-  const dataRecord = extractSearchDataRecord(payload);
-  if (!dataRecord) {
-    return null;
-  }
-
-  const intentRecord = asRecord(dataRecord.intent);
-  const rawExplainTrace = Array.isArray(dataRecord.explain_trace) ? dataRecord.explain_trace : [];
-  const steps = rawExplainTrace
-    .map((step) => {
-      const stepRecord = asRecord(step);
-      if (!stepRecord) {
-        return null;
-      }
-
-      const name = toTrimmedString(stepRecord.name);
-      const data = asRecord(stepRecord.data);
-      if (!name || !data) {
-        return null;
-      }
-
-      return summarizeSearchTraceStep(name, data);
-    })
-    .filter((item): item is SearchTraceStageView => Boolean(item));
-
-  return {
-    traceId: toTrimmedString(dataRecord.trace_id),
-    searchRequestId:
-      toTrimmedString(dataRecord.search_request_id) || toTrimmedString(dataRecord.request_id),
-    status: toTrimmedString(dataRecord.status) || "ok",
-    searchText: toTrimmedString(intentRecord?.search_text) || fallbackQuery,
-    intentLabel: toTrimmedString(intentRecord?.label) || "unknown",
-    intentConfidence: toFiniteNumber(intentRecord?.confidence),
-    keywords: toStringArray(intentRecord?.keywords),
-    steps,
-  };
-};
-
-const toSearchFallbackPost = (
-  item: Record<string, unknown>,
-  index: number,
-  rawArticleId: string,
-): DashboardPost => {
-  const title =
-    (typeof item.title === "string" && item.title.trim()) ||
-    (typeof item.h2 === "string" && item.h2.trim()) ||
-    FALLBACK_TITLE;
-  const content =
-    (typeof item.snippet === "string" && item.snippet.trim()) ||
-    (typeof item.h2 === "string" && item.h2.trim()) ||
-    FALLBACK_CONTENT;
-  const image =
-    (typeof item.cover_image_url === "string" && item.cover_image_url.trim()) ||
-    (typeof item.cover === "string" && item.cover.trim()) ||
-    null;
-  const author =
-    (typeof item.author_name === "string" && item.author_name.trim()) ||
-    (typeof item.author === "string" && item.author.trim()) ||
-    (rawArticleId ? `用户 ${rawArticleId}` : FALLBACK_AUTHOR);
-  const publishedAt =
-    typeof item.create_time === "number"
-      ? String(item.create_time)
-      : typeof item.create_time === "string"
-        ? item.create_time
-        : "";
-  const safeIdPart = rawArticleId || String(index);
-
-  return {
-    id: `${INVALID_ID_PREFIX}search-${safeIdPart}`,
-    title,
-    content,
-    image,
-    author,
-    likes: 0,
-    publishedAt,
-  };
-};
-
-const toRecommendFallbackPost = (
-  recoId: string,
-  index: number,
-  explanation: string,
-): DashboardPost => {
-  const safeId = recoId.trim() || `${INVALID_ID_PREFIX}reco-${index}`;
-  const idSuffix = safeId.length > 8 ? safeId.slice(-8) : safeId;
-  const description = explanation || `推荐编号: ${idSuffix}`;
-  return {
-    id: safeId,
-    title: `推荐结果 ${index + 1}`,
-    content: description || FALLBACK_CONTENT,
-    image: null,
-    author: FALLBACK_AUTHOR,
-    likes: 0,
-    publishedAt: "",
-  };
-};
-
-const createSearchRequestId = (): string => {
-  const randomPart = Math.random().toString(36).slice(2, 8);
-  return `search_${Date.now()}_${randomPart}`;
-};
+const buildClientSearchTraceSteps = (
+  mode: DashboardSearchMode,
+  query: string,
+  resultCount: number,
+): DashboardSearchTraceStageView[] => [
+  {
+    name: "query.submit",
+    summary: "",
+    details: [`查询词：${query}`, `模式：${SEARCH_MODE_LABEL_MAP[mode]}`],
+  },
+  {
+    name:
+      mode === "author" ? "search.author" : mode === "title" ? "search.title" : "search.content",
+    summary: "",
+    details: [`目标返回：${SEARCH_TOP_K} 条`],
+  },
+  {
+    name: "view.compose",
+    summary: "",
+    details: [`当前展示：${resultCount} ${getSearchResultUnit(mode)}`],
+  },
+];
 
 const createSessionId = (): string => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -672,104 +342,12 @@ const getOrCreateSearchSessionId = (): string => {
   }
 };
 
-const pickArticleFromPayload = (payload: unknown): ArticleItem | null => {
-  const record = asRecord(payload);
-  if (!record) {
-    return null;
-  }
-
-  const candidates = [record.article, record.item, record.data, record] as unknown[];
-  for (const candidate of candidates) {
-    const candidateRecord = asRecord(candidate);
-    if (!candidateRecord) {
-      continue;
-    }
-
-    const nestedArticle = asRecord(candidateRecord.article);
-    if (nestedArticle) {
-      return nestedArticle as ArticleItem;
-    }
-
-    const looksLikeArticle = ["id", "article_id", "title", "brief", "content", "author_id"].some(
-      (key) => Object.hasOwn(candidateRecord, key),
-    );
-    if (looksLikeArticle) {
-      return candidateRecord as ArticleItem;
-    }
-  }
-
-  return null;
-};
-
-const resolveRecommendPosts = async (
-  snapshot: RecommendSnapshot,
-  token: string | null,
-): Promise<{ posts: DashboardPost[]; authorIdMap: Record<string, string> }> => {
-  const resolvedEntries = await Promise.all(
-    snapshot.ids.map(async (articleId, index) => {
-      if (canFetchArticleDetail(articleId)) {
-        try {
-          const articlePayload = await getArticle(articleId, {
-            token: token ?? undefined,
-            incr_view: false,
-          });
-          const article = pickArticleFromPayload(articlePayload);
-          if (article) {
-            const normalizedArticle: ArticleItem = {
-              ...article,
-              id: article.id ?? article.article_id ?? articleId,
-              article_id: article.article_id ?? article.id ?? articleId,
-            };
-            const post = toDashboardPost(normalizedArticle, index);
-            const authorId = article.author_id;
-            return {
-              post,
-              authorId:
-                authorId !== undefined && authorId !== null && String(authorId).trim()
-                  ? String(authorId).trim()
-                  : null,
-            };
-          }
-        } catch (error) {
-          console.warn(`Failed to hydrate recommend article: ${articleId}`, error);
-        }
-      }
-
-      return null;
-    }),
-  );
-
-  const hydratedPosts: DashboardPost[] = [];
-  const nextAuthorIdMap: Record<string, string> = {};
-
-  for (const entry of resolvedEntries) {
-    if (!entry) {
-      continue;
-    }
-
-    hydratedPosts.push(entry.post);
-    if (entry.authorId) {
-      nextAuthorIdMap[entry.post.id] = entry.authorId;
-    }
-  }
-
-  if (hydratedPosts.length > 0) {
-    return { posts: hydratedPosts, authorIdMap: nextAuthorIdMap };
-  }
-
-  return {
-    posts: snapshot.ids.map((articleId, index) =>
-      toRecommendFallbackPost(articleId, index, snapshot.explanation ?? ""),
-    ),
-    authorIdMap: {},
-  };
-};
-
 export const CardList = ({
   query = "",
   tabSlug = DEFAULT_DASHBOARD_TAB,
   mode = DEFAULT_DASHBOARD_SEARCH_MODE,
 }: CardListProps) => {
+  const router = useRouter();
   const normalizedQuery = useMemo(() => query.trim(), [query]);
   const presetTabQuery = useMemo(() => {
     if (tabSlug === DEFAULT_DASHBOARD_TAB || normalizedQuery) {
@@ -782,11 +360,13 @@ export const CardList = ({
     [mode, normalizedQuery, presetTabQuery],
   );
   const isSearchMode = effectiveQuery.length > 0;
+  const isExplicitSearchMode = normalizedQuery.length > 0;
   const [posts, setPosts] = useState<DashboardPost[]>([]);
   const [authorResults, setAuthorResults] = useState<DashboardAuthorSearchResult[]>([]);
-  const [searchEvidenceView, setSearchEvidenceView] = useState<SearchEvidenceViewState | null>(
-    null,
-  );
+  const [searchEvidenceView, setSearchEvidenceView] =
+    useState<DashboardSearchEvidenceViewState | null>(null);
+  const [selectedSearchResultId, setSelectedSearchResultId] = useState<string | null>(null);
+  const [searchUpdatedAt, setSearchUpdatedAt] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [fetchErrorMessage, setFetchErrorMessage] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -802,21 +382,39 @@ export const CardList = ({
   const [refreshFeedbackTick, setRefreshFeedbackTick] = useState(0);
   const [showRefreshFeedback, setShowRefreshFeedback] = useState(false);
   const handledRefreshNonceRef = useRef(0);
+  const refreshFeedbackTimerRef = useRef<number | null>(null);
+  const prefetchedPostIdsRef = useRef<Set<string>>(new Set());
 
-  useEffect(() => {
-    if (!refreshFeedbackTick) {
-      return;
-    }
+  useEffect(
+    () => () => {
+      if (refreshFeedbackTimerRef.current !== null) {
+        window.clearTimeout(refreshFeedbackTimerRef.current);
+      }
+    },
+    [],
+  );
 
-    setShowRefreshFeedback(true);
-    const timer = window.setTimeout(() => {
-      setShowRefreshFeedback(false);
-    }, 1100);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [refreshFeedbackTick]);
+  const selectedResultIds = useMemo(
+    () =>
+      mode === "author" ? authorResults.map((author) => author.id) : posts.map((post) => post.id),
+    [authorResults, mode, posts],
+  );
+  const activeSelectedSearchResultId =
+    isExplicitSearchMode &&
+    selectedSearchResultId &&
+    selectedResultIds.includes(selectedSearchResultId)
+      ? selectedSearchResultId
+      : (selectedResultIds[0] ?? null);
+  const prefetchablePostIds = useMemo(
+    () =>
+      new Set(
+        posts
+          .slice(0, PREFETCH_VISIBLE_CARD_LIMIT)
+          .map((post) => post.id)
+          .filter(canOpenDashboardPost),
+      ),
+    [posts],
+  );
 
   const loadLikeStates = useCallback(
     async (currentToken: string, targetPosts: DashboardPost[]): Promise<void> => {
@@ -888,432 +486,92 @@ export const CardList = ({
     [],
   );
 
+  const applyDashboardFeedView = useCallback((feed: DashboardFeedResponse): void => {
+    setPosts(feed.posts);
+    setAuthorResults(feed.authorResults);
+    setSearchEvidenceView(feed.searchEvidence);
+    setAuthorIdMap(feed.authorIdMap);
+    setSearchUpdatedAt(createCurrentTimeLabel());
+    setFetchErrorMessage(null);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
-    let disposeRecommendListeners: (() => void) | null = null;
-    const isManualRecommendRefresh = !isSearchMode && refreshNonce > handledRefreshNonceRef.current;
+    const isManualRefresh = refreshNonce > handledRefreshNonceRef.current;
     handledRefreshNonceRef.current = refreshNonce;
 
     const fetchPosts = async (): Promise<void> => {
-      try {
+      const currentToken = getAuthToken();
+      const cacheKey = buildDashboardFeedCacheKey({
+        tabSlug,
+        query: normalizedQuery,
+        mode,
+        token: currentToken,
+      });
+      const cachedFeed = isManualRefresh ? null : readDashboardFeedMemoryCache(cacheKey);
+      let showedCachedFeed = false;
+
+      setToken(currentToken);
+      setActionMessage(null);
+      setFetchErrorMessage(null);
+
+      if (cachedFeed) {
+        showedCachedFeed = true;
+        setIsLoading(false);
+        setLikeMetaMap({});
+        setFavoriteMetaMap({});
+        applyDashboardFeedView(cachedFeed);
+
+        if (currentToken && cachedFeed.posts.length) {
+          void loadLikeStates(currentToken, cachedFeed.posts);
+          void loadFavoriteStates(currentToken, cachedFeed.posts);
+        }
+      } else {
         setIsLoading(true);
-        setFetchErrorMessage(null);
-        setActionMessage(null);
         setLikeMetaMap({});
         setFavoriteMetaMap({});
         setAuthorIdMap({});
         setSearchEvidenceView(null);
         setAuthorResults([]);
+        setPosts([]);
+        setSearchUpdatedAt("");
+      }
 
-        const currentToken = getAuthToken();
-        setToken(currentToken);
+      try {
+        const feed = await fetchDashboardFeed({
+          tabSlug,
+          query: normalizedQuery,
+          mode,
+          force: isManualRefresh,
+          token: currentToken,
+          sessionId: getOrCreateSearchSessionId(),
+        });
 
-        if (effectiveQuery) {
-          setAuthorResults([]);
-
-          if (mode === "author") {
-            const authorPayload = await searchRecoByAuthor({
-              search_request_id: createSearchRequestId(),
-              query: effectiveQuery,
-              topk: SEARCH_TOP_K,
-            });
-            const nextAuthorResults = extractAuthorSearchItems(authorPayload).map(
-              toDashboardAuthorSearchResult,
-            );
-
-            if (cancelled) {
-              return;
-            }
-            setPosts([]);
-            setAuthorIdMap({});
-            setAuthorResults(nextAuthorResults);
-            setIsLoading(false);
-            return;
-          }
-
-          if (mode === "title") {
-            const titlePayload = await searchRecoByTitle({
-              search_request_id: createSearchRequestId(),
-              query: effectiveQuery,
-              topk: SEARCH_TOP_K,
-            });
-            const titleItems = extractSearchItems(titlePayload);
-            const nextPosts = titleItems.map((item, index) => toTitleSearchPost(item, index));
-            const nextAuthorIdMap: Record<string, string> = {};
-            for (const [index, item] of titleItems.entries()) {
-              const authorId = toTrimmedString(item.author_id);
-              if (authorId && nextPosts[index]) {
-                nextAuthorIdMap[nextPosts[index].id] = authorId;
-              }
-            }
-
-            if (cancelled) {
-              return;
-            }
-            setPosts(nextPosts);
-            setAuthorIdMap(nextAuthorIdMap);
-            setAuthorResults([]);
-            setIsLoading(false);
-
-            if (currentToken && nextPosts.length) {
-              void loadLikeStates(currentToken, nextPosts);
-              void loadFavoriteStates(currentToken, nextPosts);
-            }
-            return;
-          }
-
-          const sessionId = getOrCreateSearchSessionId();
-          let searchUserId = `guest:${sessionId}`;
-
-          if (currentToken) {
-            try {
-              const profile = await getUserProfile(currentToken);
-              const resolvedUid = normalizeUserUid(profile.user.uid);
-              if (resolvedUid) {
-                searchUserId = resolvedUid;
-              }
-            } catch (error) {
-              console.warn("Search fallback to guest user_id:", error);
-            }
-          }
-
-          const searchPayload = await searchRecoByContent({
-            search_request_id: createSearchRequestId(),
-            user_id: searchUserId,
-            session_id: sessionId,
-            query: effectiveQuery,
-            topk: SEARCH_TOP_K,
-            need_answer: false,
-            explain: true,
-          });
-          const nextSearchEvidenceView = buildSearchEvidenceViewState(
-            searchPayload,
-            effectiveQuery,
-          );
-          if (!cancelled) {
-            setSearchEvidenceView(nextSearchEvidenceView);
-          }
-          const searchItems = extractSearchItems(searchPayload);
-
-          if (!searchItems.length) {
-            if (cancelled) {
-              return;
-            }
-            setPosts([]);
-            setAuthorResults([]);
-            setAuthorIdMap({});
-            setIsLoading(false);
-            return;
-          }
-
-          let finalPosts: DashboardPost[] = [];
-          let nextAuthorIdMap: Record<string, string> = {};
-
-          const resolvedPosts = await Promise.all(
-            searchItems.map(async (item, index) => {
-              const articleId = pickSearchItemArticleId(item);
-
-              if (canFetchArticleDetail(articleId)) {
-                try {
-                  const articlePayload = await getArticle(articleId, {
-                    token: currentToken ?? undefined,
-                    incr_view: false,
-                  });
-                  const article = pickArticleFromPayload(articlePayload);
-                  if (article) {
-                    const normalizedArticle: ArticleItem = {
-                      ...article,
-                      id: article.id ?? article.article_id ?? articleId,
-                      article_id: article.article_id ?? article.id ?? articleId,
-                    };
-                    const post = withSearchEvidence(
-                      toDashboardPost(normalizedArticle, index),
-                      item,
-                    );
-                    const authorId = article.author_id;
-                    if (authorId !== undefined && authorId !== null && String(authorId).trim()) {
-                      nextAuthorIdMap[post.id] = String(authorId).trim();
-                    }
-                    return post;
-                  }
-                } catch (error) {
-                  console.warn(`Failed to load search article detail: ${articleId}`, error);
-                }
-              }
-
-              return withSearchEvidence(toSearchFallbackPost(item, index, articleId), item);
-            }),
-          );
-
-          finalPosts = resolvedPosts;
-          if (cancelled) {
-            return;
-          }
-          setPosts(finalPosts);
-          setAuthorResults([]);
-          setAuthorIdMap(nextAuthorIdMap);
-          setIsLoading(false);
-
-          if (!finalPosts.length) {
-            setFetchErrorMessage(
-              "\u641c\u7d22\u7ed3\u679c\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5",
-            );
-            return;
-          }
-
-          if (currentToken) {
-            void loadLikeStates(currentToken, finalPosts);
-            void loadFavoriteStates(currentToken, finalPosts);
-          }
+        if (cancelled) {
           return;
         }
 
-        const sessionId = getOrCreateRecoSessionId();
-        const guestUserId = buildGuestRecoUserId(sessionId);
-        const guestUserKey = buildUserRecoKey(guestUserId);
-        let currentPriority = 0;
-        const RECOMMEND_PRIORITY = {
-          guestCachedSnapshotFallback: 10,
-          guestCachedResolved: 20,
-          guestLiveSnapshotFallback: 25,
-          guestLiveResolved: 30,
-          userCachedSnapshotFallback: 40,
-          userCachedResolved: 50,
-          userLiveSnapshotFallback: 55,
-          userLiveResolved: 60,
-        } as const;
+        saveDashboardFeedMemoryCache(cacheKey, feed);
+        applyDashboardFeedView(feed);
+        setIsLoading(false);
 
-        let recommendSnapshotSeq = 0;
-
-        const applyRecommendViewCache = (userKey: string, priority: number): void => {
-          const cachedView = readRecommendViewCache(userKey).view;
-          if (cancelled || !cachedView || !cachedView.posts.length || priority < currentPriority) {
-            return;
-          }
-
-          currentPriority = priority;
-          setPosts(cachedView.posts);
-          setAuthorIdMap(cachedView.authorIdMap);
-          setFetchErrorMessage(null);
-          setIsLoading(false);
-          if (currentToken) {
-            void loadLikeStates(currentToken, cachedView.posts);
-            void loadFavoriteStates(currentToken, cachedView.posts);
-          }
-        };
-
-        const applyRecommendSnapshot = (
-          snapshot: RecommendSnapshot | null,
-          fallbackPriority: number,
-          resolvedPriority: number,
-        ): void => {
-          if (cancelled || !snapshot || !snapshot.ids.length) {
-            return;
-          }
-
-          const snapshotSeq = ++recommendSnapshotSeq;
-          if (fallbackPriority >= currentPriority) {
-            currentPriority = fallbackPriority;
-            const fallbackPosts = toRecommendSnapshotPosts(snapshot);
-            setPosts(fallbackPosts);
-            setAuthorIdMap({});
-            setFetchErrorMessage(null);
-            setIsLoading(false);
-            if (currentToken) {
-              void loadLikeStates(currentToken, fallbackPosts);
-              void loadFavoriteStates(currentToken, fallbackPosts);
-            }
-          }
-
-          void (async () => {
-            const resolved = await resolveRecommendPosts(snapshot, currentToken);
-            if (
-              cancelled ||
-              snapshotSeq !== recommendSnapshotSeq ||
-              resolvedPriority < currentPriority
-            ) {
-              return;
-            }
-
-            currentPriority = resolvedPriority;
-            setPosts(resolved.posts);
-            setAuthorIdMap(resolved.authorIdMap);
-            setFetchErrorMessage(null);
-            setIsLoading(false);
-            if (currentToken) {
-              void loadLikeStates(currentToken, resolved.posts);
-              void loadFavoriteStates(currentToken, resolved.posts);
-            }
-
-            const hasRenderablePosts = resolved.posts.some(
-              (post) => !post.id.startsWith(INVALID_ID_PREFIX) && canFetchArticleDetail(post.id),
-            );
-            if (hasRenderablePosts) {
-              saveRecommendViewCache(snapshot, resolved.posts, resolved.authorIdMap);
-            }
-          })();
-        };
-
-        const applyEmptyRecommendState = (): void => {
-          if (cancelled || currentPriority > 0) {
-            return;
-          }
-
-          setPosts([]);
-          setAuthorIdMap({});
-          setIsLoading(false);
-        };
-
-        const refreshGuestRecommend = async (): Promise<void> => {
-          try {
-            const snapshot = await fetchRecommendSnapshot(
-              {
-                userId: guestUserId,
-                userKey: guestUserKey,
-                sessionId,
-                surface: "dashboard_recommend",
-                query: "",
-                periodBucket: "d1",
-              },
-              {
-                force: isManualRecommendRefresh,
-              },
-            );
-            applyRecommendSnapshot(
-              snapshot,
-              RECOMMEND_PRIORITY.guestLiveSnapshotFallback,
-              RECOMMEND_PRIORITY.guestLiveResolved,
-            );
-            if (!snapshot?.ids.length) {
-              applyEmptyRecommendState();
-            }
-          } catch (error) {
-            console.warn("Failed to refresh guest recommend snapshot:", error);
-            if (currentPriority === 0 && !cancelled) {
-              setFetchErrorMessage(
-                "\u63a8\u8350\u5185\u5bb9\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5",
-              );
-              setPosts([]);
-              setAuthorIdMap({});
-              setIsLoading(false);
-            }
-          }
-        };
-
-        let resolvedUserId: string | null = null;
-        let resolvingUserId: Promise<string | null> | null = null;
-        const resolveUserId = async (): Promise<string | null> => {
-          if (!currentToken) {
-            return null;
-          }
-
-          if (resolvedUserId) {
-            return resolvedUserId;
-          }
-
-          if (resolvingUserId) {
-            return resolvingUserId;
-          }
-
-          resolvingUserId = (async () => {
-            try {
-              const profile = await getUserProfile(currentToken);
-              const uid = normalizeUserUid(profile.user.uid);
-              resolvedUserId = uid || null;
-              return resolvedUserId;
-            } catch (error) {
-              console.warn("Recommend fallback to guest user_id:", error);
-              resolvedUserId = null;
-              return null;
-            } finally {
-              resolvingUserId = null;
-            }
-          })();
-          return resolvingUserId;
-        };
-
-        const refreshUserRecommend = async (): Promise<void> => {
-          const uid = await resolveUserId();
-          if (!uid || cancelled) {
-            return;
-          }
-
-          const userKey = buildUserRecoKey(uid);
-          if (!isManualRecommendRefresh) {
-            applyRecommendViewCache(userKey, RECOMMEND_PRIORITY.userCachedResolved);
-
-            const userCached = readRecommendSnapshotCache(userKey);
-            applyRecommendSnapshot(
-              userCached.snapshot,
-              RECOMMEND_PRIORITY.userCachedSnapshotFallback,
-              RECOMMEND_PRIORITY.userCachedResolved,
-            );
-          }
-
-          try {
-            const snapshot = await fetchRecommendSnapshot(
-              {
-                userId: uid,
-                userKey,
-                sessionId,
-                surface: "dashboard_recommend",
-                query: "",
-                periodBucket: "d1",
-              },
-              {
-                force: isManualRecommendRefresh,
-              },
-            );
-            applyRecommendSnapshot(
-              snapshot,
-              RECOMMEND_PRIORITY.userLiveSnapshotFallback,
-              RECOMMEND_PRIORITY.userLiveResolved,
-            );
-          } catch (error) {
-            console.warn("Failed to refresh user recommend snapshot:", error);
-          }
-        };
-
-        if (!isManualRecommendRefresh) {
-          applyRecommendViewCache(guestUserKey, RECOMMEND_PRIORITY.guestCachedResolved);
-          const guestCached = readRecommendSnapshotCache(guestUserKey);
-          applyRecommendSnapshot(
-            guestCached.snapshot,
-            RECOMMEND_PRIORITY.guestCachedSnapshotFallback,
-            RECOMMEND_PRIORITY.guestCachedResolved,
-          );
+        if (currentToken && feed.posts.length) {
+          void loadLikeStates(currentToken, feed.posts);
+          void loadFavoriteStates(currentToken, feed.posts);
         }
-
-        const triggerRecommendRefresh = (): void => {
-          void refreshGuestRecommend();
-          if (currentToken) {
-            void refreshUserRecommend();
-          }
-        };
-
-        triggerRecommendRefresh();
-
-        const handleVisibilityChange = (): void => {
-          if (document.visibilityState !== "visible") {
-            return;
-          }
-          triggerRecommendRefresh();
-        };
-        const handleOnline = (): void => {
-          triggerRecommendRefresh();
-        };
-
-        document.addEventListener("visibilitychange", handleVisibilityChange);
-        window.addEventListener("online", handleOnline);
-        disposeRecommendListeners = () => {
-          document.removeEventListener("visibilitychange", handleVisibilityChange);
-          window.removeEventListener("online", handleOnline);
-        };
       } catch (error) {
         console.warn("Failed to load dashboard posts:", error);
         if (cancelled) {
           return;
         }
+
+        if (showedCachedFeed) {
+          setFetchErrorMessage(null);
+          setActionMessage("已显示缓存内容，最新内容同步失败，可稍后手动刷新");
+          setIsLoading(false);
+          return;
+        }
+
         setFetchErrorMessage(
           normalizedQuery
             ? "\u641c\u7d22\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5"
@@ -1331,18 +589,16 @@ export const CardList = ({
 
     return () => {
       cancelled = true;
-      if (disposeRecommendListeners) {
-        disposeRecommendListeners();
-      }
     };
   }, [
     effectiveQuery,
-    isSearchMode,
+    applyDashboardFeedView,
     loadFavoriteStates,
     loadLikeStates,
     mode,
     normalizedQuery,
     refreshNonce,
+    tabSlug,
   ]);
 
   const getCurrentMeta = (postId: string): LikeMeta => {
@@ -1422,40 +678,40 @@ export const CardList = ({
       },
     }));
 
-    let nextLikeCount = currentMeta.likeCount;
-    let nextDislikeCount = currentMeta.dislikeCount;
-    let nextLikeState = currentMeta.likeState;
-
     try {
-      for (const step of steps) {
-        const result = await likeAction(token, {
-          target_type: "article",
-          target_id: postId,
-          action_type: step,
-          author_id: authorIdMap[postId],
-          weight: 1,
-        });
+      const optimisticMeta = await steps.reduce<Promise<LikeMeta>>(
+        async (metaPromise, step) => {
+          const previousMeta = await metaPromise;
+          const result = await likeAction(token, {
+            target_type: "article",
+            target_id: postId,
+            action_type: step,
+            author_id: authorIdMap[postId],
+            weight: 1,
+          });
 
-        nextLikeCount = toNumber(result.like_count, nextLikeCount);
-        nextDislikeCount = toNumber(result.dislike_count, nextDislikeCount);
-        nextLikeState = applyReactionStep(nextLikeState, step);
-
-        setLikeMetaMap((prev) => ({
-          ...prev,
-          [postId]: {
-            likeCount: nextLikeCount,
-            dislikeCount: nextDislikeCount,
-            likeState: nextLikeState,
+          const nextMeta: LikeMeta = {
+            likeCount: toNumber(result.like_count, previousMeta.likeCount),
+            dislikeCount: toNumber(result.dislike_count, previousMeta.dislikeCount),
+            likeState: applyReactionStep(previousMeta.likeState, step),
             busy: true,
-          },
-        }));
-      }
+          };
+
+          setLikeMetaMap((prev) => ({
+            ...prev,
+            [postId]: nextMeta,
+          }));
+
+          return nextMeta;
+        },
+        Promise.resolve({ ...currentMeta, busy: true }),
+      );
 
       setLikeMetaMap((prev) => ({
         ...prev,
         [postId]: {
-          likeCount: nextLikeCount,
-          dislikeCount: nextDislikeCount,
+          likeCount: optimisticMeta.likeCount,
+          dislikeCount: optimisticMeta.dislikeCount,
           likeState: finalState,
           busy: false,
         },
@@ -1535,6 +791,45 @@ export const CardList = ({
     }
   };
 
+  const openPostDetail = useCallback(
+    (postId: string) => {
+      if (!canOpenDashboardPost(postId)) {
+        return;
+      }
+
+      const href = buildArticleDetailHref(postId);
+      markNavigationStart(href);
+      router.push(href);
+    },
+    [router],
+  );
+
+  const prefetchPostDetail = useCallback(
+    (postId: string) => {
+      if (
+        !prefetchablePostIds.has(postId) ||
+        !canOpenDashboardPost(postId) ||
+        prefetchedPostIdsRef.current.has(postId)
+      ) {
+        return;
+      }
+
+      const href = buildArticleDetailHref(postId);
+      prefetchedPostIdsRef.current.add(postId);
+      router.prefetch(href);
+    },
+    [prefetchablePostIds, router],
+  );
+
+  const openAuthorDetail = useCallback(
+    (authorResult: DashboardAuthorSearchResult) => {
+      const href = buildAuthorDetailHref(authorResult);
+      markNavigationStart(href);
+      router.push(href);
+    },
+    [router],
+  );
+
   const refreshButtonLabel = isSearchMode
     ? normalizedQuery
       ? "重新搜索"
@@ -1546,22 +841,23 @@ export const CardList = ({
       ? "搜索结果面板"
       : "分区内容面板"
     : "为你推荐";
-  const refreshPanelDescription = isSearchMode
-    ? normalizedQuery
-      ? `当前关键词：${normalizedQuery}`
-      : "按当前分区条件重新拉取一批内容"
-    : "主动刷新一次，看看识海社区此刻想先推给你什么";
   const refreshPanelMeta = isLoading
     ? "正在同步最新内容"
     : posts.length > 0
       ? `当前展示 ${posts.length} 篇内容`
-      : isSearchMode
-        ? "准备重新拉取搜索结果"
-        : "准备重新拉取推荐流";
+      : "暂无内容";
 
   const handleManualRefresh = () => {
     setActionMessage(null);
     setRefreshFeedbackTick((prev) => prev + 1);
+    setShowRefreshFeedback(true);
+    if (refreshFeedbackTimerRef.current !== null) {
+      window.clearTimeout(refreshFeedbackTimerRef.current);
+    }
+    refreshFeedbackTimerRef.current = window.setTimeout(() => {
+      setShowRefreshFeedback(false);
+      refreshFeedbackTimerRef.current = null;
+    }, 1100);
     setRefreshNonce((prev) => prev + 1);
   };
 
@@ -1571,7 +867,7 @@ export const CardList = ({
       ? isSearchMode
         ? "\u5df2\u6536\u5230\uff0c\u6b63\u5728\u5237\u65b0\u5f53\u524d\u7ed3\u679c"
         : "\u5df2\u6536\u5230\uff0c\u6b63\u5728\u5237\u65b0\u63a8\u8350"
-      : "\u70b9\u51fb\u540e\u4f1a\u7acb\u5373\u62c9\u53d6\u4e00\u6279\u65b0\u7684\u5185\u5bb9";
+      : "";
 
   const actionMessageIsError =
     !!actionMessage &&
@@ -1580,62 +876,99 @@ export const CardList = ({
       actionMessage.includes("不支持") ||
       actionMessage.includes("同步"));
 
+  const selectedPost = useMemo(
+    () =>
+      mode === "author"
+        ? null
+        : (posts.find((post) => post.id === activeSelectedSearchResultId) ?? posts[0] ?? null),
+    [activeSelectedSearchResultId, mode, posts],
+  );
+  const selectedAuthorResult = useMemo(
+    () =>
+      mode === "author"
+        ? (authorResults.find((author) => author.id === activeSelectedSearchResultId) ??
+          authorResults[0] ??
+          null)
+        : null,
+    [activeSelectedSearchResultId, authorResults, mode],
+  );
+  const heroImage = useMemo(
+    () => posts.find((post) => post.image)?.image ?? selectedPost?.image ?? null,
+    [posts, selectedPost],
+  );
+  const averageMatchScore = useMemo(() => {
+    const scores = posts
+      .map(resolvePostMatchScore)
+      .filter((score): score is number => typeof score === "number" && Number.isFinite(score));
+    if (!scores.length) {
+      return null;
+    }
+    return scores.reduce((sum, score) => sum + score, 0) / scores.length;
+  }, [posts]);
+  const explicitResultCount = mode === "author" ? authorResults.length : posts.length;
+  const searchTraceSteps = useMemo(() => {
+    if (mode === "content" && searchEvidenceView?.steps.length) {
+      return searchEvidenceView.steps;
+    }
+    return buildClientSearchTraceSteps(mode, normalizedQuery, explicitResultCount);
+  }, [explicitResultCount, mode, normalizedQuery, searchEvidenceView]);
+
   const renderSearchEvidencePanel = () => {
     if (!isSearchMode || mode !== "content" || !searchEvidenceView) {
       return null;
     }
 
     return (
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(240,249,255,0.96))] p-4 shadow-sm">
+      <section className="border-border bg-card/85 overflow-hidden rounded-2xl border p-4 shadow-sm backdrop-blur">
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+            <span className="bg-primary text-primary-foreground rounded-full px-3 py-1 text-xs font-semibold">
               检索证据链
             </span>
             {searchEvidenceView.traceId ? (
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-[11px] text-slate-600">
+              <span className="border-border bg-background/70 text-muted-foreground rounded-full border px-3 py-1 font-mono text-[11px]">
                 trace {searchEvidenceView.traceId}
               </span>
             ) : null}
             {searchEvidenceView.searchRequestId ? (
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-[11px] text-slate-600">
+              <span className="border-border bg-background/70 text-muted-foreground rounded-full border px-3 py-1 font-mono text-[11px]">
                 request {searchEvidenceView.searchRequestId}
               </span>
             ) : null}
-            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-700">
+            <span className="border-primary/25 bg-primary/10 text-primary rounded-full border px-3 py-1 text-[11px] font-medium">
               状态 {searchEvidenceView.status || "ok"}
             </span>
           </div>
           <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-            <div className="space-y-3 rounded-2xl border border-sky-100 bg-white/85 p-4">
+            <div className="border-border bg-background/60 space-y-3 rounded-2xl border p-4">
               <div>
-                <p className="text-[11px] font-semibold tracking-[0.18em] text-slate-500 uppercase">
+                <p className="text-muted-foreground text-[11px] font-semibold tracking-[0.18em] uppercase">
                   Query
                 </p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">
+                <p className="text-foreground mt-1 text-sm font-semibold">
                   {searchEvidenceView.searchText || effectiveQuery}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 text-xs">
-                <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-sky-700">
+                <span className="border-primary/25 bg-primary/10 text-primary rounded-full border px-2 py-1">
                   意图 {searchEvidenceView.intentLabel}
                 </span>
                 {searchEvidenceView.intentConfidence !== null ? (
-                  <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-slate-600">
+                  <span className="border-border bg-card/80 text-muted-foreground rounded-full border px-2 py-1">
                     置信度 {(searchEvidenceView.intentConfidence * 100).toFixed(0)}%
                   </span>
                 ) : null}
               </div>
               {searchEvidenceView.keywords.length ? (
                 <div className="space-y-2">
-                  <p className="text-[11px] font-semibold tracking-[0.18em] text-slate-500 uppercase">
+                  <p className="text-muted-foreground text-[11px] font-semibold tracking-[0.18em] uppercase">
                     Keywords
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {searchEvidenceView.keywords.map((keyword) => (
                       <span
                         key={`search-keyword-${keyword}`}
-                        className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700"
+                        className="border-border bg-muted/70 text-foreground rounded-full border px-2 py-1 text-xs"
                       >
                         {keyword}
                       </span>
@@ -1643,23 +976,22 @@ export const CardList = ({
                   </div>
                 </div>
               ) : null}
-              <p className="text-xs leading-5 text-slate-500">
-                每张结果卡片下方的“命中证据”展示的是这次搜索真正命中的 chunk 片段，不是文章摘要。
-              </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
               {searchEvidenceView.steps.map((step, index) => (
                 <div
                   key={`${step.name}-${index}`}
-                  className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm"
+                  className="border-border bg-background/65 rounded-2xl border p-4 shadow-sm"
                 >
-                  <p className="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase">
+                  <p className="text-muted-foreground text-[11px] font-semibold tracking-[0.16em] uppercase">
                     Step {index + 1}
                   </p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{step.name}</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">{step.summary}</p>
+                  <p className="text-foreground mt-1 text-sm font-semibold">{step.name}</p>
+                  {step.summary ? (
+                    <p className="text-muted-foreground mt-2 text-sm leading-6">{step.summary}</p>
+                  ) : null}
                   {step.details.length ? (
-                    <div className="mt-3 space-y-1 text-xs leading-5 text-slate-500">
+                    <div className="text-muted-foreground mt-3 space-y-1 text-xs leading-5">
                       {step.details.map((detail) => (
                         <p key={`${step.name}-${detail}`}>{detail}</p>
                       ))}
@@ -1675,11 +1007,14 @@ export const CardList = ({
   };
 
   const renderRefreshPanel = () => (
-    <div className="relative overflow-hidden rounded-2xl border border-sky-200/70 bg-[linear-gradient(135deg,rgba(240,249,255,0.96),rgba(236,253,245,0.92))] p-4 shadow-sm shadow-sky-100/60">
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-36 bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.18),transparent_70%)]" />
+    <div className="border-border bg-card/80 relative overflow-hidden rounded-2xl border p-4 shadow-sm backdrop-blur">
+      <div
+        className="pointer-events-none absolute inset-y-0 right-0 w-36 opacity-70"
+        style={{ background: "radial-gradient(circle at center, var(--primary), transparent 70%)" }}
+      />
       <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0 space-y-2">
-          <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/80 bg-white/70 px-3 py-1 text-xs font-medium text-sky-700 shadow-sm">
+          <div className="border-border bg-background/65 text-primary inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium shadow-sm">
             {isSearchMode ? (
               <SearchIcon className="size-3.5" />
             ) : (
@@ -1689,14 +1024,13 @@ export const CardList = ({
           </div>
           <div className="space-y-1">
             <p className="text-foreground text-base font-semibold tracking-tight">
-              {isSearchMode ? "换一批更贴近当前检索的内容" : "刷新一轮新的推荐候选"}
+              {refreshButtonLabel}
             </p>
-            <p className="text-muted-foreground text-sm">{refreshPanelDescription}</p>
           </div>
         </div>
         <div className="flex flex-col items-stretch gap-2 md:items-end">
           <div className="flex items-center justify-between gap-3 md:justify-end">
-            <div className="text-muted-foreground rounded-full bg-white/75 px-3 py-2 text-xs shadow-sm">
+            <div className="text-muted-foreground bg-background/65 rounded-full px-3 py-2 text-xs shadow-sm">
               {refreshPanelMeta}
             </div>
             <div className="relative">
@@ -1704,11 +1038,11 @@ export const CardList = ({
                 <>
                   <span
                     key={`refresh-ring-${refreshFeedbackTick}`}
-                    className="pointer-events-none absolute inset-0 animate-ping rounded-full bg-sky-400/25"
+                    className="bg-primary/25 pointer-events-none absolute inset-0 animate-ping rounded-full"
                   />
                   <span
                     key={`refresh-glow-${refreshFeedbackTick}`}
-                    className="pointer-events-none absolute -inset-1 animate-pulse rounded-full bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.32),rgba(45,212,191,0.14),transparent_72%)] blur-md"
+                    className="bg-primary/20 pointer-events-none absolute -inset-1 animate-pulse rounded-full blur-md"
                   />
                 </>
               ) : null}
@@ -1719,8 +1053,8 @@ export const CardList = ({
                 disabled={isLoading}
                 className={`relative h-11 rounded-full px-5 text-sm font-semibold text-white transition-all duration-300 ${
                   showRefreshFeedback
-                    ? "scale-[0.985] bg-slate-900 shadow-xl ring-4 shadow-sky-400/25 ring-sky-200/60 hover:bg-slate-800"
-                    : "bg-slate-900 shadow-lg shadow-slate-900/15 hover:bg-slate-800"
+                    ? "ring-primary/25 scale-[0.985] shadow-xl ring-4"
+                    : "shadow-primary/15 shadow-lg"
                 }`}
               >
                 <RefreshCcwIcon
@@ -1740,8 +1074,8 @@ export const CardList = ({
             aria-live="polite"
             className={`min-h-5 text-right text-xs transition-all duration-300 ${
               isLoading || showRefreshFeedback
-                ? "translate-y-0 text-sky-700 opacity-100"
-                : "-translate-y-1 text-slate-500 opacity-70"
+                ? "text-primary translate-y-0 opacity-100"
+                : "text-muted-foreground -translate-y-1 opacity-70"
             }`}
           >
             {refreshFeedbackMessage}
@@ -1751,59 +1085,710 @@ export const CardList = ({
     </div>
   );
 
-  const renderAuthorResultGrid = () => (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {authorResults.map((authorResult) => (
-        <Link
-          key={authorResult.id}
-          href={`/author/${encodeURIComponent(authorResult.authorId)}?name=${encodeURIComponent(authorResult.authorName)}`}
-          className="group rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md"
-        >
-          <div className="space-y-4">
+  const renderFavoriteDialog = () => (
+    <FavoritePickerDialog
+      open={favoriteDialogPost !== null}
+      token={token}
+      target={
+        favoriteDialogPost
+          ? {
+              targetId: favoriteDialogPost.id,
+              title: favoriteDialogPost.title,
+              cover: favoriteDialogPost.image,
+            }
+          : null
+      }
+      onOpenChange={(open) => {
+        if (!open) {
+          setFavoriteDialogPost(null);
+        }
+      }}
+      onSaved={(favorite) => {
+        if (!favoriteDialogPost) {
+          return;
+        }
+
+        setFavoriteMetaMap((prev) => ({
+          ...prev,
+          [favoriteDialogPost.id]: {
+            favorited: true,
+            favoriteIds: Array.from(
+              new Set([...(prev[favoriteDialogPost.id]?.favoriteIds ?? []), favorite.favoriteId]),
+            ),
+            busy: false,
+          },
+        }));
+        setActionMessage("已加入收藏夹");
+        setFavoriteDialogPost(null);
+      }}
+    />
+  );
+
+  const renderExplicitSearchHero = () => {
+    const averageMatchText = formatPercentText(averageMatchScore);
+    const hitMetric = averageMatchText
+      ? { label: "平均匹配", value: averageMatchText }
+      : { label: "命中结果", value: `${explicitResultCount} ${getSearchResultUnit(mode)}` };
+    const secondaryMetric =
+      mode === "author"
+        ? {
+            label: "关联文章",
+            value: `${formatCompactCount(
+              authorResults.reduce((sum, item) => sum + item.articleCount, 0),
+            )} 篇`,
+          }
+        : {
+            label: "有效封面",
+            value: `${posts.filter((post) => post.image).length} 张`,
+          };
+
+    return (
+      <section className="border-border bg-card/80 relative overflow-hidden rounded-[1rem] border shadow-lg shadow-black/10">
+        {heroImage ? (
+          <Image
+            src={heroImage}
+            alt=""
+            fill
+            priority
+            sizes="(max-width: 1024px) 100vw, 1120px"
+            className="object-cover opacity-45"
+          />
+        ) : null}
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{ background: "var(--app-search-hero-overlay)" }}
+        />
+        <div className="relative grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div className="min-w-0 space-y-3">
+            <div className="border-border bg-card/80 text-primary inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold shadow-sm">
+              <SparklesIcon className="size-3.5" />
+              {SEARCH_MODE_LABEL_MAP[mode]}
+            </div>
             <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1">
-                  作者检索
-                </span>
-                <span className="font-mono">{authorResult.authorId}</span>
-              </div>
-              <h3 className="text-lg font-semibold tracking-tight text-slate-900 transition-colors group-hover:text-sky-700">
-                {authorResult.authorName}
-              </h3>
+              <h2 className="text-foreground text-2xl font-bold sm:text-3xl">
+                为你找到关于「{normalizedQuery}」的灵感
+              </h2>
             </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
-                <p className="text-[11px] tracking-[0.18em] text-slate-500 uppercase">文章数</p>
-                <p className="mt-2 text-xl font-semibold text-slate-900">
-                  {authorResult.articleCount}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-sky-50/70 p-3">
-                <p className="text-[11px] tracking-[0.18em] text-slate-500 uppercase">最近文章</p>
-                <p className="mt-2 line-clamp-2 text-sm font-medium text-slate-800">
-                  {authorResult.latestArticleTitle || "暂无最近文章标题"}
-                </p>
-              </div>
-            </div>
-
-            {authorResult.latestArticleTime ? (
-              <p className="text-sm text-slate-500">
-                最近发布时间：{authorResult.latestArticleTime}
-              </p>
-            ) : null}
-
-            <div className="inline-flex items-center rounded-full bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors group-hover:bg-sky-700">
-              进入作者主页
+            <div className="text-muted-foreground flex flex-wrap gap-2 text-xs font-semibold">
+              <span className="border-border bg-card/75 rounded-full border px-3 py-1.5">
+                相关内容{" "}
+                <strong className="text-primary">
+                  {explicitResultCount} {getSearchResultUnit(mode)}
+                </strong>
+              </span>
+              <span className="border-border bg-card/75 rounded-full border px-3 py-1.5">
+                {hitMetric.label} <strong className="text-primary">{hitMetric.value}</strong>
+              </span>
+              <span className="border-border bg-card/75 rounded-full border px-3 py-1.5">
+                {secondaryMetric.label}{" "}
+                <strong className="text-primary">{secondaryMetric.value}</strong>
+              </span>
             </div>
           </div>
-        </Link>
-      ))}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center lg:flex-col lg:items-end">
+            <div className="border-border bg-card/80 text-muted-foreground rounded-full border px-4 py-2 text-xs font-medium shadow-sm">
+              {searchUpdatedAt ? `更新于 ${searchUpdatedAt}` : "正在同步结果"}
+            </div>
+            <Button
+              type="button"
+              onClick={handleManualRefresh}
+              disabled={isLoading}
+              className="shadow-primary/20 h-11 rounded-full px-5 shadow-lg"
+            >
+              <RefreshCcwIcon className={cn("size-4", isLoading ? "animate-spin" : "")} />
+              {isLoading ? "搜索中" : "刷新结果"}
+            </Button>
+          </div>
+        </div>
+      </section>
+    );
+  };
+
+  const renderExplicitSearchTracePanel = () => {
+    const hasBackendTrace = mode === "content" && searchEvidenceView;
+
+    return (
+      <section className="border-border bg-card/78 rounded-[1rem] border p-4 shadow-md shadow-black/5">
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="text-foreground flex items-center gap-2 text-sm font-bold">
+            <SearchIcon className="text-primary size-4" />
+            搜索过程追踪
+          </div>
+          <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-[11px]">
+            {hasBackendTrace && searchEvidenceView.traceId ? (
+              <span className="border-border bg-muted/70 text-primary rounded-full border px-2.5 py-1 font-mono">
+                trace_{searchEvidenceView.traceId}
+              </span>
+            ) : null}
+            {hasBackendTrace && searchEvidenceView.searchRequestId ? (
+              <span className="border-border bg-card/80 rounded-full border px-2.5 py-1 font-mono">
+                {searchEvidenceView.searchRequestId}
+              </span>
+            ) : null}
+            {hasBackendTrace ? (
+              <span className="border-primary/25 bg-primary/10 text-primary rounded-full border px-2.5 py-1 font-semibold">
+                状态 {searchEvidenceView.status || "ok"}
+              </span>
+            ) : (
+              <span className="border-border bg-card/80 rounded-full border px-2.5 py-1">
+                客户端视图链路
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="overflow-x-auto pb-1">
+          <div className="flex min-w-max items-stretch gap-3">
+            <div className="border-border bg-background/65 w-36 shrink-0 rounded-[0.75rem] border p-3 shadow-sm">
+              <p className="text-muted-foreground text-[11px] font-semibold">查询词</p>
+              <p className="text-primary mt-2 line-clamp-2 text-sm font-bold">{normalizedQuery}</p>
+              {searchEvidenceView?.keywords.length ? (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {searchEvidenceView.keywords.slice(0, 3).map((keyword) => (
+                    <span
+                      key={`explicit-keyword-${keyword}`}
+                      className="bg-primary/10 text-primary rounded-full px-2 py-0.5 text-[10px] font-medium"
+                    >
+                      {keyword}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            {searchTraceSteps.map((step, index) => (
+              <div key={`${step.name}-${index}`} className="flex items-center gap-3">
+                <ArrowRightIcon className="text-primary size-4 shrink-0" />
+                <div className="border-border bg-background/65 w-40 shrink-0 rounded-[0.75rem] border p-3 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-primary/10 text-primary inline-flex size-6 items-center justify-center rounded-full">
+                      {index === searchTraceSteps.length - 1 ? (
+                        <CheckCircle2Icon className="size-3.5" />
+                      ) : (
+                        <FileTextIcon className="size-3.5" />
+                      )}
+                    </span>
+                    <span className="text-muted-foreground text-[11px] font-semibold">
+                      STEP {index + 1}
+                    </span>
+                  </div>
+                  <p className="text-foreground mt-2 line-clamp-1 text-sm font-bold">{step.name}</p>
+                  <p className="text-muted-foreground mt-1 line-clamp-2 min-h-8 text-xs leading-4">
+                    {step.summary}
+                  </p>
+                  {step.details[0] ? (
+                    <p className="text-primary mt-2 line-clamp-1 text-[11px] font-medium">
+                      {step.details[0]}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  };
+
+  const renderPostSearchCard = (post: DashboardPost, index: number) => {
+    const meta = likeMetaMap[post.id];
+    const favoriteMeta = favoriteMetaMap[post.id];
+    const matchText = formatPercentText(resolvePostMatchScore(post));
+    const tags = collectPostSearchTags(post);
+    const publishedAt = formatOptionalDate(post.publishedAt);
+    const isSelected =
+      activeSelectedSearchResultId === post.id || (!activeSelectedSearchResultId && index === 0);
+
+    return (
+      <InteractiveSurface
+        variant="card"
+        key={post.id}
+        role="button"
+        tabIndex={0}
+        onClick={() => setSelectedSearchResultId(post.id)}
+        onFocus={() => prefetchPostDetail(post.id)}
+        onPointerEnter={() => prefetchPostDetail(post.id)}
+        onDoubleClick={(event: MouseEvent<HTMLElement>) => {
+          if (isCardControlTarget(event.target)) {
+            return;
+          }
+          openPostDetail(post.id);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setSelectedSearchResultId(post.id);
+          }
+        }}
+        className={cn(
+          "bg-card/90 group flex min-h-[18rem] cursor-pointer flex-col overflow-hidden rounded-[0.75rem] border shadow-md shadow-black/5",
+          isSelected ? "border-primary ring-primary/25 ring-2" : "border-border/80",
+        )}
+      >
+        <div className="bg-muted relative h-32 overflow-hidden">
+          {post.image ? (
+            <Image
+              src={post.image}
+              alt={post.title}
+              fill
+              priority={index === 0}
+              sizes="(max-width: 768px) 100vw, 320px"
+              className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+            />
+          ) : (
+            <div className="from-muted via-card to-accent text-primary flex h-full items-center justify-center bg-gradient-to-br">
+              <FileTextIcon className="size-8" />
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-1 flex-col gap-3 p-4">
+          <div className="space-y-2">
+            <h3 className="text-foreground line-clamp-2 text-base leading-6 font-bold">
+              {post.title}
+            </h3>
+            <p className="text-muted-foreground line-clamp-2 min-h-10 text-sm leading-5">
+              {post.content}
+            </p>
+          </div>
+
+          {tags.length ? (
+            <div className="flex flex-wrap gap-1.5">
+              {tags.slice(0, 3).map((tag) => (
+                <span
+                  key={`${post.id}-search-tag-${tag}`}
+                  className="bg-accent text-accent-foreground rounded-full px-2 py-1 text-[11px] font-medium"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="text-muted-foreground mt-auto flex flex-wrap items-center gap-2 text-[11px] font-medium">
+            {matchText ? (
+              <span className="inline-flex items-center gap-1 text-emerald-700">
+                <CheckCircle2Icon className="size-3" />
+                {matchText} 匹配
+              </span>
+            ) : null}
+            <span className="inline-flex items-center gap-1">
+              <ThumbsUpIcon className="size-3" />
+              {formatCompactCount(meta?.likeCount ?? post.likes)}
+            </span>
+            {publishedAt ? (
+              <span className="inline-flex items-center gap-1">
+                <ClockIcon className="size-3" />
+                {publishedAt}
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="border-border bg-muted/45 flex items-center justify-between border-t px-3 py-2">
+          <span className="text-muted-foreground line-clamp-1 text-[11px] font-medium">
+            {post.author}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant={meta?.likeState === LIKE_STATE.LIKED ? "default" : "ghost"}
+              size="sm"
+              disabled={meta?.busy}
+              onClick={(event) => {
+                event.stopPropagation();
+                void handleLike(post.id);
+              }}
+              className="h-7 rounded-full px-2"
+              aria-label="点赞"
+            >
+              <ThumbsUpIcon className="size-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant={meta?.likeState === LIKE_STATE.DISLIKED ? "destructive" : "ghost"}
+              size="sm"
+              disabled={meta?.busy}
+              onClick={(event) => {
+                event.stopPropagation();
+                void handleDislike(post.id);
+              }}
+              className="h-7 rounded-full px-2"
+              aria-label="点踩"
+            >
+              <ThumbsDownIcon className="size-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant={favoriteMeta?.favorited ? "default" : "outline"}
+              size="sm"
+              disabled={favoriteMeta?.busy}
+              onClick={(event) => {
+                event.stopPropagation();
+                void handleFavorite({ id: post.id, title: post.title, image: post.image });
+              }}
+              className="border-border h-7 rounded-full px-2"
+              aria-label={favoriteMeta?.favorited ? "取消收藏" : "收藏"}
+            >
+              <BookmarkIcon className="size-3.5" />
+            </Button>
+          </div>
+        </div>
+      </InteractiveSurface>
+    );
+  };
+
+  const renderAuthorSearchCard = (authorResult: DashboardAuthorSearchResult, index: number) => {
+    const isSelected =
+      activeSelectedSearchResultId === authorResult.id ||
+      (!activeSelectedSearchResultId && index === 0);
+
+    return (
+      <InteractiveSurface
+        variant="card"
+        key={authorResult.id}
+        role="button"
+        tabIndex={0}
+        onClick={() => setSelectedSearchResultId(authorResult.id)}
+        onDoubleClick={(event: MouseEvent<HTMLElement>) => {
+          if (isCardControlTarget(event.target)) {
+            return;
+          }
+          openAuthorDetail(authorResult);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setSelectedSearchResultId(authorResult.id);
+          }
+        }}
+        className={cn(
+          "bg-card/90 cursor-pointer rounded-[0.75rem] border p-4 shadow-md shadow-black/5",
+          isSelected ? "border-primary ring-primary/25 ring-2" : "border-border/80",
+        )}
+      >
+        <div className="flex items-start gap-3">
+          <span className="bg-accent text-primary inline-flex size-12 shrink-0 items-center justify-center rounded-full">
+            <UserRoundIcon className="size-6" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-foreground line-clamp-1 text-base font-bold">
+              {authorResult.authorName}
+            </p>
+            <p className="text-muted-foreground mt-1 font-mono text-[11px]">
+              {authorResult.authorId}
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="bg-accent rounded-[0.65rem] px-3 py-2">
+            <p className="text-muted-foreground text-[11px]">文章数</p>
+            <p className="text-primary mt-1 text-lg font-bold">{authorResult.articleCount}</p>
+          </div>
+          <div className="bg-muted rounded-[0.65rem] px-3 py-2">
+            <p className="text-muted-foreground text-[11px]">最近文章</p>
+            <p className="text-foreground mt-1 line-clamp-1 text-sm font-semibold">
+              {authorResult.latestArticleTitle || "暂无标题"}
+            </p>
+          </div>
+        </div>
+      </InteractiveSurface>
+    );
+  };
+
+  const renderSelectedPostDetail = () => {
+    if (!selectedPost) {
+      return null;
+    }
+
+    const tags = collectPostSearchTags(selectedPost);
+    const matchText = formatPercentText(resolvePostMatchScore(selectedPost));
+    const publishedAt = formatOptionalDate(selectedPost.publishedAt);
+    const detailHref = canOpenDashboardPost(selectedPost.id)
+      ? `/article/${encodeURIComponent(selectedPost.id)}`
+      : "";
+
+    return (
+      <aside className="border-border bg-card/92 overflow-hidden rounded-[0.85rem] border shadow-lg shadow-black/10 xl:sticky xl:top-6">
+        <div className="bg-muted relative h-44">
+          {selectedPost.image ? (
+            <Image
+              src={selectedPost.image}
+              alt={selectedPost.title}
+              fill
+              sizes="(max-width: 1280px) 100vw, 400px"
+              className="object-cover"
+            />
+          ) : (
+            <div className="from-muted via-card to-accent text-primary flex h-full items-center justify-center bg-gradient-to-br">
+              <FileTextIcon className="size-10" />
+            </div>
+          )}
+        </div>
+        <div className="space-y-4 p-5">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold">
+              <span className="bg-primary text-primary-foreground rounded-full px-2.5 py-1">
+                精选结果
+              </span>
+              {matchText ? (
+                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">
+                  匹配度 {matchText}
+                </span>
+              ) : null}
+            </div>
+            <h3 className="text-foreground text-xl leading-7 font-bold">{selectedPost.title}</h3>
+            <p className="text-muted-foreground text-sm leading-6">{selectedPost.content}</p>
+          </div>
+
+          {selectedPost.searchEvidence?.snippet ? (
+            <div className="border-border bg-muted/70 rounded-[0.75rem] border p-3">
+              <p className="text-foreground mb-1 text-xs font-bold">命中片段</p>
+              <p className="text-muted-foreground line-clamp-5 text-xs leading-5">
+                {selectedPost.searchEvidence.snippet}
+              </p>
+            </div>
+          ) : null}
+
+          {tags.length ? (
+            <div className="flex flex-wrap gap-2">
+              {tags.map((tag) => (
+                <span
+                  key={`detail-tag-${selectedPost.id}-${tag}`}
+                  className="bg-accent text-accent-foreground rounded-full px-2.5 py-1 text-xs font-medium"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="bg-muted text-muted-foreground grid gap-2 rounded-[0.75rem] p-3 text-xs">
+            <span className="inline-flex items-center gap-2">
+              <UserRoundIcon className="text-primary size-3.5" />
+              {selectedPost.author}
+            </span>
+            {publishedAt ? (
+              <span className="inline-flex items-center gap-2">
+                <ClockIcon className="text-primary size-3.5" />
+                发布时间：{publishedAt}
+              </span>
+            ) : null}
+          </div>
+
+          {detailHref ? (
+            <Button asChild className="w-full rounded-full">
+              <Link href={detailHref}>
+                查看原文
+                <ArrowRightIcon className="size-4" />
+              </Link>
+            </Button>
+          ) : (
+            <Button className="w-full rounded-full" disabled>
+              暂无原文入口
+            </Button>
+          )}
+        </div>
+      </aside>
+    );
+  };
+
+  const renderSelectedAuthorDetail = () => {
+    if (!selectedAuthorResult) {
+      return null;
+    }
+
+    return (
+      <aside className="border-border bg-card/92 rounded-[0.85rem] border p-5 shadow-lg shadow-black/10 xl:sticky xl:top-6">
+        <div className="space-y-5">
+          <div className="flex items-start gap-3">
+            <span className="bg-accent text-primary inline-flex size-14 shrink-0 items-center justify-center rounded-full">
+              <UserRoundIcon className="size-7" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-primary text-xs font-semibold">精选作者</p>
+              <h3 className="text-foreground mt-1 text-xl font-bold">
+                {selectedAuthorResult.authorName}
+              </h3>
+              <p className="text-muted-foreground mt-1 font-mono text-xs">
+                {selectedAuthorResult.authorId}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-accent rounded-[0.75rem] p-3">
+              <p className="text-muted-foreground text-xs">文章数</p>
+              <p className="text-primary mt-2 text-2xl font-bold">
+                {selectedAuthorResult.articleCount}
+              </p>
+            </div>
+            <div className="bg-muted rounded-[0.75rem] p-3">
+              <p className="text-muted-foreground text-xs">最近动态</p>
+              <p className="text-foreground mt-2 line-clamp-2 text-sm font-semibold">
+                {selectedAuthorResult.latestArticleTitle || "暂无最近文章"}
+              </p>
+            </div>
+          </div>
+
+          {selectedAuthorResult.latestArticleTime ? (
+            <div className="border-border bg-card text-muted-foreground rounded-[0.75rem] border p-3 text-xs">
+              <ClockIcon className="text-primary mr-1 inline size-3.5" />
+              最近发布时间：{selectedAuthorResult.latestArticleTime}
+            </div>
+          ) : null}
+
+          <Button asChild className="w-full rounded-full">
+            <Link
+              href={`/author/${encodeURIComponent(selectedAuthorResult.authorId)}?name=${encodeURIComponent(selectedAuthorResult.authorName)}`}
+            >
+              进入作者主页
+              <ArrowRightIcon className="size-4" />
+            </Link>
+          </Button>
+        </div>
+      </aside>
+    );
+  };
+
+  const renderExplicitSearchResults = () => {
+    if (isLoading) {
+      return (
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div
+                key={`explicit-search-skeleton-${index}`}
+                className="border-border bg-card/80 h-72 animate-pulse rounded-[0.75rem] border p-4 shadow-sm"
+              >
+                <div className="bg-muted h-28 rounded-[0.65rem]" />
+                <div className="bg-muted mt-4 h-4 w-2/3 rounded" />
+                <div className="bg-muted mt-3 h-3 w-full rounded" />
+                <div className="bg-muted mt-2 h-3 w-4/5 rounded" />
+              </div>
+            ))}
+          </div>
+          <div className="border-border bg-card/80 hidden h-96 animate-pulse rounded-[0.85rem] border xl:block" />
+        </div>
+      );
+    }
+
+    if (fetchErrorMessage) {
+      return (
+        <section className="rounded-[1rem] border border-red-100 bg-red-50/80 p-8 text-center text-sm font-medium text-red-600">
+          {fetchErrorMessage}
+        </section>
+      );
+    }
+
+    if (!hasRenderableResults) {
+      return (
+        <section className="border-border bg-card/82 rounded-[1rem] border p-8 text-center">
+          <SearchIcon className="text-primary mx-auto size-8" />
+          <p className="text-foreground mt-3 text-sm font-semibold">
+            {mode === "author"
+              ? "未搜索到相关作者"
+              : mode === "title"
+                ? "未搜索到相关标题"
+                : "未搜索到相关内容"}
+          </p>
+        </section>
+      );
+    }
+
+    return (
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem] 2xl:grid-cols-[minmax(0,1fr)_25rem]">
+        {hasAuthorResults ? (
+          <MotionList className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
+            {authorResults.map(renderAuthorSearchCard)}
+          </MotionList>
+        ) : (
+          <MotionList className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
+            {posts.map(renderPostSearchCard)}
+          </MotionList>
+        )}
+        {hasAuthorResults ? renderSelectedAuthorDetail() : renderSelectedPostDetail()}
+      </div>
+    );
+  };
+
+  const renderExplicitSearchExperience = () => (
+    <div className="space-y-4">
+      {renderExplicitSearchHero()}
+      {renderExplicitSearchTracePanel()}
+      {actionMessage && (
+        <p className={`text-sm ${actionMessageIsError ? "text-destructive" : "text-primary"}`}>
+          {actionMessage}
+        </p>
+      )}
+      {renderExplicitSearchResults()}
+      {renderFavoriteDialog()}
     </div>
+  );
+
+  const renderAuthorResultGrid = () => (
+    <MotionList className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {authorResults.map((authorResult) => (
+        <InteractiveSurface asChild variant="card" key={authorResult.id}>
+          <Link
+            href={`/author/${encodeURIComponent(authorResult.authorId)}?name=${encodeURIComponent(authorResult.authorName)}`}
+            className="border-border bg-card group rounded-3xl border p-5 shadow-sm"
+          >
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-[11px]">
+                  <span className="border-border bg-muted rounded-full border px-2 py-1">
+                    作者检索
+                  </span>
+                  <span className="font-mono">{authorResult.authorId}</span>
+                </div>
+                <h3 className="text-foreground group-hover:text-primary text-lg font-semibold tracking-tight transition-colors">
+                  {authorResult.authorName}
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="border-border bg-muted/80 rounded-2xl border p-3">
+                  <p className="text-muted-foreground text-[11px] tracking-[0.18em] uppercase">
+                    文章数
+                  </p>
+                  <p className="text-foreground mt-2 text-xl font-semibold">
+                    {authorResult.articleCount}
+                  </p>
+                </div>
+                <div className="border-border bg-accent/70 rounded-2xl border p-3">
+                  <p className="text-muted-foreground text-[11px] tracking-[0.18em] uppercase">
+                    最近文章
+                  </p>
+                  <p className="text-foreground mt-2 line-clamp-2 text-sm font-medium">
+                    {authorResult.latestArticleTitle || "暂无最近文章标题"}
+                  </p>
+                </div>
+              </div>
+
+              {authorResult.latestArticleTime ? (
+                <p className="text-muted-foreground text-sm">
+                  最近发布时间：{authorResult.latestArticleTime}
+                </p>
+              ) : null}
+
+              <div className="bg-primary text-primary-foreground group-hover:bg-primary/90 inline-flex items-center rounded-full px-3 py-2 text-sm font-medium transition-colors">
+                进入作者主页
+              </div>
+            </div>
+          </Link>
+        </InteractiveSurface>
+      ))}
+    </MotionList>
   );
 
   const hasAuthorResults = mode === "author" && authorResults.length > 0;
   const hasRenderableResults = hasAuthorResults || posts.length > 0;
+
+  if (isExplicitSearchMode) {
+    return renderExplicitSearchExperience();
+  }
 
   if (isLoading) {
     if (isSearchMode) {
@@ -1818,7 +1803,7 @@ export const CardList = ({
     return (
       <div className="space-y-4">
         {renderRefreshPanel()}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 10 }).map((_, index) => (
             <div
               key={`reco-skeleton-${index}`}
@@ -1877,8 +1862,8 @@ export const CardList = ({
       {hasAuthorResults ? (
         renderAuthorResultGrid()
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-          {posts.map((post) => {
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {posts.map((post, index) => {
             const meta = likeMetaMap[post.id];
             const favoriteMeta = favoriteMetaMap[post.id];
             return (
@@ -1892,51 +1877,19 @@ export const CardList = ({
                 isFavorited={favoriteMeta?.favorited ?? false}
                 actionDisabled={meta?.busy}
                 favoriteDisabled={favoriteMeta?.busy}
+                imagePriority={index === 0}
                 onLike={handleLike}
                 onDislike={handleDislike}
                 onFavorite={handleFavorite}
+                onOpen={openPostDetail}
+                onPrefetch={prefetchPostDetail}
               />
             );
           })}
         </div>
       )}
 
-      <FavoritePickerDialog
-        open={favoriteDialogPost !== null}
-        token={token}
-        target={
-          favoriteDialogPost
-            ? {
-                targetId: favoriteDialogPost.id,
-                title: favoriteDialogPost.title,
-                cover: favoriteDialogPost.image,
-              }
-            : null
-        }
-        onOpenChange={(open) => {
-          if (!open) {
-            setFavoriteDialogPost(null);
-          }
-        }}
-        onSaved={(favorite) => {
-          if (!favoriteDialogPost) {
-            return;
-          }
-
-          setFavoriteMetaMap((prev) => ({
-            ...prev,
-            [favoriteDialogPost.id]: {
-              favorited: true,
-              favoriteIds: Array.from(
-                new Set([...(prev[favoriteDialogPost.id]?.favoriteIds ?? []), favorite.favoriteId]),
-              ),
-              busy: false,
-            },
-          }));
-          setActionMessage("已加入收藏夹");
-          setFavoriteDialogPost(null);
-        }}
-      />
+      {renderFavoriteDialog()}
     </div>
   );
 };
