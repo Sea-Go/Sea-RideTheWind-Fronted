@@ -4,10 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { TaskProgressBoard } from "@/components/profile/TaskProgressBoard";
-import { ProfileThemeShell } from "@/components/profile/ProfileThemeShell";
 import { Layout } from "@/components/layout/layout";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { ProfileThemeShell } from "@/components/profile/ProfileThemeShell";
+import { TaskProgressBoard } from "@/components/profile/TaskProgressBoard";
 import { Button } from "@/components/ui/button";
 import {
   ADMIN_FRONTEND_SESSION_MESSAGE,
@@ -94,9 +94,6 @@ export default function ProfileTasksPage() {
           <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-2">
               <h1 className="text-3xl font-bold tracking-tight">任务详情</h1>
-              <p className="text-muted-foreground text-sm">
-                这里会完整展示当前登录账号的任务进度，并细分为未完成和已完成。
-              </p>
             </div>
             <Button asChild variant="outline">
               <Link href="/profile">返回个人中心</Link>
@@ -110,7 +107,6 @@ export default function ProfileTasksPage() {
             errorMessage={errorMessage}
             currentUserId={userId || null}
             title="全部任务"
-            description="任务数据直接来自后端任务系统，刷新后即可看到最新完成情况。"
             onRefresh={() => void handleRefresh()}
           />
         </ProfileThemeShell>
