@@ -6,6 +6,9 @@ export const USER_CENTER_API_PATHS = {
   login: `${USER_CENTER_BFF_V1_PREFIX}/user/login`,
   getUser: `${USER_CENTER_BFF_V1_PREFIX}/user/get`,
   updateUser: `${USER_CENTER_BFF_V1_PREFIX}/user/update`,
+  uploadAvatar: `${USER_CENTER_BFF_V1_PREFIX}/user/avatar`,
+  avatarHistory: `${USER_CENTER_BFF_V1_PREFIX}/user/avatar/history`,
+  selectAvatar: `${USER_CENTER_BFF_V1_PREFIX}/user/avatar/select`,
   logout: `${USER_CENTER_BFF_V1_PREFIX}/user/logout`,
   deleteUser: `${USER_CENTER_BFF_V1_PREFIX}/user/delete`,
 } as const;
@@ -54,6 +57,7 @@ const COMMENT_BFF_PREFIX = "/api/comment";
 export const COMMENT_API_PATHS = {
   create: `${COMMENT_BFF_PREFIX}/v1/comment/create`,
   list: `${COMMENT_BFF_PREFIX}/v1/comment/list`,
+  like: `${COMMENT_BFF_PREFIX}/v1/comment/like`,
 } as const;
 
 // ─── 点赞服务（通过 BFF: /api/like/*）──────────────────────────────────────
