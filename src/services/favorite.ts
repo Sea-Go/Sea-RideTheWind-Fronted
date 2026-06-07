@@ -2,6 +2,15 @@ import { FAVORITE_API_PATHS } from "@/constants/api-paths";
 import { request, withBearerAuthorization } from "@/services/request";
 
 const TARGET_TYPE_ARTICLE = "article";
+const FAVORITE_INVENTORY_TTL_MS = 60 * 1000;
+
+interface FavoriteInventoryCacheEntry {
+  inventory: FavoriteInventory;
+  expiresAt: number;
+}
+
+const favoriteInventoryCache = new Map<string, FavoriteInventoryCacheEntry>();
+const favoriteInventoryInflight = new Map<string, Promise<FavoriteInventory>>();
 
 export interface FavoriteFolder {
   folderId: string;
@@ -72,6 +81,20 @@ const normalizeId = (value: unknown): string => {
   return String(value).trim();
 };
 
+const getTokenCacheKey = (token: string): string => token.trim();
+
+export const invalidateFavoriteInventoryCache = (token?: string): void => {
+  if (token) {
+    const cacheKey = getTokenCacheKey(token);
+    favoriteInventoryCache.delete(cacheKey);
+    favoriteInventoryInflight.delete(cacheKey);
+    return;
+  }
+
+  favoriteInventoryCache.clear();
+  favoriteInventoryInflight.clear();
+};
+
 const normalizeFolder = (folder: FavoriteFolder): FavoriteFolder => ({
   ...folder,
   folderId: normalizeId(folder.folderId),
@@ -128,6 +151,7 @@ export const createFavoriteFolder = async (
     body: JSON.stringify(payload),
   });
 
+  invalidateFavoriteInventoryCache(token);
   return normalizeId(response.folderId);
 };
 
@@ -140,6 +164,7 @@ export const updateFavoriteFolder = async (
     headers: withBearerAuthorization(token),
     body: JSON.stringify(payload),
   });
+  invalidateFavoriteInventoryCache(token);
 };
 
 export const deleteFavoriteFolder = async (token: string, folderId: string): Promise<void> => {
@@ -148,6 +173,7 @@ export const deleteFavoriteFolder = async (token: string, folderId: string): Pro
     headers: withBearerAuthorization(token),
     body: JSON.stringify({ folderId }),
   });
+  invalidateFavoriteInventoryCache(token);
 };
 
 export const createOrFindFavoriteFolder = async (
@@ -200,6 +226,7 @@ export const createFavoriteItem = async (
     body: JSON.stringify(payload),
   });
 
+  invalidateFavoriteInventoryCache(token);
   return normalizeId(response.favoriteId);
 };
 
@@ -209,9 +236,10 @@ export const deleteFavoriteItem = async (token: string, favoriteId: string): Pro
     headers: withBearerAuthorization(token),
     body: JSON.stringify({ favoriteId }),
   });
+  invalidateFavoriteInventoryCache(token);
 };
 
-export const loadFavoriteInventory = async (token: string): Promise<FavoriteInventory> => {
+const loadFavoriteInventoryFresh = async (token: string): Promise<FavoriteInventory> => {
   const folders = await listFavoriteFolders(token);
   if (!folders.length) {
     return {
@@ -238,6 +266,38 @@ export const loadFavoriteInventory = async (token: string): Promise<FavoriteInve
     itemsByFolderId,
     articleMap: buildArticleMap(itemsByFolderId),
   };
+};
+
+export const loadFavoriteInventory = async (
+  token: string,
+  options: { force?: boolean } = {},
+): Promise<FavoriteInventory> => {
+  const cacheKey = getTokenCacheKey(token);
+  const cached = favoriteInventoryCache.get(cacheKey);
+  if (!options.force && cached && cached.expiresAt > Date.now()) {
+    return cached.inventory;
+  }
+
+  const inflight = favoriteInventoryInflight.get(cacheKey);
+  if (!options.force && inflight) {
+    return inflight;
+  }
+
+  const task = loadFavoriteInventoryFresh(token);
+  favoriteInventoryInflight.set(cacheKey, task);
+
+  try {
+    const inventory = await task;
+    favoriteInventoryCache.set(cacheKey, {
+      inventory,
+      expiresAt: Date.now() + FAVORITE_INVENTORY_TTL_MS,
+    });
+    return inventory;
+  } finally {
+    if (favoriteInventoryInflight.get(cacheKey) === task) {
+      favoriteInventoryInflight.delete(cacheKey);
+    }
+  }
 };
 
 export const getArticleFavorites = (
@@ -298,6 +358,7 @@ export const deleteFavoriteItems = async (
   );
 
   await Promise.all(uniqueIds.map((favoriteId) => deleteFavoriteItem(token, favoriteId)));
+  invalidateFavoriteInventoryCache(token);
 };
 
 export const deleteArticleFavorites = async (
