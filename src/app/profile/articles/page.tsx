@@ -1,5 +1,14 @@
 "use client";
 
+import { FileTextIcon, PenBoxIcon, RefreshCcwIcon, Trash2Icon } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { Layout } from "@/components/layout/layout";
+import { PageContainer } from "@/components/layout/PageContainer";
+import { ProfileThemeShell } from "@/components/profile/ProfileThemeShell";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,15 +19,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { FileTextIcon, PenBoxIcon, RefreshCcwIcon, Trash2Icon } from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
-
-import { Layout } from "@/components/layout/layout";
-import { PageContainer } from "@/components/layout/PageContainer";
-import { ProfileThemeShell } from "@/components/profile/ProfileThemeShell";
 import { Button } from "@/components/ui/button";
 import { type ArticleItem, deleteArticle, listArticles } from "@/services/article";
 import {
@@ -110,7 +110,7 @@ const buildSummary = (article: ArticleItem): string => {
 const ARTICLE_STATUS_MAP: Record<number, { label: string; className: string }> = {
   1: {
     label: "草稿",
-    className: "bg-slate-100 text-slate-700 border-slate-200",
+    className: "app-pill",
   },
   2: {
     label: "已发布",
@@ -126,7 +126,7 @@ const ARTICLE_STATUS_MAP: Record<number, { label: string; className: string }> =
   },
   5: {
     label: "已删除",
-    className: "bg-zinc-100 text-zinc-700 border-zinc-200",
+    className: "bg-muted text-muted-foreground border-border",
   },
 };
 
@@ -171,8 +171,7 @@ const resolveArticleStatus = (
       detailMessage = detailMessage.replace(/^doc ingest failed:\s*/i, "");
     }
     if (detailMessage.includes("未找到一级标题")) {
-      detailMessage =
-        "系统在入库时没有从正文里识别到一级标题。现在标题会自动使用你发布时填写的标题，编辑后重新保存一次即可重新提交。";
+      detailMessage = "正文缺少一级标题，请编辑后重新保存。";
     }
 
     return {
@@ -180,7 +179,6 @@ const resolveArticleStatus = (
       className: "bg-rose-100 text-rose-700 border-rose-200",
       detailTitle: "发布失败原因",
       detailMessage,
-      detailHint: "修改文章后重新保存，就会再次进入发布流程。",
     };
   }
 
@@ -199,7 +197,6 @@ const resolveArticleStatus = (
 export default function ProfileArticlesPage() {
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState("");
   const [articles, setArticles] = useState<ArticleItem[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -238,7 +235,6 @@ export default function ProfileArticlesPage() {
         throw new Error("当前用户信息无效，请重新登录");
       }
 
-      setCurrentUserId(uid);
       const response = await listArticles({
         author_id: uid,
         page: nextPage,
@@ -319,19 +315,13 @@ export default function ProfileArticlesPage() {
     <Layout>
       <PageContainer className="py-8">
         <ProfileThemeShell className="space-y-6">
-          <header className="flex flex-col gap-4 rounded-3xl border border-sky-100 bg-[linear-gradient(135deg,rgba(239,246,255,0.95),rgba(248,250,252,0.92))] p-6 shadow-sm shadow-sky-100/60 lg:flex-row lg:items-center lg:justify-between">
+          <header className="app-hero-surface flex flex-col gap-4 rounded-3xl p-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/80 px-3 py-1 text-xs font-medium text-sky-700 shadow-sm">
+              <div className="app-pill inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium">
                 <FileTextIcon className="size-3.5" />
                 文章管理
               </div>
               <h1 className="text-3xl font-bold tracking-tight">管理我发布过的文章</h1>
-              <p className="text-muted-foreground text-sm">
-                在这里查看自己的发文状态，并快速进入查看、编辑和删除操作。
-              </p>
-              {currentUserId && (
-                <p className="text-muted-foreground text-xs">当前作者编号：{currentUserId}</p>
-              )}
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <Button variant="outline" onClick={handleRefresh} disabled={isLoading}>
@@ -348,17 +338,17 @@ export default function ProfileArticlesPage() {
           </header>
 
           <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="rounded-2xl border p-5">
+            <div className="app-stat-tile rounded-2xl p-5">
               <p className="text-muted-foreground text-sm">文章总数</p>
               <p className="mt-2 text-3xl font-bold">{total}</p>
             </div>
-            <div className="rounded-2xl border p-5">
+            <div className="app-stat-tile rounded-2xl p-5">
               <p className="text-muted-foreground text-sm">当前页码</p>
               <p className="mt-2 text-3xl font-bold">
                 {page} / {totalPages}
               </p>
             </div>
-            <div className="rounded-2xl border p-5">
+            <div className="app-stat-tile rounded-2xl p-5">
               <p className="text-muted-foreground text-sm">每页数量</p>
               <p className="mt-2 text-3xl font-bold">{PAGE_SIZE}</p>
             </div>
@@ -370,7 +360,10 @@ export default function ProfileArticlesPage() {
           {isLoading ? (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {Array.from({ length: 4 }).map((_, index) => (
-                <div key={`article-manage-skeleton-${index}`} className="rounded-2xl border p-5">
+                <div
+                  key={`article-manage-skeleton-${index}`}
+                  className="app-surface rounded-2xl p-5"
+                >
                   <div className="bg-muted h-5 w-40 animate-pulse rounded" />
                   <div className="bg-muted mt-4 h-4 w-full animate-pulse rounded" />
                   <div className="bg-muted mt-2 h-4 w-4/5 animate-pulse rounded" />
@@ -379,11 +372,8 @@ export default function ProfileArticlesPage() {
               ))}
             </div>
           ) : articles.length === 0 ? (
-            <div className="rounded-3xl border border-dashed p-10 text-center">
+            <div className="app-empty-state rounded-3xl p-10 text-center">
               <p className="text-lg font-semibold">你还没有文章</p>
-              <p className="text-muted-foreground mt-2 text-sm">
-                去发布第一篇文章后，这里就会显示你的文章管理列表。
-              </p>
               <div className="mt-5">
                 <Button asChild>
                   <Link href="/post">立即去发布</Link>
@@ -392,7 +382,7 @@ export default function ProfileArticlesPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-              {articles.map((article) => {
+              {articles.map((article, index) => {
                 const articleId = normalizeId(article.id ?? article.article_id);
                 const title = toText(article.title, "未命名文章");
                 const cover = toText(article.cover_image_url ?? article.cover);
@@ -405,7 +395,7 @@ export default function ProfileArticlesPage() {
                 return (
                   <article
                     key={articleId || title}
-                    className="overflow-hidden rounded-3xl border bg-white/70 shadow-sm transition-shadow hover:shadow-md"
+                    className="app-surface overflow-hidden rounded-3xl transition-shadow hover:shadow-md"
                   >
                     {cover && (
                       <div className="relative h-52 w-full overflow-hidden border-b">
@@ -413,7 +403,7 @@ export default function ProfileArticlesPage() {
                           src={cover}
                           alt={title}
                           fill
-                          unoptimized
+                          priority={index === 0}
                           className="object-cover"
                           sizes="(max-width: 1280px) 100vw, 50vw"
                         />
@@ -439,7 +429,7 @@ export default function ProfileArticlesPage() {
                       </p>
 
                       {statusMeta.detailMessage && (
-                        <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-4">
+                        <div className="app-danger-surface rounded-2xl p-4">
                           <p className="text-sm font-semibold text-rose-700">
                             {statusMeta.detailTitle ?? "失败原因"}
                           </p>
@@ -456,30 +446,30 @@ export default function ProfileArticlesPage() {
                         {secondaryTags.slice(0, 5).map((tag) => (
                           <span
                             key={`${articleId}-${tag}`}
-                            className="rounded-full bg-sky-50 px-3 py-1 text-xs text-sky-700"
+                            className="app-pill rounded-full px-3 py-1 text-xs"
                           >
                             #{tag}
                           </span>
                         ))}
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3 text-sm text-slate-600 md:grid-cols-4">
-                        <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                          <p className="text-xs text-slate-500">浏览</p>
+                      <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+                        <div className="app-stat-tile rounded-2xl px-3 py-3">
+                          <p className="text-muted-foreground text-xs">浏览</p>
                           <p className="mt-1 font-semibold">{toNumber(article.view_count, 0)}</p>
                         </div>
-                        <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                          <p className="text-xs text-slate-500">点赞</p>
+                        <div className="app-stat-tile rounded-2xl px-3 py-3">
+                          <p className="text-muted-foreground text-xs">点赞</p>
                           <p className="mt-1 font-semibold">
                             {toNumber(article.like_count ?? article.likes, 0)}
                           </p>
                         </div>
-                        <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                          <p className="text-xs text-slate-500">评论</p>
+                        <div className="app-stat-tile rounded-2xl px-3 py-3">
+                          <p className="text-muted-foreground text-xs">评论</p>
                           <p className="mt-1 font-semibold">{toNumber(article.comment_count, 0)}</p>
                         </div>
-                        <div className="rounded-2xl bg-slate-50 px-3 py-3">
-                          <p className="text-xs text-slate-500">最近更新</p>
+                        <div className="app-stat-tile rounded-2xl px-3 py-3">
+                          <p className="text-muted-foreground text-xs">最近更新</p>
                           <p className="mt-1 font-semibold">{formatTime(article.update_time)}</p>
                         </div>
                       </div>
