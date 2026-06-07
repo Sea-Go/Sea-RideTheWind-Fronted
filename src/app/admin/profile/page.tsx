@@ -185,7 +185,6 @@ export default function AdminProfilePage() {
       <PageContainer className="space-y-6 py-8">
         <header className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">管理员资料</h1>
-          <p className="text-muted-foreground text-sm">维护管理员资料并可创建新管理员账号。</p>
           <Button asChild variant="outline" size="sm">
             <Link href="/admin">返回管理首页</Link>
           </Button>
@@ -263,13 +262,6 @@ export default function AdminProfilePage() {
 
             <section className="space-y-4 rounded-xl border p-6">
               <h2 className="text-xl font-semibold">创建管理员</h2>
-              <p className="text-muted-foreground text-sm">
-                也可以使用独立的
-                <Link href="/admin/register" className="text-primary ml-1 hover:underline">
-                  管理员账号页面
-                </Link>
-                进行注册。
-              </p>
               <div className="grid gap-2">
                 <Label htmlFor="admin-create-username">账号</Label>
                 <Input
