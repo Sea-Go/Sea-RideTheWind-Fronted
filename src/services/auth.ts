@@ -1,5 +1,5 @@
-import { getAdminAuthToken } from "@/services/admin";
 import { USER_CENTER_API_PATHS } from "@/constants/api-paths";
+import { getAdminAuthToken } from "@/services/admin";
 import { request, withBearerAuthorization } from "@/services/request";
 
 const TOKEN_STORAGE_KEY = "user_center_token";
@@ -49,6 +49,7 @@ export interface UserProfile {
   score: number;
   username: string;
   email?: string;
+  avatar_url?: string;
   extra_info?: Record<string, string>;
 }
 
@@ -63,7 +64,8 @@ export interface LogoutResponse {
 
 export interface UpdateUserPayload {
   username?: string;
-  password: string;
+  password?: string;
+  current_password?: string;
   email?: string;
   extra_info?: Record<string, string>;
 }
@@ -76,11 +78,40 @@ export interface DeleteUserResponse {
   success: boolean;
 }
 
-export const registerUser = (payload: RegisterUserPayload): Promise<RegisterUserResponse> =>
-  request<RegisterUserResponse>(USER_CENTER_API_PATHS.register, {
+export interface AvatarHistoryItem {
+  id: string;
+  avatar_url: string;
+  content_type: string;
+  size_bytes: number;
+  is_current: boolean;
+  create_time: string;
+}
+
+export interface UploadAvatarResponse {
+  avatar_url: string;
+  history: AvatarHistoryItem;
+}
+
+export interface AvatarHistoryResponse {
+  list: AvatarHistoryItem[];
+}
+
+export interface SelectAvatarResponse {
+  avatar_url: string;
+  history: AvatarHistoryItem;
+}
+
+export const registerUser = (payload: RegisterUserPayload): Promise<RegisterUserResponse> => {
+  const normalizedPayload: RegisterUserPayload = {
+    ...payload,
+    email: typeof payload.email === "string" ? payload.email.trim() : "",
+  };
+
+  return request<RegisterUserResponse>(USER_CENTER_API_PATHS.register, {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify(normalizedPayload),
   });
+};
 
 export const loginUser = (payload: LoginUserPayload): Promise<LoginUserResponse> =>
   request<LoginUserResponse>(USER_CENTER_API_PATHS.login, {
@@ -147,6 +178,74 @@ export const updateUserProfile = (
     headers: withBearerAuthorization(token),
     body: JSON.stringify(payload),
   });
+
+const parseUploadPayload = async <T>(response: Response): Promise<T> => {
+  let payload: unknown = null;
+  try {
+    payload = (await response.json()) as unknown;
+  } catch (error) {
+    void error;
+  }
+
+  const record =
+    payload && typeof payload === "object" ? (payload as Record<string, unknown>) : null;
+  const message =
+    typeof record?.msg === "string"
+      ? record.msg
+      : typeof record?.message === "string"
+        ? record.message
+        : "头像上传失败，请稍后重试。";
+
+  if (!response.ok) {
+    throw new Error(message);
+  }
+
+  if (
+    record &&
+    typeof record.code === "number" &&
+    typeof record.msg === "string" &&
+    Object.hasOwn(record, "data")
+  ) {
+    if (record.code !== 200) {
+      throw new Error(record.msg || "头像上传失败，请稍后重试。");
+    }
+    return record.data as T;
+  }
+
+  return payload as T;
+};
+
+export const uploadUserAvatar = async (
+  token: string,
+  file: File,
+): Promise<UploadAvatarResponse> => {
+  const formData = new FormData();
+  formData.append("avatar", file);
+
+  const response = await fetch(USER_CENTER_API_PATHS.uploadAvatar, {
+    method: "POST",
+    headers: withBearerAuthorization(token),
+    body: formData,
+  });
+
+  return parseUploadPayload<UploadAvatarResponse>(response);
+};
+
+export const getUserAvatarHistory = (token: string): Promise<AvatarHistoryResponse> =>
+  request<AvatarHistoryResponse>(USER_CENTER_API_PATHS.avatarHistory, {
+    method: "GET",
+    headers: withBearerAuthorization(token),
+  });
+
+export const selectUserAvatar = (token: string, historyId: string): Promise<SelectAvatarResponse> =>
+  request<SelectAvatarResponse>(USER_CENTER_API_PATHS.selectAvatar, {
+    method: "POST",
+    headers: withBearerAuthorization(token),
+    body: JSON.stringify({ history_id: historyId }),
+  });
+
+export const getProfileAvatarUrl = (user: UserProfile | null | undefined): string =>
+  user?.avatar_url?.trim() || user?.extra_info?.avatar?.trim() || "";
 
 export const logoutUser = (token: string): Promise<LogoutResponse> =>
   request<LogoutResponse>(USER_CENTER_API_PATHS.logout, {
