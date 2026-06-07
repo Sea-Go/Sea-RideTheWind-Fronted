@@ -1,13 +1,5 @@
-import { HotRankingBoard } from "@/components/hot/HotRankingBoard";
-import { Layout } from "@/components/layout/layout";
-import { PageContainer } from "@/components/layout/PageContainer";
+import { redirect } from "next/navigation";
 
 export default function HotPage() {
-  return (
-    <Layout>
-      <PageContainer>
-        <HotRankingBoard />
-      </PageContainer>
-    </Layout>
-  );
+  redirect("/dashboard/hot");
 }
