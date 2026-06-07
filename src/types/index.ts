@@ -31,3 +31,36 @@ export interface DashboardAuthorSearchResult {
   latestArticleTitle?: string;
   latestArticleTime?: string;
 }
+
+export interface DashboardSearchTraceStageView {
+  name: string;
+  summary: string;
+  details: string[];
+}
+
+export interface DashboardSearchEvidenceViewState {
+  traceId: string;
+  searchRequestId: string;
+  status: string;
+  searchText: string;
+  intentLabel: string;
+  intentConfidence: number | null;
+  keywords: string[];
+  steps: DashboardSearchTraceStageView[];
+}
+
+export interface DashboardFeedRequest {
+  tabSlug?: string;
+  query?: string;
+  mode?: DashboardSearchMode;
+  force?: boolean;
+  sessionId?: string;
+}
+
+export interface DashboardFeedResponse {
+  posts: DashboardPost[];
+  authorResults: DashboardAuthorSearchResult[];
+  searchEvidence: DashboardSearchEvidenceViewState | null;
+  authorIdMap: Record<string, string>;
+  fetchedAt: number;
+}
