@@ -8,7 +8,7 @@ import { Layout } from "@/components/layout/layout";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { ProfileThemeShell } from "@/components/profile/ProfileThemeShell";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -180,9 +180,6 @@ export default function ProfileFollowPage() {
         <ProfileThemeShell className="space-y-6">
           <header className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">关注管理</h1>
-            <p className="text-muted-foreground text-sm">
-              管理关注、粉丝、黑名单，并查看推荐关注用户。
-            </p>
             <div>
               <Button asChild variant="outline" size="sm">
                 <Link href="/profile">返回个人中心</Link>
@@ -197,7 +194,6 @@ export default function ProfileFollowPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>关系操作</CardTitle>
-                  <CardDescription>当前登录用户编号：{currentUserId || "--"}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid gap-2">
@@ -256,9 +252,6 @@ export default function ProfileFollowPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle>我的关注</CardTitle>
-                    <CardDescription>
-                      最近 {PAGE_SIZE} 条关注关系，可点击进入对方主页
-                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     {renderUserIdList(followIds, "暂无关注记录", { clickable: true })}
@@ -268,9 +261,6 @@ export default function ProfileFollowPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle>我的粉丝</CardTitle>
-                    <CardDescription>
-                      最近 {PAGE_SIZE} 条粉丝关系，也支持点击查看主页
-                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     {renderUserIdList(followerIds, "暂无粉丝记录", { clickable: true })}
@@ -280,7 +270,6 @@ export default function ProfileFollowPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle>黑名单</CardTitle>
-                    <CardDescription>最近 {PAGE_SIZE} 条拉黑记录</CardDescription>
                   </CardHeader>
                   <CardContent>{renderUserIdList(blockIds, "黑名单为空")}</CardContent>
                 </Card>
@@ -288,7 +277,6 @@ export default function ProfileFollowPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle>推荐关注</CardTitle>
-                    <CardDescription>基于三层关注关系生成</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {recommendations.length === 0 ? (
