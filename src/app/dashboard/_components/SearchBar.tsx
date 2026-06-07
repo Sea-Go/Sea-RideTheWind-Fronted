@@ -79,9 +79,9 @@ export const SearchBar = ({
   };
 
   return (
-    <div className="mt-4 mb-4 flex flex-col gap-3 lg:mt-6 lg:flex-row lg:items-center">
+    <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center">
       <Select value={mode} onValueChange={(value) => setMode(value as DashboardSearchMode)}>
-        <SelectTrigger className="h-11 w-full rounded-full px-4 sm:h-12 lg:w-52">
+        <SelectTrigger className="border-border/85 bg-card/78 text-muted-foreground h-11 w-full rounded-full px-5 shadow-sm sm:h-12 lg:w-56">
           <SelectValue placeholder="选择搜索模式" />
         </SelectTrigger>
         <SelectContent>
@@ -100,11 +100,11 @@ export const SearchBar = ({
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="h-11 flex-1 rounded-full px-4 sm:h-12"
+          className="border-border/85 bg-card/78 h-11 flex-1 rounded-full px-5 shadow-sm sm:h-12"
         />
         <Button
           type="button"
-          className="h-11 w-full rounded-full px-5 sm:h-12 sm:w-auto"
+          className="h-11 w-full rounded-full px-6 shadow-lg shadow-primary/20 sm:h-12 sm:w-auto"
           onClick={submitSearch}
         >
           搜索
