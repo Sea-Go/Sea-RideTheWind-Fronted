@@ -1,5 +1,6 @@
 "use client";
 
+import { MessageCircleIcon, ThumbsDownIcon, ThumbsUpIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -9,16 +10,25 @@ import { MarkdownArticle } from "@/components/article/MarkdownArticle";
 import { FavoritePickerDialog } from "@/components/favorite/FavoritePickerDialog";
 import { Layout } from "@/components/layout/layout";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { Button } from "@/components/ui/button";
 import { type ArticleItem, getArticle } from "@/services/article";
-import { getAuthToken, getUserProfile } from "@/services/auth";
 import {
+  getAuthToken,
+  getProfileAvatarUrl,
+  getUserProfile,
+  type UserProfile,
+} from "@/services/auth";
+import {
+  COMMENT_ACTION,
+  type CommentActionType,
   type CommentId,
   type CommentItem,
   type CommentSubject,
   createComment,
   getCommentReplies,
   getRootComments,
+  likeComment,
 } from "@/services/comment";
 import {
   deleteArticleFavorites,
@@ -51,6 +61,32 @@ interface ReplyThreadState {
   error: string | null;
 }
 
+interface CommentReactionState {
+  likeState: LikeState;
+  busy: boolean;
+}
+
+interface ReplyComposerState {
+  parentId: CommentId;
+  parentUserId: CommentId;
+  parentUserName: string;
+  draft: string;
+  isSubmitting: boolean;
+  error: string | null;
+}
+
+const DEFAULT_COMMENT_REACTION_STATE: CommentReactionState = {
+  likeState: LIKE_STATE.NONE,
+  busy: false,
+};
+
+interface ParsedCommentMeta {
+  authorName?: string;
+  authorAvatarUrl?: string;
+  replyToUserId?: string;
+  replyToName?: string;
+}
+
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" ? (value as Record<string, unknown>) : null;
 
@@ -71,6 +107,13 @@ const toArticleItem = (value: unknown): ArticleItem | null => {
 const toText = (value: unknown, fallback = ""): string =>
   typeof value === "string" && value.trim() ? value.trim() : fallback;
 
+const toOptionalText = (value: unknown): string =>
+  typeof value === "string"
+    ? value.trim()
+    : value === undefined || value === null
+      ? ""
+      : String(value).trim();
+
 const toNumber = (value: unknown, fallback = 0): number => {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -87,6 +130,139 @@ const toNumber = (value: unknown, fallback = 0): number => {
 };
 
 const toCommentIdKey = (id: CommentId): string => String(id);
+
+const parseCommentMeta = (meta: unknown): ParsedCommentMeta => {
+  const raw = typeof meta === "string" ? meta.trim() : "";
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    const record = asRecord(parsed);
+    if (!record) {
+      return {};
+    }
+    return {
+      authorName: toOptionalText(
+        record.author_name ?? record.authorName ?? record.username ?? record.display_name,
+      ),
+      authorAvatarUrl: toOptionalText(
+        record.author_avatar_url ?? record.authorAvatarUrl ?? record.avatar_url ?? record.avatarUrl,
+      ),
+      replyToUserId: toOptionalText(record.reply_to_user_id ?? record.replyToUserId),
+      replyToName: toOptionalText(record.reply_to_name ?? record.replyToName),
+    };
+  } catch {
+    return {};
+  }
+};
+
+const getCommentFieldText = (comment: CommentItem, keys: string[]): string => {
+  const record = comment as unknown as Record<string, unknown>;
+  for (const key of keys) {
+    const value = toOptionalText(record[key]);
+    if (value) {
+      return value;
+    }
+  }
+  return "";
+};
+
+const isCurrentUserComment = (
+  comment: CommentItem,
+  currentUserProfile: UserProfile | null,
+): boolean => {
+  const uid = toOptionalText(currentUserProfile?.uid);
+  return Boolean(uid) && toCommentIdKey(comment.user_id) === uid;
+};
+
+const getCommentAuthorView = (
+  comment: CommentItem,
+  currentUserProfile: UserProfile | null,
+): { uid: string; name: string; avatarUrl: string } => {
+  const meta = parseCommentMeta(comment.meta);
+  const uid = toCommentIdKey(comment.user_id);
+  if (isCurrentUserComment(comment, currentUserProfile)) {
+    return {
+      uid,
+      name: toOptionalText(currentUserProfile?.username) || `用户 ${uid}`,
+      avatarUrl: getProfileAvatarUrl(currentUserProfile),
+    };
+  }
+
+  const fieldName = getCommentFieldText(comment, ["author_name", "username", "display_name"]);
+  const fieldAvatar = getCommentFieldText(comment, [
+    "author_avatar_url",
+    "avatar_url",
+    "avatarUrl",
+  ]);
+  return {
+    uid,
+    name: fieldName || meta.authorName || `用户 ${uid}`,
+    avatarUrl: fieldAvatar || meta.authorAvatarUrl || "",
+  };
+};
+
+const findThreadCommentById = (
+  id: CommentId,
+  rootComment: CommentItem,
+  replies: CommentItem[],
+): CommentItem | null => {
+  const targetKey = toCommentIdKey(id);
+  if (toCommentIdKey(rootComment.id) === targetKey) {
+    return rootComment;
+  }
+  return replies.find((reply) => toCommentIdKey(reply.id) === targetKey) ?? null;
+};
+
+const getReplyTargetName = (
+  reply: CommentItem,
+  parentComment: CommentItem | null,
+  currentUserProfile: UserProfile | null,
+): string => {
+  const meta = parseCommentMeta(reply.meta);
+  if (meta.replyToName) {
+    return meta.replyToName;
+  }
+  if (parentComment) {
+    return getCommentAuthorView(parentComment, currentUserProfile).name;
+  }
+  return "上级评论";
+};
+
+const buildCommentMeta = (
+  currentUserProfile: UserProfile | null,
+  replyTo?: { userId: CommentId; name: string },
+): string => {
+  const payload: Record<string, string> = {};
+  const username = toOptionalText(currentUserProfile?.username);
+  const avatarUrl = getProfileAvatarUrl(currentUserProfile);
+  if (username) {
+    payload.author_name = username;
+  }
+  if (avatarUrl) {
+    payload.author_avatar_url = avatarUrl;
+  }
+  if (replyTo) {
+    payload.reply_to_user_id = toCommentIdKey(replyTo.userId);
+    payload.reply_to_name = replyTo.name;
+  }
+  return JSON.stringify(payload);
+};
+
+const toRawCommentInteger = (id: CommentId, { allowZero = false } = {}): string | null => {
+  const rawId = String(id).trim();
+  if (!/^\d+$/.test(rawId)) {
+    return null;
+  }
+
+  if (!allowZero && rawId === "0") {
+    return null;
+  }
+
+  return rawId;
+};
 
 const createEmptyReplyThreadState = (): ReplyThreadState => ({
   expanded: false,
@@ -110,6 +286,11 @@ const mergeFavoriteItems = (items: FavoriteItem[]): FavoriteItem[] => {
 };
 
 const resolveArticleTargetId = (article: ArticleItem | null, fallbackId: string): string => {
+  const routeId = fallbackId.trim();
+  if (routeId) {
+    return routeId;
+  }
+
   if (article?.id !== undefined && article.id !== null && String(article.id).trim()) {
     return String(article.id).trim();
   }
@@ -128,6 +309,121 @@ const normalizeCommentSubject = (value: unknown): CommentSubject | null => {
   return subject ? (subject as unknown as CommentSubject) : null;
 };
 
+const updateCommentTreeById = (
+  items: CommentItem[],
+  targetId: CommentId,
+  updater: (item: CommentItem) => CommentItem,
+): CommentItem[] => {
+  const targetKey = toCommentIdKey(targetId);
+  let changed = false;
+
+  const nextItems = items.map((item) => {
+    const itemKey = toCommentIdKey(item.id);
+    const nextChildren = Array.isArray(item.children)
+      ? updateCommentTreeById(item.children, targetId, updater)
+      : item.children;
+
+    let nextItem = itemKey === targetKey ? updater(item) : item;
+    if (nextChildren && nextChildren !== item.children) {
+      nextItem = {
+        ...nextItem,
+        children: nextChildren,
+      };
+    }
+
+    if (nextItem !== item) {
+      changed = true;
+    }
+
+    return nextItem;
+  });
+
+  return changed ? nextItems : items;
+};
+
+const applyCommentReactionStep = (comment: CommentItem, step: CommentActionType): CommentItem => {
+  const likeCount = toNumber(comment.like_count, 0);
+  const dislikeCount = toNumber(comment.dislike_count, 0);
+
+  switch (step) {
+    case COMMENT_ACTION.LIKE:
+      return {
+        ...comment,
+        like_count: likeCount + 1,
+      };
+    case COMMENT_ACTION.CANCEL_LIKE:
+      return {
+        ...comment,
+        like_count: Math.max(0, likeCount - 1),
+      };
+    case COMMENT_ACTION.DISLIKE:
+      return {
+        ...comment,
+        dislike_count: dislikeCount + 1,
+      };
+    case COMMENT_ACTION.CANCEL_DISLIKE:
+      return {
+        ...comment,
+        dislike_count: Math.max(0, dislikeCount - 1),
+      };
+    default:
+      return comment;
+  }
+};
+
+function CommentReactionControls({
+  comment,
+  likeState,
+  isBusy,
+  onLike,
+  onDislike,
+}: {
+  comment: CommentItem;
+  likeState: LikeState;
+  isBusy: boolean;
+  onLike: (comment: CommentItem) => void;
+  onDislike: (comment: CommentItem) => void;
+}) {
+  const commentKey = toCommentIdKey(comment.id);
+  const likeActive = likeState === LIKE_STATE.LIKED;
+  const dislikeActive = likeState === LIKE_STATE.DISLIKED;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button
+        id={`comment-${commentKey}-like-button`}
+        type="button"
+        size="sm"
+        variant={likeActive ? "default" : "ghost"}
+        aria-pressed={likeActive}
+        data-comment-id={commentKey}
+        data-comment-action="like"
+        onClick={() => onLike(comment)}
+        disabled={isBusy}
+      >
+        <ThumbsUpIcon className="size-3.5" />
+        <span>赞</span>
+        <span>{toNumber(comment.like_count, 0)}</span>
+      </Button>
+      <Button
+        id={`comment-${commentKey}-dislike-button`}
+        type="button"
+        size="sm"
+        variant={dislikeActive ? "destructive" : "ghost"}
+        aria-pressed={dislikeActive}
+        data-comment-id={commentKey}
+        data-comment-action="dislike"
+        onClick={() => onDislike(comment)}
+        disabled={isBusy}
+      >
+        <ThumbsDownIcon className="size-3.5" />
+        <span>踩</span>
+        <span>{toNumber(comment.dislike_count, 0)}</span>
+      </Button>
+    </div>
+  );
+}
+
 export default function ArticleDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -135,9 +431,14 @@ export default function ArticleDetailPage() {
 
   const [token, setToken] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
   const [article, setArticle] = useState<ArticleItem | null>(null);
   const [isLoadingArticle, setIsLoadingArticle] = useState(true);
   const [articleError, setArticleError] = useState<string | null>(null);
+  const articleTargetId = useMemo(
+    () => resolveArticleTargetId(article, articleId),
+    [article, articleId],
+  );
 
   const [likeCount, setLikeCount] = useState(0);
   const [dislikeCount, setDislikeCount] = useState(0);
@@ -158,30 +459,37 @@ export default function ArticleDetailPage() {
   const [commentDraft, setCommentDraft] = useState("");
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [commentSubmitMessage, setCommentSubmitMessage] = useState<string | null>(null);
+  const [commentReactionMessage, setCommentReactionMessage] = useState<string | null>(null);
+  const [commentReactionById, setCommentReactionById] = useState<
+    Record<string, CommentReactionState>
+  >({});
   const [replyStateByRootId, setReplyStateByRootId] = useState<Record<string, ReplyThreadState>>(
     {},
   );
+  const [replyComposerByRootId, setReplyComposerByRootId] = useState<
+    Record<string, ReplyComposerState>
+  >({});
 
   useEffect(() => {
-    const currentToken = getAuthToken();
-    setToken(currentToken);
-
-    if (!currentToken) {
+    if (!token) {
       setCurrentUserId(null);
+      setCurrentUserProfile(null);
       return;
     }
 
     void (async () => {
       try {
-        const profile = await getUserProfile(currentToken);
+        const profile = await getUserProfile(token);
         const uid = String(profile.user.uid ?? "").trim();
         setCurrentUserId(uid || null);
+        setCurrentUserProfile(profile.user ?? null);
       } catch (error) {
         console.warn("Failed to load current user profile:", error);
         setCurrentUserId(null);
+        setCurrentUserProfile(null);
       }
     })();
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     if (!token || !article) {
@@ -193,17 +501,15 @@ export default function ArticleDetailPage() {
     void (async () => {
       try {
         const inventory = await loadFavoriteInventory(token);
-        setFavoriteItems(
-          getArticleFavorites(inventory, resolveArticleTargetId(article, articleId)),
-        );
+        setFavoriteItems(getArticleFavorites(inventory, articleTargetId));
       } catch (error) {
         console.warn("Failed to load article favorite state:", error);
       }
     })();
-  }, [article, articleId, token]);
+  }, [article, articleTargetId, token]);
 
   const loadComments = useCallback(
-    async (authToken: string, page: number, append: boolean) => {
+    async (authToken: string, targetId: string, page: number, append: boolean) => {
       setIsLoadingComments(true);
       if (!append) {
         setCommentError(null);
@@ -212,7 +518,7 @@ export default function ArticleDetailPage() {
       try {
         const response = await getRootComments(authToken, {
           target_type: "article",
-          target_id: articleId,
+          target_id: targetId,
           sort_type: 0,
           page,
           page_size: PAGE_SIZE,
@@ -233,6 +539,7 @@ export default function ArticleDetailPage() {
 
         if (!append) {
           setReplyStateByRootId({});
+          setReplyComposerByRootId({});
         }
         setCommentError(null);
       } catch (error) {
@@ -241,17 +548,19 @@ export default function ArticleDetailPage() {
           setComments([]);
           setCommentSubject(null);
           setReplyStateByRootId({});
+          setReplyComposerByRootId({});
         }
       } finally {
         setIsLoadingComments(false);
       }
     },
-    [articleId],
+    [],
   );
 
   const loadReplies = useCallback(
     async (
       authToken: string,
+      targetId: string,
       rootId: CommentId,
       replyCount: number,
       page: number,
@@ -275,7 +584,7 @@ export default function ArticleDetailPage() {
       try {
         const response = await getCommentReplies(authToken, {
           target_type: "article",
-          target_id: articleId,
+          target_id: targetId,
           sort_type: 0,
           root_id: rootId,
           page,
@@ -283,17 +592,11 @@ export default function ArticleDetailPage() {
         });
 
         const nextReplies = Array.isArray(response.comment) ? response.comment : [];
-        const totalCount = toNumber(response.subject?.total_count, 0);
         setReplyStateByRootId((prev) => {
           const prevState = prev[rootKey] ?? createEmptyReplyThreadState();
           const mergedItems = append ? [...prevState.items, ...nextReplies] : nextReplies;
           const loadedCount = mergedItems.length;
-          const hasMore =
-            totalCount > 0
-              ? page * PAGE_SIZE < totalCount
-              : replyCount > 0
-                ? loadedCount < replyCount
-                : nextReplies.length >= PAGE_SIZE;
+          const hasMore = replyCount > loadedCount || nextReplies.length >= PAGE_SIZE;
 
           return {
             ...prev,
@@ -325,48 +628,53 @@ export default function ArticleDetailPage() {
         });
       }
     },
-    [articleId],
+    [],
   );
 
   const syncLikeStats = useCallback(
     async (
       authToken: string,
+      targetId: string,
       fallback: { likeCount: number; dislikeCount: number; likeState: LikeState },
     ): Promise<boolean> => {
       try {
         const [countResult, stateResult] = await Promise.all([
           getLikeCount(authToken, {
             target_type: "article",
-            target_ids: [articleId],
+            target_ids: [targetId],
           }),
           getLikeState(authToken, {
             target_type: "article",
-            target_ids: [articleId],
+            target_ids: [targetId],
           }),
         ]);
 
-        const counters = countResult.counts?.[articleId];
+        const counters = countResult.counts?.[targetId];
         setLikeCount(toNumber(counters?.like_count, fallback.likeCount));
         setDislikeCount(toNumber(counters?.dislike_count, fallback.dislikeCount));
-        setLikeState(toLikeState(stateResult.states?.[articleId], fallback.likeState));
+        setLikeState(toLikeState(stateResult.states?.[targetId], fallback.likeState));
         return true;
       } catch (error) {
         console.warn("Failed to load like state:", error);
         return false;
       }
     },
-    [articleId],
+    [],
   );
 
   useEffect(() => {
     const loadArticle = async () => {
+      const currentToken = getAuthToken();
+      setToken(currentToken);
       setIsLoadingArticle(true);
       setArticleError(null);
       setReactionMessage(null);
+      setCommentReactionMessage(null);
+      setCommentReactionById({});
 
       try {
         const articlePayload = await getArticle(articleId, {
-          token: token ?? undefined,
+          token: currentToken ?? undefined,
           incr_view: true,
         });
 
@@ -380,24 +688,12 @@ export default function ArticleDetailPage() {
         setLikeCount(initialLikes);
         setDislikeCount(0);
         setLikeState(LIKE_STATE.NONE);
-
-        if (token) {
-          setReplyStateByRootId({});
-          await Promise.all([
-            syncLikeStats(token, {
-              likeCount: initialLikes,
-              dislikeCount: 0,
-              likeState: LIKE_STATE.NONE,
-            }),
-            loadComments(token, 1, false),
-          ]);
-        } else {
-          setComments([]);
-          setCommentSubject(null);
-          setReplyStateByRootId({});
-          setHasMoreComments(false);
-          setCommentError("登录后可查看评论内容");
-        }
+        setComments([]);
+        setCommentSubject(null);
+        setReplyStateByRootId({});
+        setReplyComposerByRootId({});
+        setHasMoreComments(false);
+        setCommentError(currentToken ? null : "登录后可查看评论内容");
       } catch (error) {
         setArticleError(error instanceof Error ? error.message : "文章加载失败");
         setArticle(null);
@@ -407,7 +703,37 @@ export default function ArticleDetailPage() {
     };
 
     void loadArticle();
-  }, [articleId, loadComments, syncLikeStats, token]);
+  }, [articleId]);
+
+  useEffect(() => {
+    if (!article) {
+      return;
+    }
+
+    if (!token) {
+      setComments([]);
+      setCommentSubject(null);
+      setReplyStateByRootId({});
+      setReplyComposerByRootId({});
+      setHasMoreComments(false);
+      setCommentError("登录后可查看评论内容");
+      return;
+    }
+
+    const initialLikes = toNumber(article.like_count ?? article.likes, 0);
+    void (async () => {
+      setReplyStateByRootId({});
+      setReplyComposerByRootId({});
+      await Promise.all([
+        syncLikeStats(token, articleTargetId, {
+          likeCount: initialLikes,
+          dislikeCount: 0,
+          likeState: LIKE_STATE.NONE,
+        }),
+        loadComments(token, articleTargetId, 1, false),
+      ]);
+    })();
+  }, [article, articleTargetId, loadComments, syncLikeStats, token]);
 
   const handleReaction = async (targetState: ReactionTarget) => {
     if (!token) {
@@ -436,7 +762,7 @@ export default function ArticleDetailPage() {
       for (const step of steps) {
         const result = await likeAction(token, {
           target_type: "article",
-          target_id: articleId,
+          target_id: articleTargetId,
           action_type: step,
           author_id:
             article?.author_id !== undefined && article?.author_id !== null
@@ -457,7 +783,7 @@ export default function ArticleDetailPage() {
       setLikeState(finalState);
     } catch (error) {
       console.warn("Failed to react article:", error);
-      const synced = await syncLikeStats(token, {
+      const synced = await syncLikeStats(token, articleTargetId, {
         likeCount: previousLikeCount,
         dislikeCount: previousDislikeCount,
         likeState: previousLikeState,
@@ -481,6 +807,180 @@ export default function ArticleDetailPage() {
 
   const handleDislike = async () => {
     await handleReaction(LIKE_STATE.DISLIKED);
+  };
+
+  const updateVisibleComment = useCallback(
+    (commentId: CommentId, updater: (comment: CommentItem) => CommentItem) => {
+      setComments((prev) => updateCommentTreeById(prev, commentId, updater));
+      setReplyStateByRootId((prev) => {
+        let changed = false;
+        const nextState = Object.fromEntries(
+          Object.entries(prev).map(([rootKey, replyState]) => {
+            const nextItems = updateCommentTreeById(replyState.items, commentId, updater);
+            if (nextItems !== replyState.items) {
+              changed = true;
+              return [
+                rootKey,
+                {
+                  ...replyState,
+                  items: nextItems,
+                },
+              ];
+            }
+
+            return [rootKey, replyState];
+          }),
+        ) as Record<string, ReplyThreadState>;
+
+        return changed ? nextState : prev;
+      });
+    },
+    [],
+  );
+
+  const refreshVisibleComment = useCallback(
+    async (authToken: string, targetId: string, comment: CommentItem) => {
+      const rootId = toRawCommentInteger(comment.root_id, { allowZero: true }) ?? "0";
+
+      if (rootId === "0") {
+        const pageSize = Math.max(commentPage * PAGE_SIZE, comments.length, PAGE_SIZE);
+
+        try {
+          const response = await getRootComments(authToken, {
+            target_type: "article",
+            target_id: targetId,
+            sort_type: 0,
+            page: 1,
+            page_size: pageSize,
+          });
+
+          const nextComments = Array.isArray(response.comment) ? response.comment : [];
+          const nextSubject = normalizeCommentSubject(response.subject);
+          const rootCount = toNumber(nextSubject?.root_count, 0);
+          setComments(nextComments);
+          setCommentSubject(nextSubject);
+          setHasMoreComments(
+            rootCount > 0 ? nextComments.length < rootCount : nextComments.length >= pageSize,
+          );
+        } catch (error) {
+          console.warn("Failed to refresh comment reaction counts:", error);
+        }
+        return;
+      }
+
+      const rootKey = rootId;
+      const replyState = replyStateByRootId[rootKey];
+      if (!replyState?.initialized) {
+        return;
+      }
+
+      const pageSize = Math.max(replyState.page * PAGE_SIZE, replyState.items.length, PAGE_SIZE);
+      const rootComment = comments.find((item) => toCommentIdKey(item.id) === rootKey);
+      const rootReplyCount = toNumber(rootComment?.reply_count, 0);
+      try {
+        const response = await getCommentReplies(authToken, {
+          target_type: "article",
+          target_id: targetId,
+          sort_type: 0,
+          root_id: rootId,
+          page: 1,
+          page_size: pageSize,
+        });
+
+        const nextReplies = Array.isArray(response.comment) ? response.comment : [];
+        setReplyStateByRootId((prev) => {
+          const prevState = prev[rootKey] ?? createEmptyReplyThreadState();
+          return {
+            ...prev,
+            [rootKey]: {
+              ...prevState,
+              initialized: true,
+              items: nextReplies,
+              page: replyState.page,
+              hasMore: rootReplyCount > nextReplies.length || nextReplies.length >= pageSize,
+              isLoading: false,
+              error: null,
+            },
+          };
+        });
+      } catch (error) {
+        console.warn("Failed to refresh reply reaction counts:", error);
+      }
+    },
+    [commentPage, comments, replyStateByRootId],
+  );
+
+  const handleCommentReaction = async (comment: CommentItem, targetState: ReactionTarget) => {
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    const commentId = toRawCommentInteger(comment.id);
+    if (!commentId) {
+      setCommentReactionMessage("当前评论暂不支持互动。");
+      return;
+    }
+
+    const commentKey = toCommentIdKey(comment.id);
+    const previousReaction = commentReactionById[commentKey] ?? DEFAULT_COMMENT_REACTION_STATE;
+    if (previousReaction.busy) {
+      return;
+    }
+
+    const steps = buildReactionSteps(previousReaction.likeState, targetState);
+    const finalState = resolveReactionFinalState(previousReaction.likeState, targetState);
+    let nextLikeState = previousReaction.likeState;
+
+    setCommentReactionMessage(null);
+    setCommentReactionById((prev) => ({
+      ...prev,
+      [commentKey]: {
+        likeState: previousReaction.likeState,
+        busy: true,
+      },
+    }));
+
+    try {
+      for (const step of steps) {
+        await likeComment(token, {
+          target_type: "article",
+          target_id: articleTargetId,
+          comment_id: commentId,
+          action_type: step,
+        });
+
+        updateVisibleComment(comment.id, (item) => applyCommentReactionStep(item, step));
+        nextLikeState = applyReactionStep(nextLikeState, step);
+        setCommentReactionById((prev) => ({
+          ...prev,
+          [commentKey]: {
+            likeState: nextLikeState,
+            busy: true,
+          },
+        }));
+      }
+
+      setCommentReactionById((prev) => ({
+        ...prev,
+        [commentKey]: {
+          likeState: finalState,
+          busy: false,
+        },
+      }));
+      await refreshVisibleComment(token, articleTargetId, comment);
+    } catch (error) {
+      console.warn("Failed to react comment:", error);
+      setCommentReactionById((prev) => ({
+        ...prev,
+        [commentKey]: {
+          likeState: nextLikeState,
+          busy: false,
+        },
+      }));
+      setCommentReactionMessage("评论互动失败，已尽量同步当前状态。");
+      await refreshVisibleComment(token, articleTargetId, comment);
+    }
   };
 
   const handleToggleFavorite = async () => {
@@ -514,7 +1014,7 @@ export default function ArticleDetailPage() {
     if (!token || isLoadingComments || !hasMoreComments) {
       return;
     }
-    await loadComments(token, commentPage + 1, true);
+    await loadComments(token, articleTargetId, commentPage + 1, true);
   };
 
   const handleSubmitComment = async () => {
@@ -534,18 +1034,322 @@ export default function ArticleDetailPage() {
     setCommentError(null);
 
     try {
-      await createComment(token, {
+      const createdComment = await createComment(token, {
         target_type: "article",
-        target_id: articleId,
+        target_id: articleTargetId,
         content,
+        meta: buildCommentMeta(currentUserProfile),
       });
+
+      const optimisticComment: CommentItem = {
+        id: createdComment.id,
+        user_id: currentUserId ?? 0,
+        content,
+        root_id: 0,
+        parent_id: 0,
+        like_count: 0,
+        dislike_count: 0,
+        reply_count: 0,
+        attribute: 0,
+        state: 0,
+        created_at: createdComment.created_at,
+        meta: buildCommentMeta(currentUserProfile),
+        children: [],
+      };
+
       setCommentDraft("");
-      await loadComments(token, 1, false);
+      setCommentPage(1);
+      setComments((prev) =>
+        prev.some((item) => toCommentIdKey(item.id) === toCommentIdKey(createdComment.id))
+          ? prev
+          : [optimisticComment, ...prev],
+      );
+      setCommentSubject((prev) => {
+        if (!prev) {
+          return {
+            target_type: "article",
+            target_id: articleTargetId,
+            total_count: 1,
+            root_count: 1,
+            state: 0,
+            attribute: 0,
+            owner_id:
+              article?.author_id !== undefined && article.author_id !== null
+                ? String(article.author_id)
+                : 0,
+          };
+        }
+
+        return {
+          ...prev,
+          total_count: toNumber(prev.total_count, 0) + 1,
+          root_count: toNumber(prev.root_count, 0) + 1,
+        };
+      });
+      window.setTimeout(() => {
+        void loadComments(token, articleTargetId, 1, false);
+      }, 3000);
       setCommentSubmitMessage("评论已发布。");
     } catch (error) {
       setCommentSubmitMessage(error instanceof Error ? error.message : "评论发布失败，请稍后重试");
     } finally {
       setIsSubmittingComment(false);
+    }
+  };
+
+  const ensureReplyThreadOpen = async (rootComment: CommentItem) => {
+    if (!token) {
+      router.push("/login");
+      return false;
+    }
+
+    const rootKey = toCommentIdKey(rootComment.id);
+    const currentState = replyStateByRootId[rootKey];
+    if (currentState?.expanded && currentState.initialized) {
+      return true;
+    }
+
+    if (currentState?.initialized) {
+      setReplyStateByRootId((prev) => ({
+        ...prev,
+        [rootKey]: {
+          ...currentState,
+          expanded: true,
+          error: null,
+        },
+      }));
+      return true;
+    }
+
+    const initialReplies = Array.isArray(rootComment.children) ? rootComment.children : [];
+    if (initialReplies.length > 0) {
+      const replyCount = toNumber(rootComment.reply_count, initialReplies.length);
+      setReplyStateByRootId((prev) => ({
+        ...prev,
+        [rootKey]: {
+          expanded: true,
+          initialized: true,
+          items: initialReplies,
+          page: 1,
+          hasMore: replyCount > initialReplies.length,
+          isLoading: false,
+          error: null,
+        },
+      }));
+      return true;
+    }
+
+    await loadReplies(
+      token,
+      articleTargetId,
+      rootComment.id,
+      toNumber(rootComment.reply_count, 0),
+      1,
+      false,
+    );
+    return true;
+  };
+
+  const handleStartReply = async (rootComment: CommentItem, parentComment: CommentItem) => {
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    const rootId = toRawCommentInteger(rootComment.id);
+    const parentId = toRawCommentInteger(parentComment.id);
+    if (!rootId || !parentId) {
+      setCommentReactionMessage("当前评论暂不支持回复。");
+      return;
+    }
+
+    const rootKey = toCommentIdKey(rootComment.id);
+    const parentAuthor = getCommentAuthorView(parentComment, currentUserProfile);
+    setReplyComposerByRootId((prev) => {
+      const previous = prev[rootKey];
+      const isSameParent = previous
+        ? toCommentIdKey(previous.parentId) === toCommentIdKey(parentId)
+        : false;
+      return {
+        ...prev,
+        [rootKey]: {
+          parentId,
+          parentUserId: parentComment.user_id,
+          parentUserName: parentAuthor.name,
+          draft: isSameParent ? previous.draft : "",
+          isSubmitting: false,
+          error: null,
+        },
+      };
+    });
+
+    await ensureReplyThreadOpen(rootComment);
+  };
+
+  const handleCancelReply = (rootComment: CommentItem) => {
+    const rootKey = toCommentIdKey(rootComment.id);
+    setReplyComposerByRootId((prev) => {
+      const next = { ...prev };
+      delete next[rootKey];
+      return next;
+    });
+  };
+
+  const handleReplyDraftChange = (rootComment: CommentItem, value: string) => {
+    const rootKey = toCommentIdKey(rootComment.id);
+    setReplyComposerByRootId((prev) => {
+      const previous = prev[rootKey];
+      if (!previous) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [rootKey]: {
+          ...previous,
+          draft: value,
+          error: null,
+        },
+      };
+    });
+  };
+
+  const handleSubmitReply = async (rootComment: CommentItem) => {
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    const rootKey = toCommentIdKey(rootComment.id);
+    const composer = replyComposerByRootId[rootKey];
+    if (!composer) {
+      return;
+    }
+
+    const rootId = toRawCommentInteger(rootComment.id);
+    const parentId = toRawCommentInteger(composer.parentId);
+    if (!rootId || !parentId) {
+      setReplyComposerByRootId((prev) => ({
+        ...prev,
+        [rootKey]: {
+          ...composer,
+          error: "当前评论暂不支持回复。",
+        },
+      }));
+      return;
+    }
+
+    const content = composer.draft.trim();
+    if (!content) {
+      setReplyComposerByRootId((prev) => ({
+        ...prev,
+        [rootKey]: {
+          ...composer,
+          error: "请输入回复内容后再提交。",
+        },
+      }));
+      return;
+    }
+
+    setReplyComposerByRootId((prev) => ({
+      ...prev,
+      [rootKey]: {
+        ...composer,
+        isSubmitting: true,
+        error: null,
+      },
+    }));
+
+    try {
+      const createdReply = await createComment(token, {
+        target_type: "article",
+        target_id: articleTargetId,
+        root_id: rootId,
+        parent_id: parentId,
+        content,
+        meta: buildCommentMeta(currentUserProfile, {
+          userId: composer.parentUserId,
+          name: composer.parentUserName,
+        }),
+      });
+
+      const optimisticReply: CommentItem = {
+        id: createdReply.id,
+        user_id: currentUserId ?? 0,
+        content,
+        root_id: rootId,
+        parent_id: parentId,
+        like_count: 0,
+        dislike_count: 0,
+        reply_count: 0,
+        attribute: 0,
+        state: 0,
+        created_at: createdReply.created_at,
+        meta: buildCommentMeta(currentUserProfile, {
+          userId: composer.parentUserId,
+          name: composer.parentUserName,
+        }),
+        children: [],
+      };
+
+      updateVisibleComment(rootComment.id, (item) => ({
+        ...item,
+        reply_count: toNumber(item.reply_count, 0) + 1,
+      }));
+      setCommentSubject((prev) =>
+        prev
+          ? {
+              ...prev,
+              total_count: toNumber(prev.total_count, 0) + 1,
+            }
+          : prev,
+      );
+      setReplyStateByRootId((prev) => {
+        const prevState = prev[rootKey] ?? createEmptyReplyThreadState();
+        const exists = prevState.items.some(
+          (item) => toCommentIdKey(item.id) === toCommentIdKey(createdReply.id),
+        );
+        return {
+          ...prev,
+          [rootKey]: {
+            ...prevState,
+            expanded: true,
+            initialized: true,
+            items: exists ? prevState.items : [optimisticReply, ...prevState.items],
+            page: Math.max(prevState.page, 1),
+            hasMore: prevState.hasMore,
+            isLoading: false,
+            error: null,
+          },
+        };
+      });
+      setReplyComposerByRootId((prev) => ({
+        ...prev,
+        [rootKey]: {
+          ...composer,
+          draft: "",
+          isSubmitting: false,
+          error: null,
+        },
+      }));
+      window.setTimeout(() => {
+        void loadReplies(
+          token,
+          articleTargetId,
+          rootComment.id,
+          toNumber(rootComment.reply_count, 0) + 1,
+          1,
+          false,
+        );
+      }, 3000);
+    } catch (error) {
+      setReplyComposerByRootId((prev) => ({
+        ...prev,
+        [rootKey]: {
+          ...composer,
+          isSubmitting: false,
+          error: error instanceof Error ? error.message : "回复发布失败，请稍后重试",
+        },
+      }));
     }
   };
 
@@ -598,7 +1402,14 @@ export default function ArticleDetailPage() {
       return;
     }
 
-    await loadReplies(token, comment.id, toNumber(comment.reply_count, 0), 1, false);
+    await loadReplies(
+      token,
+      articleTargetId,
+      comment.id,
+      toNumber(comment.reply_count, 0),
+      1,
+      false,
+    );
   };
 
   const handleLoadMoreReplies = async (comment: CommentItem) => {
@@ -614,6 +1425,7 @@ export default function ArticleDetailPage() {
 
     await loadReplies(
       token,
+      articleTargetId,
       comment.id,
       toNumber(comment.reply_count, 0),
       replyState.page + 1,
@@ -625,7 +1437,14 @@ export default function ArticleDetailPage() {
     if (!token) {
       return;
     }
-    await loadReplies(token, comment.id, toNumber(comment.reply_count, 0), 1, false);
+    await loadReplies(
+      token,
+      articleTargetId,
+      comment.id,
+      toNumber(comment.reply_count, 0),
+      1,
+      false,
+    );
   };
 
   if (isLoadingArticle) {
@@ -675,7 +1494,7 @@ export default function ArticleDetailPage() {
     article.author_id !== null &&
     currentUserId === String(article.author_id).trim();
   const favoriteTarget = {
-    targetId: resolveArticleTargetId(article, articleId),
+    targetId: articleTargetId,
     title,
     cover: cover || null,
   };
@@ -707,16 +1526,22 @@ export default function ArticleDetailPage() {
               variant={likeState === LIKE_STATE.LIKED ? "default" : "secondary"}
               onClick={handleLike}
               disabled={isReacting}
+              aria-pressed={likeState === LIKE_STATE.LIKED}
             >
-              👍 {likeCount}
+              <ThumbsUpIcon className="size-4" />
+              <span>赞</span>
+              <span>{likeCount}</span>
             </Button>
             <Button
               id="article-dislike-button"
               variant={likeState === LIKE_STATE.DISLIKED ? "destructive" : "secondary"}
               onClick={handleDislike}
               disabled={isReacting}
+              aria-pressed={likeState === LIKE_STATE.DISLIKED}
             >
-              👎 {dislikeCount}
+              <ThumbsDownIcon className="size-4" />
+              <span>踩</span>
+              <span>{dislikeCount}</span>
             </Button>
           </div>
         </div>
@@ -724,7 +1549,7 @@ export default function ArticleDetailPage() {
         {reactionMessage && <p className="text-destructive text-sm">{reactionMessage}</p>}
         {favoriteMessage && <p className="text-primary text-sm">{favoriteMessage}</p>}
 
-        <article className="space-y-5 rounded-[1.75rem] border bg-white/90 p-4 shadow-sm sm:p-6">
+        <article className="border-border bg-card/90 text-card-foreground space-y-5 rounded-[1.75rem] border p-4 shadow-sm backdrop-blur sm:p-6">
           <header className="space-y-3">
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
             <p className="text-muted-foreground text-sm">
@@ -732,7 +1557,7 @@ export default function ArticleDetailPage() {
               {authorSpaceHref ? (
                 <Link
                   href={authorSpaceHref}
-                  className="ml-1 font-medium text-sky-700 underline-offset-4 transition hover:text-sky-600 hover:underline"
+                  className="text-primary hover:text-primary/80 ml-1 font-medium underline-offset-4 transition hover:underline"
                 >
                   {author}
                 </Link>
@@ -744,22 +1569,29 @@ export default function ArticleDetailPage() {
             </p>
             {brief && <p className="text-muted-foreground">{brief}</p>}
             {!!cover && (
-              <div className="overflow-hidden rounded-[1.5rem] border">
+              <div className="border-border overflow-hidden rounded-[1.5rem] border">
                 <Image
                   src={cover}
                   alt={title}
                   width={1200}
                   height={720}
-                  unoptimized
+                  priority
+                  sizes="100vw"
                   className="max-h-[280px] w-full object-cover sm:max-h-[420px]"
                 />
               </div>
             )}
           </header>
 
-          <div className="text-muted-foreground flex flex-wrap gap-3 text-sm">
-            <span>点赞：{likeCount}</span>
-            <span>点踩：{dislikeCount}</span>
+          <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-sm">
+            <span className="inline-flex items-center gap-1.5">
+              <ThumbsUpIcon className="size-4" />
+              点赞：{likeCount}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <ThumbsDownIcon className="size-4" />
+              点踩：{dislikeCount}
+            </span>
           </div>
 
           <section>
@@ -767,12 +1599,12 @@ export default function ArticleDetailPage() {
           </section>
         </article>
 
-        <section className="space-y-4 rounded-[1.75rem] border bg-white/90 p-4 shadow-sm sm:p-6">
+        <section className="border-border bg-card/90 text-card-foreground space-y-4 rounded-[1.75rem] border p-4 shadow-sm backdrop-blur sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
-              <h2 className="text-xl font-semibold">
-                评论
-                {token && !commentError ? `（${rootCommentCount}）` : ""}
+              <h2 className="flex items-center gap-2 text-xl font-semibold">
+                <MessageCircleIcon className="size-5" />
+                <span>评论{token && !commentError ? `（${rootCommentCount}）` : ""}</span>
               </h2>
               {token && !commentError && (
                 <p className="text-muted-foreground text-xs leading-5">
@@ -787,6 +1619,7 @@ export default function ArticleDetailPage() {
               disabled={!token || isSubmittingComment || !commentDraft.trim()}
               className="w-full sm:w-auto"
             >
+              <MessageCircleIcon className="size-4" />
               {isSubmittingComment ? "发布中..." : "发布评论"}
             </Button>
           </div>
@@ -794,8 +1627,11 @@ export default function ArticleDetailPage() {
           {!token && <p className="text-muted-foreground text-sm">登录后可查看评论内容</p>}
 
           {token && (
-            <div className="space-y-3 rounded-lg border p-4">
-              <label htmlFor="article-comment-draft" className="text-sm font-medium">
+            <div className="space-y-2">
+              <label
+                htmlFor="article-comment-draft"
+                className="text-foreground text-sm font-medium"
+              >
                 写下你的评论
               </label>
               <textarea
@@ -803,7 +1639,7 @@ export default function ArticleDetailPage() {
                 value={commentDraft}
                 onChange={(event) => setCommentDraft(event.target.value)}
                 rows={4}
-                className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring min-h-[112px] rounded-md border px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                className="border-input bg-background/70 text-foreground placeholder:text-muted-foreground focus:border-ring focus:bg-card focus:ring-ring/20 min-h-[128px] w-full resize-y rounded-2xl border px-4 py-3 text-sm leading-6 transition outline-none focus:ring-4 disabled:cursor-not-allowed disabled:opacity-60"
                 placeholder="写点你的看法，支持纯文本评论。"
                 disabled={isSubmittingComment}
               />
@@ -818,13 +1654,19 @@ export default function ArticleDetailPage() {
                   className={`text-sm ${
                     commentSubmitMessage.includes("失败") || commentSubmitMessage.includes("请输入")
                       ? "text-destructive"
-                      : "text-emerald-600"
+                      : "text-primary"
                   }`}
                 >
                   {commentSubmitMessage}
                 </p>
               )}
             </div>
+          )}
+
+          {commentReactionMessage && (
+            <p id="comment-reaction-message" className="text-destructive text-sm">
+              {commentReactionMessage}
+            </p>
           )}
 
           {commentError && token && <p className="text-destructive text-sm">{commentError}</p>}
@@ -838,20 +1680,64 @@ export default function ArticleDetailPage() {
               {comments.map((comment) => {
                 const rootKey = toCommentIdKey(comment.id);
                 const replyState = replyStateByRootId[rootKey];
+                const replyComposer = replyComposerByRootId[rootKey];
+                const commentReaction =
+                  commentReactionById[rootKey] ?? DEFAULT_COMMENT_REACTION_STATE;
+                const commentAuthor = getCommentAuthorView(comment, currentUserProfile);
                 const replyCount = toNumber(comment.reply_count, 0);
-                const canToggleReplies = replyCount > 0;
+                const visibleReplyCount = Math.max(replyCount, replyState?.items.length ?? 0);
+                const canToggleReplies = replyCount > 0 || Boolean(replyState?.initialized);
 
                 return (
-                  <div key={rootKey} className="space-y-3 rounded-lg border p-4">
-                    <div className="text-muted-foreground flex items-center justify-between text-xs">
-                      <span>用户 {comment.user_id}</span>
-                      <span>{comment.created_at}</span>
+                  <div
+                    key={rootKey}
+                    className="border-border bg-background/65 space-y-3 rounded-2xl border px-4 py-3.5 shadow-sm"
+                  >
+                    <div className="flex items-start gap-3">
+                      <ProfileAvatar
+                        avatarUrl={commentAuthor.avatarUrl}
+                        uid={commentAuthor.uid}
+                        username={commentAuthor.name}
+                        size="sm"
+                        className="rounded-2xl ring-0"
+                      />
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="flex flex-col gap-1 text-xs sm:flex-row sm:items-center sm:justify-between">
+                          <span className="text-foreground truncate font-medium">
+                            {commentAuthor.name}
+                          </span>
+                          <span className="text-muted-foreground">{comment.created_at}</span>
+                        </div>
+                        <p className="text-foreground text-sm leading-6">{comment.content}</p>
+                      </div>
                     </div>
-                    <p className="text-sm leading-6">{comment.content}</p>
-                    <div className="text-muted-foreground flex items-center justify-between gap-2 text-xs">
-                      <span>
-                        👍 {comment.like_count} · 👎 {comment.dislike_count} · 回复 {replyCount}
-                      </span>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <CommentReactionControls
+                        comment={comment}
+                        likeState={commentReaction.likeState}
+                        isBusy={commentReaction.busy}
+                        onLike={(item) => {
+                          void handleCommentReaction(item, LIKE_STATE.LIKED);
+                        }}
+                        onDislike={(item) => {
+                          void handleCommentReaction(item, LIKE_STATE.DISLIKED);
+                        }}
+                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void handleStartReply(comment, comment)}
+                        >
+                          <MessageCircleIcon className="size-3.5" />
+                          回复
+                        </Button>
+                        <span className="text-muted-foreground text-xs">
+                          回复 {visibleReplyCount}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-end gap-2">
                       {canToggleReplies && (
                         <Button
                           variant="ghost"
@@ -859,13 +1745,69 @@ export default function ArticleDetailPage() {
                           onClick={() => void handleToggleReplies(comment)}
                           disabled={replyState?.isLoading}
                         >
-                          {replyState?.expanded ? "收起回复" : `查看回复（${replyCount}）`}
+                          {replyState?.expanded
+                            ? "收起回复"
+                            : replyState?.initialized
+                              ? `查看回复（${visibleReplyCount}）`
+                              : "查看回复"}
                         </Button>
                       )}
                     </div>
 
                     {replyState?.expanded && (
-                      <div className="ml-4 space-y-2 border-l pl-4">
+                      <div className="border-primary/35 bg-muted/55 space-y-3 rounded-2xl border-l-2 px-4 py-3">
+                        {replyComposer && (
+                          <div className="space-y-2">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <label
+                                htmlFor={`comment-${rootKey}-reply-draft`}
+                                className="text-foreground text-sm font-medium"
+                              >
+                                回复{" "}
+                                {replyComposer.parentUserName ||
+                                  `用户 ${replyComposer.parentUserId}`}
+                              </label>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleCancelReply(comment)}
+                                disabled={replyComposer.isSubmitting}
+                                className="w-full sm:w-auto"
+                              >
+                                取消
+                              </Button>
+                            </div>
+                            <textarea
+                              id={`comment-${rootKey}-reply-draft`}
+                              value={replyComposer.draft}
+                              onChange={(event) =>
+                                handleReplyDraftChange(comment, event.target.value)
+                              }
+                              rows={3}
+                              className="border-input bg-card/75 text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-ring/20 min-h-[92px] w-full resize-y rounded-2xl border px-4 py-3 text-sm leading-6 transition outline-none focus:ring-4 disabled:cursor-not-allowed disabled:opacity-60"
+                              placeholder="写下你的回复"
+                              disabled={replyComposer.isSubmitting}
+                            />
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <p className="min-h-5 text-sm">
+                                {replyComposer.error && (
+                                  <span className="text-destructive">{replyComposer.error}</span>
+                                )}
+                              </p>
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => void handleSubmitReply(comment)}
+                                disabled={replyComposer.isSubmitting || !replyComposer.draft.trim()}
+                                className="w-full sm:w-auto"
+                              >
+                                {replyComposer.isSubmitting ? "回复中..." : "发布回复"}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
                         {replyState.error && (
                           <div className="space-y-2">
                             <p className="text-destructive text-xs">{replyState.error}</p>
@@ -888,16 +1830,74 @@ export default function ArticleDetailPage() {
 
                         {replyState.items.map((reply, index) => {
                           const replyKey = `${rootKey}-${toCommentIdKey(reply.id)}-${index}`;
+                          const replyReaction =
+                            commentReactionById[toCommentIdKey(reply.id)] ??
+                            DEFAULT_COMMENT_REACTION_STATE;
+                          const replyAuthor = getCommentAuthorView(reply, currentUserProfile);
+                          const parentComment = findThreadCommentById(
+                            reply.parent_id,
+                            comment,
+                            replyState.items,
+                          );
+                          const replyTargetName = getReplyTargetName(
+                            reply,
+                            parentComment,
+                            currentUserProfile,
+                          );
                           return (
-                            <div key={replyKey} className="space-y-1 rounded-md border px-3 py-2">
-                              <div className="text-muted-foreground flex items-center justify-between text-xs">
-                                <span>用户 {reply.user_id}</span>
-                                <span>{reply.created_at}</span>
+                            <div
+                              key={replyKey}
+                              className="bg-card/80 space-y-2 rounded-xl px-3 py-2"
+                            >
+                              <div className="flex items-start gap-3">
+                                <ProfileAvatar
+                                  avatarUrl={replyAuthor.avatarUrl}
+                                  uid={replyAuthor.uid}
+                                  username={replyAuthor.name}
+                                  size="sm"
+                                  className="rounded-xl ring-0"
+                                />
+                                <div className="min-w-0 flex-1 space-y-1.5">
+                                  <div className="flex flex-col gap-1 text-xs sm:flex-row sm:items-center sm:justify-between">
+                                    <span className="text-foreground truncate font-medium">
+                                      {replyAuthor.name}
+                                    </span>
+                                    <span className="text-muted-foreground">
+                                      {reply.created_at}
+                                    </span>
+                                  </div>
+                                  <div className="text-muted-foreground text-xs">
+                                    回复{" "}
+                                    <span className="text-foreground font-medium">
+                                      {replyTargetName}
+                                    </span>
+                                  </div>
+                                  <p className="text-foreground text-sm leading-6">
+                                    {reply.content}
+                                  </p>
+                                </div>
                               </div>
-                              <p className="text-sm leading-6">{reply.content}</p>
-                              <p className="text-muted-foreground text-xs">
-                                👍 {reply.like_count} · 👎 {reply.dislike_count}
-                              </p>
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <CommentReactionControls
+                                  comment={reply}
+                                  likeState={replyReaction.likeState}
+                                  isBusy={replyReaction.busy}
+                                  onLike={(item) => {
+                                    void handleCommentReaction(item, LIKE_STATE.LIKED);
+                                  }}
+                                  onDislike={(item) => {
+                                    void handleCommentReaction(item, LIKE_STATE.DISLIKED);
+                                  }}
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => void handleStartReply(comment, reply)}
+                                >
+                                  <MessageCircleIcon className="size-3.5" />
+                                  回复
+                                </Button>
+                              </div>
                             </div>
                           );
                         })}
