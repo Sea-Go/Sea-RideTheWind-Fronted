@@ -82,7 +82,7 @@ const buildSummary = (article: ArticleItem): string => {
 
   const content = stripMarkdown(toText(article.content));
   if (!content) {
-    return "暂时还没有摘要，打开文章可以查看更多内容。";
+    return "暂无摘要";
   }
 
   return content.length > 88 ? `${content.slice(0, 88)}...` : content;
@@ -325,7 +325,7 @@ export default function AuthorSpacePage() {
       } else {
         await followUser(token, { target_id: authorId });
         setIsFollowed(true);
-        setFollowMessage("关注成功，之后可以更快看到这位作者的更新。");
+        setFollowMessage("关注成功");
       }
     } catch (error) {
       setFollowMessage(error instanceof Error ? error.message : "关注操作失败，请稍后重试。");
@@ -365,22 +365,18 @@ export default function AuthorSpacePage() {
   return (
     <Layout>
       <PageContainer className="space-y-6 py-8">
-        <header className="rounded-[2rem] border border-sky-100 bg-[radial-gradient(circle_at_top_left,rgba(186,230,253,0.4),transparent_32%),linear-gradient(135deg,rgba(248,250,252,0.98),rgba(239,246,255,0.95))] p-6 shadow-sm shadow-sky-100/70">
+        <header className="app-hero-surface rounded-[2rem] p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-4">
               <div className="flex size-16 items-center justify-center rounded-[1.5rem] bg-sky-600 text-2xl font-semibold text-white shadow-lg shadow-sky-200">
                 {authorInitial}
               </div>
               <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/80 px-3 py-1 text-xs font-medium text-sky-700 shadow-sm">
+                <div className="app-pill inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium">
                   <BookOpenTextIcon className="size-3.5" />
                   作者空间
                 </div>
                 <h1 className="text-3xl font-bold tracking-tight">{resolvedAuthorName}</h1>
-                <p className="text-muted-foreground text-sm">
-                  这里展示这位作者最近发布的内容，你可以快速浏览主题方向，也可以直接进入文章详情继续阅读。
-                </p>
-                <p className="text-muted-foreground text-xs">作者 ID：{authorId || "--"}</p>
               </div>
             </div>
             <div className="flex flex-col items-stretch gap-3 lg:items-end">
@@ -420,23 +416,16 @@ export default function AuthorSpacePage() {
           </div>
         </header>
 
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-3xl border bg-white/80 p-5 shadow-sm">
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="app-stat-tile rounded-3xl p-5">
             <p className="text-muted-foreground text-sm">当前展示</p>
             <p className="mt-2 text-3xl font-bold">{articles.length}</p>
-            <p className="text-muted-foreground mt-2 text-xs">本页已发布文章数量</p>
           </div>
-          <div className="rounded-3xl border bg-white/80 p-5 shadow-sm">
+          <div className="app-stat-tile rounded-3xl p-5">
             <p className="text-muted-foreground text-sm">页码位置</p>
             <p className="mt-2 text-3xl font-bold">
               {page} / {totalPages}
             </p>
-            <p className="text-muted-foreground mt-2 text-xs">支持翻页查看更多作者内容</p>
-          </div>
-          <div className="rounded-3xl border bg-white/80 p-5 shadow-sm">
-            <p className="text-muted-foreground text-sm">作者标识</p>
-            <p className="mt-2 text-lg font-semibold break-all">{authorId || "--"}</p>
-            <p className="text-muted-foreground mt-2 text-xs">便于排查文章归属与跳转问题</p>
           </div>
         </section>
 
@@ -447,7 +436,7 @@ export default function AuthorSpacePage() {
             {Array.from({ length: 10 }).map((_, index) => (
               <div
                 key={`author-article-skeleton-${index}`}
-                className="overflow-hidden rounded-lg border bg-white/80 shadow-sm"
+                className="app-surface overflow-hidden rounded-lg"
               >
                 <div className="bg-muted h-40 animate-pulse" />
                 <div className="space-y-3 p-3">
@@ -465,11 +454,8 @@ export default function AuthorSpacePage() {
             ))}
           </div>
         ) : articles.length === 0 ? (
-          <div className="rounded-[2rem] border border-dashed p-10 text-center">
-            <p className="text-lg font-semibold">这位作者暂时还没有可展示的文章。</p>
-            <p className="text-muted-foreground mt-2 text-sm">
-              你可以稍后再来看，或者先回到推荐页继续浏览其他内容。
-            </p>
+          <div className="app-empty-state rounded-[2rem] p-10 text-center">
+            <p className="text-lg font-semibold">暂无文章</p>
             <div className="mt-5">
               <Button asChild>
                 <Link href="/dashboard/recommend">回到推荐页</Link>
@@ -480,13 +466,10 @@ export default function AuthorSpacePage() {
           <section className="space-y-4">
             <div className="space-y-1">
               <h2 className="text-2xl font-semibold">作者相关文章</h2>
-              <p className="text-muted-foreground text-sm">
-                卡片尺寸已经按推荐页的密度收紧，方便一屏内浏览更多文章。
-              </p>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-              {articles.map((article) => {
+              {articles.map((article, index) => {
                 const articleId = normalizeId(article.id ?? article.article_id);
                 const title = toText(article.title, "未命名文章");
                 const cover = toText(article.cover_image_url ?? article.cover);
@@ -500,7 +483,7 @@ export default function AuthorSpacePage() {
                 return (
                   <article
                     key={articleId || title}
-                    className="overflow-hidden rounded-lg border bg-white/85 shadow-sm transition-shadow hover:shadow-md"
+                    className="app-surface overflow-hidden rounded-lg transition-shadow hover:shadow-md"
                   >
                     {cover && (
                       <div className="relative h-40 w-full overflow-hidden">
@@ -508,7 +491,7 @@ export default function AuthorSpacePage() {
                           src={cover}
                           alt={title}
                           fill
-                          unoptimized
+                          priority={index === 0}
                           sizes="(max-width: 768px) 100vw, 320px"
                           className="object-cover"
                         />
@@ -516,8 +499,8 @@ export default function AuthorSpacePage() {
                     )}
 
                     <div className="space-y-2.5 p-3">
-                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-                        <span className="rounded-full bg-slate-100 px-2 py-1">
+                      <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-[11px]">
+                        <span className="app-pill rounded-full px-2 py-1">
                           发布于 {formatTime(article.create_time)}
                         </span>
                       </div>
@@ -533,7 +516,7 @@ export default function AuthorSpacePage() {
                           {secondaryTags.slice(0, 2).map((tag) => (
                             <span
                               key={`${articleId}-${tag}`}
-                              className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600"
+                              className="app-pill rounded-full px-2 py-0.5 text-[11px]"
                             >
                               #{tag}
                             </span>
@@ -541,14 +524,14 @@ export default function AuthorSpacePage() {
                         </div>
                       )}
 
-                      <div className="flex flex-wrap gap-1.5 text-[11px] text-slate-600">
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                      <div className="flex flex-wrap gap-1.5 text-[11px]">
+                        <span className="app-pill rounded-full px-2 py-0.5">
                           浏览 {toNumber(article.view_count, 0)}
                         </span>
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                        <span className="app-pill rounded-full px-2 py-0.5">
                           点赞 {toNumber(article.like_count ?? article.likes, 0)}
                         </span>
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                        <span className="app-pill rounded-full px-2 py-0.5">
                           评论 {toNumber(article.comment_count, 0)}
                         </span>
                       </div>
@@ -569,7 +552,7 @@ export default function AuthorSpacePage() {
         )}
 
         {!isLoading && totalPages > 1 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border bg-white/80 p-4 shadow-sm">
+          <div className="app-surface flex flex-wrap items-center justify-between gap-3 rounded-3xl p-4">
             <p className="text-muted-foreground text-sm">
               第 {page} 页，共 {totalPages} 页
             </p>
