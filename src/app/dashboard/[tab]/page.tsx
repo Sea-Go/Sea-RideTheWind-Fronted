@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 
-import { normalizeDashboardSearchMode } from "@/app/dashboard/_constants/search-mode";
 import { CardList } from "@/app/dashboard/_components/CardList";
 import { DashboardShell } from "@/app/dashboard/_components/DashboardShell";
+import { normalizeDashboardSearchMode } from "@/app/dashboard/_constants/search-mode";
 import {
   DASHBOARD_TAB_SLUG_SET,
   DASHBOARD_TABS,
