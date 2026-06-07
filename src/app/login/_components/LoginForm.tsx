@@ -4,31 +4,23 @@ import { Eye, EyeOff } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 
+import { markNavigationStart } from "@/components/motion/navigation-timing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { type AuthRole, getSafeNextPath } from "@/lib/auth-entry";
-import {
-  clearAdminAuthToken,
-  loginAdmin,
-  saveAdminAuthToken,
-} from "@/services/admin";
-import {
-  clearAuthToken,
-  ensureUserSession,
-  loginUser,
-  saveAuthToken,
-} from "@/services/auth";
+import { clearAdminAuthToken, loginAdmin, saveAdminAuthToken } from "@/services/admin";
+import { clearAuthToken, ensureUserSession, loginUser, saveAuthToken } from "@/services/auth";
 
 interface LoginFormProps {
   role: AuthRole;
   onRoleChange: (role: AuthRole) => void;
 }
 
-const roleOptions: Array<{ value: AuthRole; label: string; description: string }> = [
-  { value: "user", label: "普通用户", description: "进入推荐流、关注、消息和个人空间" },
-  { value: "admin", label: "管理员", description: "进入管理员中心，同时保留前台访问能力" },
+const roleOptions: Array<{ value: AuthRole; label: string }> = [
+  { value: "user", label: "普通用户" },
+  { value: "admin", label: "管理员" },
 ];
 
 export function LoginForm({ role, onRoleChange }: LoginFormProps) {
@@ -87,6 +79,7 @@ export function LoginForm({ role, onRoleChange }: LoginFormProps) {
         saveAuthToken(token);
       }
 
+      markNavigationStart(redirectPath);
       router.push(redirectPath);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "登录失败，请稍后再试。");
@@ -96,10 +89,9 @@ export function LoginForm({ role, onRoleChange }: LoginFormProps) {
   };
 
   return (
-    <Card className="w-full max-w-[360px]">
+    <Card className="app-surface-elevated w-full max-w-[380px] shadow-2xl">
       <CardHeader className="pb-3">
         <CardTitle className="text-3xl">登录</CardTitle>
-        <p className="text-muted-foreground text-sm">先选择身份，再进入对应空间。</p>
       </CardHeader>
       <CardContent>
         <form className="grid gap-4" onSubmit={handleSubmit}>
@@ -114,14 +106,13 @@ export function LoginForm({ role, onRoleChange }: LoginFormProps) {
                     key={option.value}
                     type="button"
                     onClick={() => onRoleChange(option.value)}
-                    className={`rounded-xl border px-3 py-3 text-left transition-colors ${
+                    className={`rounded-2xl border px-3 py-3 text-left transition-all ${
                       active
-                        ? "border-primary bg-primary/8 text-foreground"
-                        : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                        ? "border-primary bg-primary/10 text-foreground shadow-sm shadow-sky-500/10"
+                        : "border-border/80 text-muted-foreground hover:bg-accent hover:text-foreground hover:border-primary/40"
                     }`}
                   >
                     <div className="text-sm font-medium">{option.label}</div>
-                    <div className="mt-1 text-xs leading-5">{option.description}</div>
                   </button>
                 );
               })}
@@ -165,7 +156,7 @@ export function LoginForm({ role, onRoleChange }: LoginFormProps) {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button type="submit" className="h-10 w-[128px]" disabled={loading}>
+            <Button type="submit" className="h-10 w-[136px]" disabled={loading}>
               {loading ? "登录中..." : role === "admin" ? "管理员登录" : "用户登录"}
             </Button>
             {errorMessage ? (
