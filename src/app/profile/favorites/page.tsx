@@ -20,19 +20,16 @@ import { ProfileThemeShell } from "@/components/profile/ProfileThemeShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  ADMIN_FRONTEND_SESSION_MESSAGE,
-  getFrontendAccessState,
-} from "@/services/auth";
+import { ADMIN_FRONTEND_SESSION_MESSAGE, getFrontendAccessState } from "@/services/auth";
 import {
   createFavoriteFolder,
   deleteFavoriteFolder,
   deleteFavoriteItem,
+  type FavoriteFolder,
+  type FavoriteItem,
   listFavoriteFolders,
   listFavoritesByFolder,
   updateFavoriteFolder,
-  type FavoriteFolder,
-  type FavoriteItem,
 } from "@/services/favorite";
 
 const buildErrorMessage = (error: unknown, fallback: string): string =>
@@ -301,9 +298,6 @@ export default function ProfileFavoritesPage() {
         <ProfileThemeShell className="space-y-6">
           <header className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">我的收藏</h1>
-            <p className="text-muted-foreground text-sm">
-              先挑一个收藏夹，再在下面查看这个收藏夹里装着的文章。
-            </p>
             <Button asChild variant="outline" size="sm">
               <Link href="/profile">返回个人中心</Link>
             </Button>
@@ -316,9 +310,6 @@ export default function ProfileFavoritesPage() {
               <section className="bg-card rounded-3xl border p-5 shadow-sm">
                 <div className="space-y-1">
                   <h2 className="text-lg font-semibold">新建收藏夹</h2>
-                  <p className="text-muted-foreground text-sm">
-                    给你的文章准备一个新筐，之后点收藏时就能往里面放。
-                  </p>
                 </div>
 
                 <form
@@ -355,9 +346,6 @@ export default function ProfileFavoritesPage() {
               <section className="bg-card space-y-4 rounded-3xl border p-5 shadow-sm">
                 <div className="space-y-1">
                   <h2 className="text-lg font-semibold">收藏夹</h2>
-                  <p className="text-muted-foreground text-sm">
-                    把收藏夹当成装文章的筐，点一下某个筐，下面就会展开它装着的内容。
-                  </p>
                 </div>
 
                 {errorMessage ? <p className="text-destructive text-sm">{errorMessage}</p> : null}
@@ -400,9 +388,6 @@ export default function ProfileFavoritesPage() {
                                 </div>
                                 <div className="space-y-1">
                                   <p className="truncate text-base font-semibold">{folder.name}</p>
-                                  <p className="text-muted-foreground text-xs">
-                                    {isSelected ? "当前打开的收藏筐" : "点击查看这个收藏夹里的文章"}
-                                  </p>
                                 </div>
                               </div>
                               {isBusy ? (
@@ -420,30 +405,28 @@ export default function ProfileFavoritesPage() {
 
                     {!selectedFolder ? (
                       <div className="text-muted-foreground rounded-2xl border border-dashed px-6 py-12 text-center">
-                        请选择一个收藏夹，然后在下面查看它装着的文章。
+                        请选择收藏夹
                       </div>
                     ) : (
                       <div className="space-y-4 border-t pt-4">
-                        <div className="flex flex-col gap-4 rounded-2xl bg-[linear-gradient(135deg,rgba(248,250,252,0.94),rgba(239,246,255,0.92))] p-4 md:flex-row md:items-center md:justify-between">
+                        <div className="app-hero-surface flex flex-col gap-4 rounded-2xl p-4 md:flex-row md:items-center md:justify-between">
                           <div className="space-y-2">
-                            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/70 bg-white/80 px-3 py-1 text-xs font-medium text-sky-700 shadow-sm">
+                            <div className="app-pill inline-flex w-fit items-center gap-2 rounded-full px-3 py-1 text-xs font-medium">
                               <BookmarkIcon className="size-3.5" />
-                              当前收藏筐
+                              当前收藏夹
                             </div>
                             <div className="space-y-1">
                               <h3 className="text-2xl font-semibold tracking-tight">
                                 {selectedFolder.name}
                               </h3>
                               <p className="text-muted-foreground text-sm">
-                                {isItemsLoading
-                                  ? "正在打开这个收藏夹..."
-                                  : `这个收藏夹里现在有 ${items.length} 篇文章`}
+                                {isItemsLoading ? "加载中..." : `共 ${items.length} 篇文章`}
                               </p>
                             </div>
                           </div>
 
                           <div className="flex flex-col gap-2 md:items-end">
-                            <div className="text-muted-foreground inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs shadow-sm">
+                            <div className="app-pill text-muted-foreground inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs">
                               <FolderIcon className="size-3.5" />
                               收藏夹 ID：{selectedFolder.folderId}
                             </div>
