@@ -4,11 +4,12 @@ import { Eye, EyeOff } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 
+import { markNavigationStart } from "@/components/motion/navigation-timing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { buildOnboardingQuestionnairePath, type AuthRole, getSafeNextPath } from "@/lib/auth-entry";
+import { type AuthRole, buildOnboardingQuestionnairePath, getSafeNextPath } from "@/lib/auth-entry";
 import { clearAdminAuthToken, createAdmin, loginAdmin, saveAdminAuthToken } from "@/services/admin";
 import {
   clearAuthToken,
@@ -23,9 +24,9 @@ interface RegisterFormProps {
   onRoleChange: (role: AuthRole) => void;
 }
 
-const roleOptions: Array<{ value: AuthRole; label: string; description: string }> = [
-  { value: "user", label: "普通用户", description: "创建社区账号，正常使用推荐和互动功能" },
-  { value: "admin", label: "管理员", description: "创建管理员账号，并同步拥有前台用户能力" },
+const roleOptions: Array<{ value: AuthRole; label: string }> = [
+  { value: "user", label: "普通用户" },
+  { value: "admin", label: "管理员" },
 ];
 
 export function RegisterForm({ role, onRoleChange }: RegisterFormProps) {
@@ -99,10 +100,13 @@ export function RegisterForm({ role, onRoleChange }: RegisterFormProps) {
             password: normalizedPassword,
             email: normalizedEmail || undefined,
           });
-          router.push(getSafeNextPath("admin", searchParams.get("next")));
+          const redirectPath = getSafeNextPath("admin", searchParams.get("next"));
+          markNavigationStart(redirectPath);
+          router.push(redirectPath);
           return;
         } catch (syncError) {
           console.warn("admin register user-session sync failed:", syncError);
+          markNavigationStart("/admin");
           router.push("/admin");
           return;
         }
@@ -121,9 +125,11 @@ export function RegisterForm({ role, onRoleChange }: RegisterFormProps) {
         });
         clearAdminAuthToken();
         saveAuthToken(token);
-        router.push(
-          buildOnboardingQuestionnairePath(getSafeNextPath("user", searchParams.get("next"))),
+        const redirectPath = buildOnboardingQuestionnairePath(
+          getSafeNextPath("user", searchParams.get("next")),
         );
+        markNavigationStart(redirectPath);
+        router.push(redirectPath);
         return;
       } catch {
         setSuccessMessage("注册成功，请使用新账号登录。");
@@ -139,12 +145,9 @@ export function RegisterForm({ role, onRoleChange }: RegisterFormProps) {
   };
 
   return (
-    <Card className="w-full max-w-[360px]">
+    <Card className="app-surface-elevated w-full max-w-[380px] shadow-2xl">
       <CardHeader className="pb-3">
         <CardTitle className="text-3xl">注册</CardTitle>
-        <p className="text-muted-foreground text-sm">
-          注册时就能决定身份，管理员会自动补齐前台能力。
-        </p>
       </CardHeader>
       <CardContent>
         <form className="grid gap-4" onSubmit={handleSubmit}>
@@ -159,14 +162,13 @@ export function RegisterForm({ role, onRoleChange }: RegisterFormProps) {
                     key={option.value}
                     type="button"
                     onClick={() => onRoleChange(option.value)}
-                    className={`rounded-xl border px-3 py-3 text-left transition-colors ${
+                    className={`rounded-2xl border px-3 py-3 text-left transition-all ${
                       active
-                        ? "border-primary bg-primary/8 text-foreground"
-                        : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                        ? "border-primary bg-primary/10 text-foreground shadow-sm shadow-sky-500/10"
+                        : "border-border/80 text-muted-foreground hover:bg-accent hover:text-foreground hover:border-primary/40"
                     }`}
                   >
                     <div className="text-sm font-medium">{option.label}</div>
-                    <div className="mt-1 text-xs leading-5">{option.description}</div>
                   </button>
                 );
               })}
