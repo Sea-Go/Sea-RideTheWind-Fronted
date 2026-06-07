@@ -1,8 +1,20 @@
 "use client";
 
-import { Editor } from "@bytemd/react";
+import dynamic from "next/dynamic";
 
 import { uploadArticleInlineImage } from "@/services/article";
+
+const ByteMDEditor = dynamic(
+  () => import("@/app/post/_components/ByteMDEditor").then((module) => module.ByteMDEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="border-border bg-card text-muted-foreground flex min-h-[360px] items-center justify-center rounded-3xl border text-sm">
+        编辑器加载中...
+      </div>
+    ),
+  },
+);
 
 interface MarkdownEditorProps {
   value: string;
@@ -19,7 +31,7 @@ export default function MarkdownEditor({
 }: MarkdownEditorProps) {
   return (
     <div className="h-full min-h-0">
-      <Editor
+      <ByteMDEditor
         value={value}
         onChange={onChange}
         uploadImages={async (files) => {
