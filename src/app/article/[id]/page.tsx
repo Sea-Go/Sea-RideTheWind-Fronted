@@ -1732,9 +1732,6 @@ export default function ArticleDetailPage() {
                           <MessageCircleIcon className="size-3.5" />
                           回复
                         </Button>
-                        <span className="text-muted-foreground text-xs">
-                          回复 {visibleReplyCount}
-                        </span>
                       </div>
                     </div>
                     <div className="flex items-center justify-end gap-2">
