@@ -14,7 +14,7 @@
     "lint:style": "stylelint \"**/*.{css,scss}\"",
     "lint": "pnpm lint:eslint && pnpm lint:style",
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node prepare-standalone.mjs",
     "prepare": "husky install",
     "cz": "cz"
   },
