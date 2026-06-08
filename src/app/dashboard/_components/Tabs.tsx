@@ -43,7 +43,7 @@ export const Tabs = ({ tabs }: TabsProps) => {
             className={cn(
               "h-9 shrink-0 rounded-full px-4 text-xs sm:text-sm",
               isActive
-                ? "shadow-md shadow-primary/20"
+                ? "shadow-primary/20 shadow-md"
                 : "hover:text-primary text-muted-foreground hover:bg-accent/70 bg-transparent hover:shadow-sm",
             )}
             asChild

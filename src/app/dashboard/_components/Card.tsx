@@ -1,8 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
 import type { MouseEvent } from "react";
 import { memo } from "react";
 
+import { SafeRemoteImage } from "@/components/common/SafeRemoteImage";
 import { InteractiveSurface } from "@/components/motion/InteractiveSurface";
 import { Button } from "@/components/ui/button";
 import { Card as UICard, CardContent } from "@/components/ui/card";
@@ -95,8 +95,8 @@ export const Card = memo(function Card({
     >
       <UICard className="border-border bg-card/90 group gap-0 overflow-hidden rounded-[1.15rem] p-0 shadow-md shadow-black/5">
         {image && (
-          <div className="relative h-52 w-full overflow-hidden sm:h-56">
-            <Image
+          <div className="relative h-44 w-full overflow-hidden sm:h-56">
+            <SafeRemoteImage
               src={image}
               alt={title}
               fill
@@ -181,14 +181,14 @@ export const Card = memo(function Card({
               ) : null}
             </div>
           ) : null}
-          <div className="text-muted-foreground flex items-center justify-between gap-3 text-xs">
-            <span>{author}</span>
+          <div className="text-muted-foreground flex flex-col gap-2 text-xs sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+            <span className="line-clamp-1">{author}</span>
             <Button
               variant={isFavorited ? "default" : "outline"}
               size="sm"
               disabled={favoriteDisabled}
               onClick={() => onFavorite?.({ id, title, image })}
-              className="border-border h-8 rounded-full px-3 text-xs"
+              className="border-border h-8 w-full rounded-full px-3 text-xs sm:w-auto"
             >
               {isFavorited ? "已收藏" : "收藏"}
             </Button>

@@ -104,7 +104,7 @@ export const SearchBar = ({
         />
         <Button
           type="button"
-          className="h-11 w-full rounded-full px-6 shadow-lg shadow-primary/20 sm:h-12 sm:w-auto"
+          className="shadow-primary/20 h-11 w-full rounded-full px-6 shadow-lg sm:h-12 sm:w-auto"
           onClick={submitSearch}
         >
           搜索

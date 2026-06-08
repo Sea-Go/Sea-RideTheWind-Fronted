@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { type AuthRole, buildOnboardingQuestionnairePath, getSafeNextPath } from "@/lib/auth-entry";
+import { cn } from "@/lib/utils";
 import { clearAdminAuthToken, createAdmin, loginAdmin, saveAdminAuthToken } from "@/services/admin";
 import {
   clearAuthToken,
@@ -22,6 +23,8 @@ import {
 interface RegisterFormProps {
   role: AuthRole;
   onRoleChange: (role: AuthRole) => void;
+  className?: string;
+  idPrefix?: string;
 }
 
 const roleOptions: Array<{ value: AuthRole; label: string }> = [
@@ -29,7 +32,12 @@ const roleOptions: Array<{ value: AuthRole; label: string }> = [
   { value: "admin", label: "管理员" },
 ];
 
-export function RegisterForm({ role, onRoleChange }: RegisterFormProps) {
+export function RegisterForm({
+  role,
+  onRoleChange,
+  className,
+  idPrefix = "register",
+}: RegisterFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [username, setUsername] = React.useState("");
@@ -143,13 +151,19 @@ export function RegisterForm({ role, onRoleChange }: RegisterFormProps) {
       setLoading(false);
     }
   };
+  const usernameId = `${idPrefix}-username`;
+  const emailId = `${idPrefix}-email`;
+  const positionId = `${idPrefix}-position`;
+  const inviteCodeId = `${idPrefix}-invite-code`;
+  const passwordId = `${idPrefix}-password`;
+  const confirmPasswordId = `${idPrefix}-confirm-password`;
 
   return (
-    <Card className="app-surface-elevated w-full max-w-[380px] shadow-2xl">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-3xl">注册</CardTitle>
+    <Card className={cn("app-surface-elevated w-full max-w-[380px] shadow-2xl", className)}>
+      <CardHeader className="px-5 pb-3 sm:px-6">
+        <CardTitle className="text-2xl sm:text-3xl">注册</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-5 sm:px-6">
         <form className="grid gap-4" onSubmit={handleSubmit}>
           <div className="grid gap-2">
             <Label>注册身份</Label>
@@ -176,9 +190,9 @@ export function RegisterForm({ role, onRoleChange }: RegisterFormProps) {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="register-username">用户名</Label>
+            <Label htmlFor={usernameId}>用户名</Label>
             <Input
-              id="register-username"
+              id={usernameId}
               placeholder={role === "admin" ? "请输入管理员用户名" : "请输入用户名"}
               autoComplete="username"
               value={username}
@@ -187,9 +201,9 @@ export function RegisterForm({ role, onRoleChange }: RegisterFormProps) {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="register-email">邮箱</Label>
+            <Label htmlFor={emailId}>邮箱</Label>
             <Input
-              id="register-email"
+              id={emailId}
               type="email"
               placeholder="可选，用于接收通知"
               autoComplete="email"
@@ -201,18 +215,18 @@ export function RegisterForm({ role, onRoleChange }: RegisterFormProps) {
           {role === "admin" ? (
             <>
               <div className="grid gap-2">
-                <Label htmlFor="register-position">职位</Label>
+                <Label htmlFor={positionId}>职位</Label>
                 <Input
-                  id="register-position"
+                  id={positionId}
                   placeholder="可选，例如内容审核、运营、技术支持"
                   value={position}
                   onChange={(event) => setPosition(event.target.value)}
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="register-invite-code">邀请码</Label>
+                <Label htmlFor={inviteCodeId}>邀请码</Label>
                 <Input
-                  id="register-invite-code"
+                  id={inviteCodeId}
                   placeholder="请输入管理员邀请码"
                   value={inviteCode}
                   onChange={(event) => setInviteCode(event.target.value)}
@@ -222,10 +236,10 @@ export function RegisterForm({ role, onRoleChange }: RegisterFormProps) {
           ) : null}
 
           <div className="grid gap-2">
-            <Label htmlFor="register-password">密码</Label>
+            <Label htmlFor={passwordId}>密码</Label>
             <div className="relative">
               <Input
-                id="register-password"
+                id={passwordId}
                 type={passwordVisible ? "text" : "password"}
                 placeholder="请输入密码"
                 autoComplete="new-password"
@@ -247,10 +261,10 @@ export function RegisterForm({ role, onRoleChange }: RegisterFormProps) {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="register-confirm-password">确认密码</Label>
+            <Label htmlFor={confirmPasswordId}>确认密码</Label>
             <div className="relative">
               <Input
-                id="register-confirm-password"
+                id={confirmPasswordId}
                 type={confirmPasswordVisible ? "text" : "password"}
                 placeholder="请再次输入密码"
                 autoComplete="new-password"
@@ -271,17 +285,17 @@ export function RegisterForm({ role, onRoleChange }: RegisterFormProps) {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Button type="submit" className="h-10 w-[128px]" disabled={loading}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <Button type="submit" className="h-11 w-full sm:h-10 sm:w-[128px]" disabled={loading}>
               {loading ? "提交中..." : role === "admin" ? "管理员注册" : "用户注册"}
             </Button>
             {errorMessage ? (
-              <p className="text-destructive text-sm leading-none" role="alert">
+              <p className="text-destructive text-sm leading-5" role="alert">
                 {errorMessage}
               </p>
             ) : null}
             {successMessage ? (
-              <p className="text-primary text-sm leading-none" role="status">
+              <p className="text-primary text-sm leading-5" role="status">
                 {successMessage}
               </p>
             ) : null}

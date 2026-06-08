@@ -779,25 +779,36 @@ const ChatStage = ({
   onNewPlanning,
   thinkingDurationMs,
 }: ChatStageProps) => (
-  <section className="mx-auto flex h-full w-full max-w-5xl flex-col px-4 py-6 sm:px-6">
-    <header className="border-border/70 flex items-center justify-between gap-3 border-b pb-4">
+  <section className="mx-auto flex h-full w-full max-w-5xl flex-col px-4 py-4 sm:px-6 sm:py-6">
+    <header className="border-border/70 flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 className="text-foreground text-2xl font-semibold">旅行规划 Agent</h1>
+        <h1 className="text-foreground text-xl font-semibold sm:text-2xl">旅行规划 Agent</h1>
         <p className="text-muted-foreground mt-1 text-sm">
           需求确认后会自动进入地图规划。
           {thinkingDurationMs > 0 ? ` 已思考 ${formatDuration(thinkingDurationMs)}。` : ""}
         </p>
       </div>
-      <div className="flex shrink-0 flex-wrap justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onOpenHistory}>
+      <div className="grid grid-cols-3 gap-2 sm:flex sm:shrink-0 sm:flex-wrap sm:justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onOpenHistory}
+          className="w-full sm:w-auto"
+        >
           <HistoryIcon className="size-4" />
           历史
         </Button>
-        <Button type="button" variant="outline" onClick={onOpenMap}>
+        <Button type="button" variant="outline" onClick={onOpenMap} className="w-full sm:w-auto">
           <MapIcon className="size-4" />
           地图
         </Button>
-        <Button type="button" variant="outline" onClick={onNewPlanning} disabled={isStreaming}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onNewPlanning}
+          disabled={isStreaming}
+          className="w-full sm:w-auto"
+        >
           <PlusIcon className="size-4" />
           新建
         </Button>
@@ -871,6 +882,7 @@ const MapStage = ({
   onToggleAnnotationFilter,
   onFocusTimelineTarget,
 }: MapStageProps) => {
+  const [isEvidenceOpen, setIsEvidenceOpen] = useState(false);
   const visiblePoints = useMemo(
     () =>
       Object.values(state.points).filter((item) => state.showDimmed || item.status !== "dimmed"),
@@ -927,8 +939,8 @@ const MapStage = ({
         </div>
       )}
 
-      <div className="absolute top-4 left-4 z-20 flex max-w-[calc(100%-2rem)] flex-wrap items-center gap-2">
-        <div className="app-surface rounded-lg px-3 py-2">
+      <div className="absolute top-3 left-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1.5 sm:top-4 sm:left-4 sm:max-w-[calc(100%-2rem)] sm:gap-2">
+        <div className="app-surface max-w-[15rem] rounded-lg px-3 py-2 sm:max-w-none">
           <div className="text-foreground flex items-center gap-2 text-sm font-semibold">
             <RouteIcon className="text-primary size-4" />
             {latestStatus}
@@ -943,26 +955,54 @@ const MapStage = ({
         </Button>
       </div>
 
-      <div className="absolute top-4 right-4 z-20 flex gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onOpenHistory}>
+      <div className="absolute top-3 right-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap justify-end gap-1.5 sm:top-4 sm:right-4 sm:gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label="历史"
+          title="历史"
+          onClick={onOpenHistory}
+        >
           <HistoryIcon className="size-4" />
-          历史
+          <span className="hidden min-[420px]:inline">历史</span>
         </Button>
         {mode === "chat_overlay" ? (
-          <Button type="button" variant="outline" size="sm" onClick={onBackToMap}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-label="回到地图"
+            title="回到地图"
+            onClick={onBackToMap}
+          >
             <MapIcon className="size-4" />
-            回到地图
+            <span className="hidden min-[420px]:inline">回到地图</span>
           </Button>
         ) : (
-          <Button type="button" variant="outline" size="sm" onClick={onOpenChat}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-label="对话"
+            title="对话"
+            onClick={onOpenChat}
+          >
             <MessageCircleIcon className="size-4" />
-            对话
+            <span className="hidden min-[420px]:inline">对话</span>
           </Button>
         )}
         {isStreaming && (
-          <Button type="button" variant="destructive" size="sm" onClick={onStop}>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            aria-label="停止"
+            title="停止"
+            onClick={onStop}
+          >
             <SquareIcon className="size-4" />
-            停止
+            <span className="hidden min-[420px]:inline">停止</span>
           </Button>
         )}
       </div>
@@ -974,7 +1014,7 @@ const MapStage = ({
           size="sm"
           aria-label="打开对话"
           title="对话"
-          className="shadow-primary/10 absolute top-24 right-4 z-30 shadow-lg"
+          className="shadow-primary/10 absolute top-24 right-4 z-30 hidden shadow-lg md:inline-flex"
           onClick={onOpenChat}
         >
           <MessageCircleIcon className="size-4" />
@@ -987,7 +1027,7 @@ const MapStage = ({
           type="button"
           variant="outline"
           size="sm"
-          className="app-surface-elevated absolute right-4 bottom-4 z-30 shadow-lg"
+          className="app-surface-elevated absolute right-3 bottom-[8.5rem] z-30 shadow-lg md:right-4 md:bottom-4"
           onClick={onResetRouteView}
           title={isViewportLocked ? "视角已锁定，点击回到路线范围" : "回到路线范围"}
         >
@@ -996,9 +1036,22 @@ const MapStage = ({
         </Button>
       )}
 
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="app-surface-elevated absolute bottom-[8.5rem] left-3 z-30 shadow-lg md:hidden"
+        onClick={() => setIsEvidenceOpen(true)}
+      >
+        <LightbulbIcon className="size-4" />
+        规划链路
+      </Button>
+
       <MapEvidencePanel
         state={state}
         timeline={thinkingTimeline}
+        isOpen={isEvidenceOpen}
+        onClose={() => setIsEvidenceOpen(false)}
         onToggleFilter={onToggleAnnotationFilter}
         onFocusTimelineTarget={onFocusTimelineTarget}
       />
@@ -1044,7 +1097,7 @@ const MessageList = ({
             )}
             <div
               className={cn(
-                "max-w-[78%] rounded-lg border px-4 py-3 text-sm leading-6 shadow-sm",
+                "max-w-[88%] rounded-lg border px-4 py-3 text-sm leading-6 shadow-sm sm:max-w-[78%]",
                 isUser
                   ? "border-primary bg-primary text-primary-foreground"
                   : "app-surface text-foreground",
@@ -1315,7 +1368,7 @@ const ChatDrawer = ({
       inert={!isOpen ? true : undefined}
       style={drawerStyle}
       className={cn(
-        "app-surface-elevated absolute z-[60] shadow-2xl",
+        "app-surface-elevated fixed z-[60] shadow-2xl md:absolute",
         "right-0 left-0 max-h-[78%] rounded-t-lg md:top-0 md:bottom-auto md:left-auto md:h-full md:max-h-none md:w-[440px] md:rounded-t-none md:rounded-l-lg",
         !isOpen && "pointer-events-none",
       )}
@@ -1435,7 +1488,7 @@ const HistoryDrawer = ({
         <button
           type="button"
           aria-label="关闭历史"
-          className="absolute inset-0 z-40 bg-black/35 backdrop-blur-[1px] md:bg-transparent"
+          className="fixed inset-0 z-40 bg-black/35 backdrop-blur-[1px] md:absolute md:bg-transparent"
           onClick={onClose}
         />
       )}
@@ -1444,7 +1497,7 @@ const HistoryDrawer = ({
         inert={!isOpen ? true : undefined}
         style={drawerStyle}
         className={cn(
-          "app-surface-elevated absolute z-50 shadow-2xl",
+          "app-surface-elevated fixed z-50 shadow-2xl md:absolute",
           "right-0 left-0 max-h-[82%] rounded-t-lg md:top-0 md:right-auto md:bottom-auto md:h-full md:max-h-none md:w-[400px] md:rounded-t-none md:rounded-r-lg",
           !isOpen && "pointer-events-none",
         )}
@@ -1772,11 +1825,15 @@ const isVisibleTimelineEntry = (entry: ThinkingTimelineEntry, filters: MapAnnota
 const MapEvidencePanel = ({
   state,
   timeline,
+  isOpen,
+  onClose,
   onToggleFilter,
   onFocusTimelineTarget,
 }: {
   state: MapPlanningState;
   timeline: ThinkingTimeline;
+  isOpen: boolean;
+  onClose: () => void;
   onToggleFilter: (filter: keyof MapAnnotationFilters) => void;
   onFocusTimelineTarget: (target: Omit<TimelineFocusTarget, "nonce">) => void;
 }) => {
@@ -1786,75 +1843,100 @@ const MapEvidencePanel = ({
   );
 
   return (
-    <aside className="pointer-events-auto absolute top-32 right-4 bottom-32 left-4 z-20 md:top-28 md:right-auto md:bottom-28 md:w-[min(420px,calc(100%-2rem))]">
-      <div className="app-surface-elevated flex h-full min-h-0 flex-col rounded-lg shadow-lg">
-        <div className="border-border/70 flex items-start justify-between gap-3 border-b px-4 py-3">
-          <div className="min-w-0">
-            <div className="text-foreground flex items-center gap-2 text-sm font-semibold">
-              <LightbulbIcon className="text-primary size-4" />
-              规划链路
+    <>
+      {isOpen && (
+        <button
+          type="button"
+          aria-label="关闭规划链路"
+          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[1px] md:hidden"
+          onClick={onClose}
+        />
+      )}
+      <aside
+        className={cn(
+          "pointer-events-auto fixed right-0 bottom-0 left-0 z-50 h-[78%] max-h-[78%] transition-transform duration-300 md:absolute md:top-28 md:right-auto md:bottom-28 md:left-4 md:z-20 md:h-auto md:max-h-none md:w-[min(420px,calc(100%-2rem))] md:translate-y-0",
+          isOpen ? "translate-y-0" : "pointer-events-none translate-y-full md:pointer-events-auto",
+        )}
+      >
+        <div className="app-surface-elevated flex h-full min-h-0 flex-col rounded-t-lg shadow-lg md:rounded-lg">
+          <div className="border-border/70 flex items-start justify-between gap-3 border-b px-4 py-3">
+            <div className="min-w-0">
+              <div className="text-foreground flex items-center gap-2 text-sm font-semibold">
+                <LightbulbIcon className="text-primary size-4" />
+                规划链路
+              </div>
+              <p className="text-muted-foreground mt-1 text-xs">
+                {activeStep?.title || "步骤会按规划过程串联展示"}
+              </p>
             </div>
-            <p className="text-muted-foreground mt-1 text-xs">
-              {activeStep?.title || "步骤会按规划过程串联展示"}
-            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="md:hidden"
+              onClick={onClose}
+              aria-label="关闭规划链路"
+            >
+              <XIcon className="size-4" />
+            </Button>
+          </div>
+
+          <div className="border-border/70 grid grid-cols-3 gap-2 border-b px-4 py-3">
+            <TimelineStat label="总思考" value={formatDuration(timeline.totalDurationMs)} />
+            <TimelineStat label="当前步骤" value={formatDuration(timeline.currentStepDurationMs)} />
+            <TimelineStat label="已完成" value={`${timeline.completedStepCount} 步`} />
+          </div>
+
+          <div className="border-border/70 flex flex-wrap gap-2 border-b px-4 py-3">
+            <AnnotationFilterButton
+              active={state.annotationFilters.zhihu}
+              label="知乎"
+              onClick={() => onToggleFilter("zhihu")}
+            />
+            <AnnotationFilterButton
+              active={state.annotationFilters.thought}
+              label="思考"
+              onClick={() => onToggleFilter("thought")}
+            />
+            <AnnotationFilterButton
+              active={state.annotationFilters.decision}
+              label="权衡"
+              onClick={() => onToggleFilter("decision")}
+            />
+            <AnnotationFilterButton
+              active={state.annotationFilters.review}
+              label="审核"
+              onClick={() => onToggleFilter("review")}
+            />
+            <AnnotationFilterButton
+              active={state.annotationFilters.rejected}
+              label="已过滤"
+              onClick={() => onToggleFilter("rejected")}
+            />
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            {visibleStepCount === 0 ? (
+              <div className="app-empty-state rounded-lg px-4 py-6 text-center text-xs">
+                规划开始后，公开思考、知乎素材、路线权衡和审核会按步骤出现在这里。
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {timeline.steps.map((step) => (
+                  <TimelineStepCard
+                    key={step.id}
+                    step={step}
+                    filters={state.annotationFilters}
+                    isActive={step.id === activeStep?.id}
+                    onFocusTimelineTarget={onFocusTimelineTarget}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
-
-        <div className="border-border/70 grid grid-cols-3 gap-2 border-b px-4 py-3">
-          <TimelineStat label="总思考" value={formatDuration(timeline.totalDurationMs)} />
-          <TimelineStat label="当前步骤" value={formatDuration(timeline.currentStepDurationMs)} />
-          <TimelineStat label="已完成" value={`${timeline.completedStepCount} 步`} />
-        </div>
-
-        <div className="border-border/70 flex flex-wrap gap-2 border-b px-4 py-3">
-          <AnnotationFilterButton
-            active={state.annotationFilters.zhihu}
-            label="知乎"
-            onClick={() => onToggleFilter("zhihu")}
-          />
-          <AnnotationFilterButton
-            active={state.annotationFilters.thought}
-            label="思考"
-            onClick={() => onToggleFilter("thought")}
-          />
-          <AnnotationFilterButton
-            active={state.annotationFilters.decision}
-            label="权衡"
-            onClick={() => onToggleFilter("decision")}
-          />
-          <AnnotationFilterButton
-            active={state.annotationFilters.review}
-            label="审核"
-            onClick={() => onToggleFilter("review")}
-          />
-          <AnnotationFilterButton
-            active={state.annotationFilters.rejected}
-            label="已过滤"
-            onClick={() => onToggleFilter("rejected")}
-          />
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          {visibleStepCount === 0 ? (
-            <div className="app-empty-state rounded-lg px-4 py-6 text-center text-xs">
-              规划开始后，公开思考、知乎素材、路线权衡和审核会按步骤出现在这里。
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {timeline.steps.map((step) => (
-                <TimelineStepCard
-                  key={step.id}
-                  step={step}
-                  filters={state.annotationFilters}
-                  isActive={step.id === activeStep?.id}
-                  onFocusTimelineTarget={onFocusTimelineTarget}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 };
 
@@ -2051,8 +2133,8 @@ const MapEventDock = ({
   const latest = latestEvent;
 
   return (
-    <div className="absolute right-4 bottom-4 left-4 z-20 grid gap-3 md:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="app-surface rounded-lg px-4 py-3">
+    <div className="absolute right-3 bottom-3 left-3 z-20 grid gap-2 md:right-4 md:bottom-4 md:left-4 md:grid-cols-[minmax(0,1fr)_360px] md:gap-3">
+      <div className="app-surface rounded-lg px-3 py-2 md:px-4 md:py-3">
         <p className="text-foreground text-sm font-semibold">
           {latest?.publicAction || "地图待命"}
         </p>
@@ -2060,7 +2142,7 @@ const MapEventDock = ({
           {latest?.thoughtSummary || latest?.message || "规划事件会直接落在地图点、路线和弹框上。"}
         </p>
       </div>
-      <div className="app-surface rounded-lg px-4 py-3">
+      <div className="app-surface hidden rounded-lg px-3 py-2 min-[430px]:block md:px-4 md:py-3">
         <p className="text-muted-foreground text-xs font-semibold">推荐路线</p>
         <p className="text-foreground mt-1 text-sm font-semibold">
           {selectedRoutes[0]?.route.label || "等待路线选择"}
@@ -2091,8 +2173,8 @@ const MapLegend = ({ routes, points }: { routes: MapRouteState[]; points: MapPoi
   );
 
   return (
-    <div className="app-surface absolute top-[5.25rem] right-4 left-4 z-20 rounded-lg px-3 py-2 md:right-auto md:max-w-[360px]">
-      <div className="text-muted-foreground grid grid-cols-2 gap-1.5 text-[11px] font-semibold md:grid-cols-1">
+    <div className="app-surface absolute top-[6.75rem] right-3 left-3 z-20 rounded-lg px-3 py-2 md:top-[5.25rem] md:right-auto md:left-4 md:max-w-[360px]">
+      <div className="text-muted-foreground grid grid-cols-2 gap-1.5 text-[10px] font-semibold min-[430px]:text-[11px] md:grid-cols-1">
         <LegendRow color={phaseColor} label="阶段主线" />
         <LegendRow color={dayColor} label="当日路线" />
         <LegendRow color={dayColor} label="待复核连接" dashed />

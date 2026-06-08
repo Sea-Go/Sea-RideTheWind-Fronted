@@ -14,7 +14,6 @@ import {
   UserRoundIcon,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -25,6 +24,7 @@ import {
   type DashboardTabSlug,
   DEFAULT_DASHBOARD_TAB,
 } from "@/app/dashboard/_constants/tabs";
+import { SafeRemoteImage } from "@/components/common/SafeRemoteImage";
 import { InteractiveSurface } from "@/components/motion/InteractiveSurface";
 import { MotionList } from "@/components/motion/MotionList";
 import { markNavigationStart } from "@/components/motion/navigation-timing";
@@ -1029,8 +1029,8 @@ export const CardList = ({
           </div>
         </div>
         <div className="flex flex-col items-stretch gap-2 md:items-end">
-          <div className="flex items-center justify-between gap-3 md:justify-end">
-            <div className="text-muted-foreground bg-background/65 rounded-full px-3 py-2 text-xs shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between md:justify-end">
+            <div className="text-muted-foreground bg-background/65 rounded-full px-3 py-2 text-center text-xs shadow-sm sm:text-left">
               {refreshPanelMeta}
             </div>
             <div className="relative">
@@ -1051,7 +1051,7 @@ export const CardList = ({
                 size="lg"
                 onClick={handleManualRefresh}
                 disabled={isLoading}
-                className={`relative h-11 rounded-full px-5 text-sm font-semibold text-white transition-all duration-300 ${
+                className={`relative h-11 w-full rounded-full px-5 text-sm font-semibold text-white transition-all duration-300 sm:w-auto ${
                   showRefreshFeedback
                     ? "ring-primary/25 scale-[0.985] shadow-xl ring-4"
                     : "shadow-primary/15 shadow-lg"
@@ -1072,7 +1072,7 @@ export const CardList = ({
           </div>
           <div
             aria-live="polite"
-            className={`min-h-5 text-right text-xs transition-all duration-300 ${
+            className={`min-h-5 text-center text-xs transition-all duration-300 sm:text-right ${
               isLoading || showRefreshFeedback
                 ? "text-primary translate-y-0 opacity-100"
                 : "text-muted-foreground -translate-y-1 opacity-70"
@@ -1145,7 +1145,7 @@ export const CardList = ({
     return (
       <section className="border-border bg-card/80 relative overflow-hidden rounded-[1rem] border shadow-lg shadow-black/10">
         {heroImage ? (
-          <Image
+          <SafeRemoteImage
             src={heroImage}
             alt=""
             fill
@@ -1328,7 +1328,7 @@ export const CardList = ({
       >
         <div className="bg-muted relative h-32 overflow-hidden">
           {post.image ? (
-            <Image
+            <SafeRemoteImage
               src={post.image}
               alt={post.title}
               fill
@@ -1513,7 +1513,7 @@ export const CardList = ({
       <aside className="border-border bg-card/92 overflow-hidden rounded-[0.85rem] border shadow-lg shadow-black/10 xl:sticky xl:top-6">
         <div className="bg-muted relative h-44">
           {selectedPost.image ? (
-            <Image
+            <SafeRemoteImage
               src={selectedPost.image}
               alt={selectedPost.title}
               fill

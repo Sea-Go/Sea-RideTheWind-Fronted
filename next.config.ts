@@ -36,6 +36,12 @@ const nextConfig: NextConfig = {
       {
         protocol: "http",
         hostname: "sea-ridethewindbreakthewaves.xyz",
+        port: "39000",
+        pathname: "/**",
+      },
+      {
+        protocol: "http",
+        hostname: "sea-ridethewindbreakthewaves.xyz",
         pathname: "/**",
       },
       {

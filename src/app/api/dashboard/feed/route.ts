@@ -171,6 +171,19 @@ const internalRequest = async <T>(
   return raw ? (payload as T) : unwrapPayload<T>(payload);
 };
 
+const getInternalOrigin = (request: NextRequest): string => {
+  const configured = process.env.NEXT_SERVER_INTERNAL_ORIGIN?.trim();
+  if (configured) {
+    return configured.replace(/\/+$/, "");
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    return `http://127.0.0.1:${process.env.PORT?.trim() || "3000"}`;
+  }
+
+  return request.nextUrl.origin;
+};
+
 const getCurrentUserId = async (
   origin: string,
   authorization: string | null,
@@ -568,6 +581,31 @@ const hydrateArticle = async (
   }
 };
 
+const loadLatestArticleFallback = async (
+  origin: string,
+  authorization: string | null,
+): Promise<Pick<DashboardFeedResponse, "posts" | "authorIdMap">> => {
+  const payload = await internalRequest<unknown>(
+    origin,
+    `${ARTICLE_API_PATHS.list}?page=1&page_size=20&sort_by=create_time&desc=true`,
+    {
+      method: "GET",
+      headers: buildHeaders(authorization, false),
+    },
+    { raw: true },
+  );
+  const articles = pickFirstArray(payload)
+    .map(asRecord)
+    .filter((item): item is Record<string, unknown> => Boolean(item));
+  const posts = articles.map((article, index) => toDashboardPost(article, index));
+  const authorIdMap = Object.fromEntries(
+    articles
+      .map((article, index) => [posts[index]?.id, toTrimmedString(article.author_id)])
+      .filter(([postId, authorId]) => postId && authorId),
+  );
+  return { posts, authorIdMap };
+};
+
 const buildRecommendPayload = (userId: string, sessionId: string) => ({
   rec_request_id: createRequestId("rec"),
   user_id: userId,
@@ -623,10 +661,16 @@ const loadRecommendFeed = async ({
         authorIdMap[entry.post.id] = entry.authorId;
       }
     });
+    if (!posts.length) {
+      const fallback = await loadLatestArticleFallback(origin, authorization);
+      posts.push(...fallback.posts);
+      Object.assign(authorIdMap, fallback.authorIdMap);
+    }
     const response: DashboardFeedResponse = {
-      posts: posts.length
-        ? posts
-        : ids.map((id, index) => toRecommendFallbackPost(id, index, explanation)),
+      posts:
+        posts.length || !ids.length
+          ? posts
+          : ids.map((id, index) => toRecommendFallbackPost(id, index, explanation)),
       authorResults: [],
       searchEvidence: null,
       authorIdMap,
@@ -776,7 +820,7 @@ const buildFeedResponse = async (
   ).trim();
   const authorization = request.headers.get("authorization");
   const sessionId = normalizeSessionId(body.sessionId);
-  const origin = request.nextUrl.origin;
+  const origin = getInternalOrigin(request);
 
   if (effectiveQuery) {
     return loadSearchFeed({

@@ -389,7 +389,7 @@ function CommentReactionControls({
   const dislikeActive = likeState === LIKE_STATE.DISLIKED;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
       <Button
         id={`comment-${commentKey}-like-button`}
         type="button"
@@ -400,6 +400,7 @@ function CommentReactionControls({
         data-comment-action="like"
         onClick={() => onLike(comment)}
         disabled={isBusy}
+        className="w-full sm:w-auto"
       >
         <ThumbsUpIcon className="size-3.5" />
         <span>赞</span>
@@ -415,6 +416,7 @@ function CommentReactionControls({
         data-comment-action="dislike"
         onClick={() => onDislike(comment)}
         disabled={isBusy}
+        className="w-full sm:w-auto"
       >
         <ThumbsDownIcon className="size-3.5" />
         <span>踩</span>
@@ -1503,21 +1505,22 @@ export default function ArticleDetailPage() {
     <Layout>
       <PageContainer className="space-y-6 py-5 sm:space-y-8 sm:py-8">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <Button asChild variant="outline">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
+            <Button asChild variant="outline" className="w-full sm:w-auto">
               <Link href="/dashboard/recommend">返回推荐页</Link>
             </Button>
             {canEdit && (
-              <Button asChild variant="secondary">
+              <Button asChild variant="secondary" className="w-full sm:w-auto">
                 <Link href={`/post/edit/${encodeURIComponent(articleId)}`}>去编辑</Link>
               </Button>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center">
             <Button
               variant={favoriteItems.length > 0 ? "default" : "outline"}
               onClick={() => void handleToggleFavorite()}
               disabled={isFavoriteBusy}
+              className="w-full sm:w-auto"
             >
               {isFavoriteBusy ? "处理中..." : favoriteItems.length > 0 ? "已收藏" : "收藏"}
             </Button>
@@ -1527,6 +1530,7 @@ export default function ArticleDetailPage() {
               onClick={handleLike}
               disabled={isReacting}
               aria-pressed={likeState === LIKE_STATE.LIKED}
+              className="w-full sm:w-auto"
             >
               <ThumbsUpIcon className="size-4" />
               <span>赞</span>
@@ -1538,6 +1542,7 @@ export default function ArticleDetailPage() {
               onClick={handleDislike}
               disabled={isReacting}
               aria-pressed={likeState === LIKE_STATE.DISLIKED}
+              className="w-full sm:w-auto"
             >
               <ThumbsDownIcon className="size-4" />
               <span>踩</span>
@@ -1551,8 +1556,8 @@ export default function ArticleDetailPage() {
 
         <article className="border-border bg-card/90 text-card-foreground space-y-5 rounded-[1.75rem] border p-4 shadow-sm backdrop-blur sm:p-6">
           <header className="space-y-3">
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
-            <p className="text-muted-foreground text-sm">
+            <h1 className="text-2xl font-bold tracking-tight break-words sm:text-3xl">{title}</h1>
+            <p className="text-muted-foreground text-sm leading-6 break-words">
               作者：
               {authorSpaceHref ? (
                 <Link
@@ -1594,7 +1599,7 @@ export default function ArticleDetailPage() {
             </span>
           </div>
 
-          <section>
+          <section className="min-w-0 overflow-x-auto">
             <MarkdownArticle value={content} />
           </section>
         </article>
@@ -1691,9 +1696,9 @@ export default function ArticleDetailPage() {
                 return (
                   <div
                     key={rootKey}
-                    className="border-border bg-background/65 space-y-3 rounded-2xl border px-4 py-3.5 shadow-sm"
+                    className="border-border bg-background/65 space-y-3 rounded-2xl border px-3 py-3.5 shadow-sm sm:px-4"
                   >
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-2 sm:gap-3">
                       <ProfileAvatar
                         avatarUrl={commentAuthor.avatarUrl}
                         uid={commentAuthor.uid}
@@ -1708,7 +1713,9 @@ export default function ArticleDetailPage() {
                           </span>
                           <span className="text-muted-foreground">{comment.created_at}</span>
                         </div>
-                        <p className="text-foreground text-sm leading-6">{comment.content}</p>
+                        <p className="text-foreground text-sm leading-6 break-words">
+                          {comment.content}
+                        </p>
                       </div>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1723,24 +1730,26 @@ export default function ArticleDetailPage() {
                           void handleCommentReaction(item, LIKE_STATE.DISLIKED);
                         }}
                       />
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => void handleStartReply(comment, comment)}
+                          className="w-full sm:w-auto"
                         >
                           <MessageCircleIcon className="size-3.5" />
                           回复
                         </Button>
                       </div>
                     </div>
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-stretch gap-2 sm:justify-end">
                       {canToggleReplies && (
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => void handleToggleReplies(comment)}
                           disabled={replyState?.isLoading}
+                          className="w-full sm:w-auto"
                         >
                           {replyState?.expanded
                             ? "收起回复"
@@ -1752,7 +1761,7 @@ export default function ArticleDetailPage() {
                     </div>
 
                     {replyState?.expanded && (
-                      <div className="border-primary/35 bg-muted/55 space-y-3 rounded-2xl border-l-2 px-4 py-3">
+                      <div className="border-primary/35 bg-muted/55 space-y-3 rounded-2xl border-l-2 px-3 py-3 sm:px-4">
                         {replyComposer && (
                           <div className="space-y-2">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1869,7 +1878,7 @@ export default function ArticleDetailPage() {
                                       {replyTargetName}
                                     </span>
                                   </div>
-                                  <p className="text-foreground text-sm leading-6">
+                                  <p className="text-foreground text-sm leading-6 break-words">
                                     {reply.content}
                                   </p>
                                 </div>
@@ -1890,6 +1899,7 @@ export default function ArticleDetailPage() {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => void handleStartReply(comment, reply)}
+                                  className="w-full sm:w-auto"
                                 >
                                   <MessageCircleIcon className="size-3.5" />
                                   回复
@@ -1905,6 +1915,7 @@ export default function ArticleDetailPage() {
                             size="sm"
                             onClick={() => void handleLoadMoreReplies(comment)}
                             disabled={replyState.isLoading}
+                            className="w-full sm:w-auto"
                           >
                             {replyState.isLoading ? "加载中..." : "加载更多回复"}
                           </Button>
@@ -1922,6 +1933,7 @@ export default function ArticleDetailPage() {
               variant="secondary"
               onClick={handleLoadMoreComments}
               disabled={isLoadingComments}
+              className="w-full sm:w-auto"
             >
               {isLoadingComments ? "加载中..." : "加载更多评论"}
             </Button>
