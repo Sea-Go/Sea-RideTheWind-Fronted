@@ -371,6 +371,73 @@ const applyCommentReactionStep = (comment: CommentItem, step: CommentActionType)
   }
 };
 
+type ArticleReactionInactiveVariant = "secondary" | "ghost" | "outline";
+type ArticleReactionSize = "default" | "sm";
+
+function ArticleReactionControls({
+  idPrefix,
+  likeCount,
+  dislikeCount,
+  likeState,
+  isReacting,
+  onLike,
+  onDislike,
+  className = "grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center",
+  buttonClassName = "w-full sm:w-auto",
+  inactiveVariant = "secondary",
+  size = "default",
+}: {
+  idPrefix: string;
+  likeCount: number;
+  dislikeCount: number;
+  likeState: LikeState;
+  isReacting: boolean;
+  onLike: () => void | Promise<void>;
+  onDislike: () => void | Promise<void>;
+  className?: string;
+  buttonClassName?: string;
+  inactiveVariant?: ArticleReactionInactiveVariant;
+  size?: ArticleReactionSize;
+}) {
+  const likeActive = likeState === LIKE_STATE.LIKED;
+  const dislikeActive = likeState === LIKE_STATE.DISLIKED;
+
+  return (
+    <div className={className}>
+      <Button
+        id={`${idPrefix}-like-button`}
+        type="button"
+        size={size}
+        variant={likeActive ? "default" : inactiveVariant}
+        aria-label={`点赞，当前 ${likeCount}`}
+        aria-pressed={likeActive}
+        onClick={() => void onLike()}
+        disabled={isReacting}
+        className={buttonClassName}
+      >
+        <ThumbsUpIcon className={size === "sm" ? "size-3.5" : "size-4"} />
+        <span>赞</span>
+        <span>{likeCount}</span>
+      </Button>
+      <Button
+        id={`${idPrefix}-dislike-button`}
+        type="button"
+        size={size}
+        variant={dislikeActive ? "destructive" : inactiveVariant}
+        aria-label={`点踩，当前 ${dislikeCount}`}
+        aria-pressed={dislikeActive}
+        onClick={() => void onDislike()}
+        disabled={isReacting}
+        className={buttonClassName}
+      >
+        <ThumbsDownIcon className={size === "sm" ? "size-3.5" : "size-4"} />
+        <span>踩</span>
+        <span>{dislikeCount}</span>
+      </Button>
+    </div>
+  );
+}
+
 function CommentReactionControls({
   comment,
   likeState,
@@ -1515,8 +1582,9 @@ export default function ArticleDetailPage() {
               </Button>
             )}
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center">
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
             <Button
+              type="button"
               variant={favoriteItems.length > 0 ? "default" : "outline"}
               onClick={() => void handleToggleFavorite()}
               disabled={isFavoriteBusy}
@@ -1524,30 +1592,15 @@ export default function ArticleDetailPage() {
             >
               {isFavoriteBusy ? "处理中..." : favoriteItems.length > 0 ? "已收藏" : "收藏"}
             </Button>
-            <Button
-              id="article-like-button"
-              variant={likeState === LIKE_STATE.LIKED ? "default" : "secondary"}
-              onClick={handleLike}
-              disabled={isReacting}
-              aria-pressed={likeState === LIKE_STATE.LIKED}
-              className="w-full sm:w-auto"
-            >
-              <ThumbsUpIcon className="size-4" />
-              <span>赞</span>
-              <span>{likeCount}</span>
-            </Button>
-            <Button
-              id="article-dislike-button"
-              variant={likeState === LIKE_STATE.DISLIKED ? "destructive" : "secondary"}
-              onClick={handleDislike}
-              disabled={isReacting}
-              aria-pressed={likeState === LIKE_STATE.DISLIKED}
-              className="w-full sm:w-auto"
-            >
-              <ThumbsDownIcon className="size-4" />
-              <span>踩</span>
-              <span>{dislikeCount}</span>
-            </Button>
+            <ArticleReactionControls
+              idPrefix="article-action"
+              likeCount={likeCount}
+              dislikeCount={dislikeCount}
+              likeState={likeState}
+              isReacting={isReacting}
+              onLike={handleLike}
+              onDislike={handleDislike}
+            />
           </div>
         </div>
 
@@ -1588,16 +1641,18 @@ export default function ArticleDetailPage() {
             )}
           </header>
 
-          <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-sm">
-            <span className="inline-flex items-center gap-1.5">
-              <ThumbsUpIcon className="size-4" />
-              点赞：{likeCount}
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <ThumbsDownIcon className="size-4" />
-              点踩：{dislikeCount}
-            </span>
-          </div>
+          <ArticleReactionControls
+            idPrefix="article-meta"
+            likeCount={likeCount}
+            dislikeCount={dislikeCount}
+            likeState={likeState}
+            isReacting={isReacting}
+            onLike={handleLike}
+            onDislike={handleDislike}
+            size="sm"
+            inactiveVariant="ghost"
+            buttonClassName="w-full justify-center rounded-full px-3 sm:w-auto"
+          />
 
           <section className="min-w-0 overflow-x-auto">
             <MarkdownArticle value={content} />
