@@ -1,4 +1,5 @@
-import { USER_CENTER_API_PATHS } from "@/constants/api-paths";
+import { COVER_API_PATHS, USER_CENTER_API_PATHS } from "@/constants/api-paths";
+import { extractUploadError, extractUploadUrl } from "@/lib/upload-response";
 import { getAdminAuthToken } from "@/services/admin";
 import { request, withBearerAuthorization } from "@/services/request";
 
@@ -220,12 +221,40 @@ export const uploadUserAvatar = async (
   file: File,
 ): Promise<UploadAvatarResponse> => {
   const formData = new FormData();
-  formData.append("avatar", file);
+  formData.append("image", file);
 
-  const response = await fetch(USER_CENTER_API_PATHS.uploadAvatar, {
+  const uploadResponse = await fetch(COVER_API_PATHS.upload, {
     method: "POST",
     headers: withBearerAuthorization(token),
     body: formData,
+  });
+
+  let uploadPayload: unknown = null;
+  try {
+    uploadPayload = (await uploadResponse.json()) as unknown;
+  } catch (error) {
+    void error;
+  }
+
+  if (!uploadResponse.ok) {
+    throw new Error(extractUploadError(uploadPayload) ?? "头像上传失败，请稍后重试。");
+  }
+
+  const avatarUrl = extractUploadUrl(uploadPayload);
+  if (!avatarUrl) {
+    throw new Error("头像上传成功但未返回图片地址，请稍后重试。");
+  }
+
+  const response = await fetch(USER_CENTER_API_PATHS.uploadAvatar, {
+    method: "POST",
+    headers: withBearerAuthorization(token, {
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify({
+      avatar_url: avatarUrl,
+      content_type: file.type || "image/png",
+      size_bytes: file.size,
+    }),
   });
 
   return parseUploadPayload<UploadAvatarResponse>(response);
