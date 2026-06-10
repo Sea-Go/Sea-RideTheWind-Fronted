@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
 
 import { cn } from "@/lib/utils";
@@ -14,21 +15,14 @@ interface SafeRemoteImageProps {
   priority?: boolean;
   sizes?: string;
   width?: number;
+  height?: number;
   quality?: number;
 }
 
 const isSafeImageSource = (src: string): boolean =>
   src.startsWith("/") || /^https?:\/\//i.test(src) || /^data:image\//i.test(src);
 
-const buildProxiedImageSource = (src: string, width: number, quality: number): string => {
-  if (!/^https?:\/\//i.test(src)) {
-    return src;
-  }
-
-  return `/_next/image?url=${encodeURIComponent(src)}&w=${encodeURIComponent(
-    String(width),
-  )}&q=${encodeURIComponent(String(quality))}`;
-};
+const isNativeImageSource = (src: string): boolean => /^data:image\//i.test(src);
 
 export const SafeRemoteImage = ({
   src,
@@ -38,6 +32,7 @@ export const SafeRemoteImage = ({
   priority = false,
   sizes,
   width = 1200,
+  height = width,
   quality = 75,
 }: SafeRemoteImageProps) => {
   const normalizedSrc = typeof src === "string" ? src.trim() : "";
@@ -45,8 +40,8 @@ export const SafeRemoteImage = ({
     if (!normalizedSrc || !isSafeImageSource(normalizedSrc)) {
       return "";
     }
-    return buildProxiedImageSource(normalizedSrc, width, quality);
-  }, [normalizedSrc, quality, width]);
+    return normalizedSrc;
+  }, [normalizedSrc]);
   const [failedSrc, setFailedSrc] = useState("");
   const hasError = Boolean(safeSrc && failedSrc === safeSrc);
 
@@ -54,15 +49,46 @@ export const SafeRemoteImage = ({
     return null;
   }
 
+  if (isNativeImageSource(safeSrc)) {
+    return (
+      <img
+        src={safeSrc}
+        alt={alt}
+        loading={priority ? "eager" : "lazy"}
+        decoding="async"
+        fetchPriority={priority ? "high" : "auto"}
+        sizes={sizes}
+        className={cn(fill ? "absolute inset-0 h-full w-full" : "", className)}
+        onError={() => setFailedSrc(safeSrc)}
+      />
+    );
+  }
+
+  if (fill) {
+    return (
+      <Image
+        src={safeSrc}
+        alt={alt}
+        fill
+        priority={priority}
+        sizes={sizes ?? "100vw"}
+        quality={quality}
+        className={cn("absolute inset-0 h-full w-full", className)}
+        onError={() => setFailedSrc(safeSrc)}
+      />
+    );
+  }
+
   return (
-    <img
+    <Image
       src={safeSrc}
       alt={alt}
-      loading={priority ? "eager" : "lazy"}
-      decoding="async"
-      fetchPriority={priority ? "high" : "auto"}
+      width={width}
+      height={height}
+      priority={priority}
       sizes={sizes}
-      className={cn(fill ? "absolute inset-0 h-full w-full" : "", className)}
+      quality={quality}
+      className={className}
       onError={() => setFailedSrc(safeSrc)}
     />
   );

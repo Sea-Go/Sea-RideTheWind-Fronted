@@ -6,6 +6,7 @@ const DEFAULT_ALLOWED_HOSTS = new Set([
   "175.24.130.226",
   "sea-ridethewindbreakthewaves.xyz",
 ]);
+const PREVIEW_CACHE_CONTROL = "public, max-age=3600, stale-while-revalidate=86400";
 
 const getAllowedHosts = (): Set<string> => {
   const hosts = new Set(DEFAULT_ALLOWED_HOSTS);
@@ -48,7 +49,15 @@ const buildResponseHeaders = (upstreamResponse: Response): Headers => {
   if (contentType) {
     headers.set("content-type", contentType);
   }
-  headers.set("cache-control", "no-store");
+  const etag = upstreamResponse.headers.get("etag");
+  if (etag) {
+    headers.set("etag", etag);
+  }
+  const lastModified = upstreamResponse.headers.get("last-modified");
+  if (lastModified) {
+    headers.set("last-modified", lastModified);
+  }
+  headers.set("cache-control", PREVIEW_CACHE_CONTROL);
   return headers;
 };
 
@@ -61,7 +70,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   try {
     const upstreamResponse = await fetch(targetUrl, {
       method: "GET",
-      cache: "no-store",
+      cache: "force-cache",
       headers: {
         Accept: "image/*",
       },
