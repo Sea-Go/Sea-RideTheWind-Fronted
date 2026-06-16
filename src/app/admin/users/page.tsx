@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { Layout } from "@/components/layout/layout";
-import { PageContainer } from "@/components/layout/PageContainer";
+import { AdminPageContainer } from "@/components/admin/AdminPanel";
+import { AdminShell } from "@/components/admin/AdminShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { buildLoginPath } from "@/lib/auth-entry";
@@ -153,8 +153,8 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <Layout>
-      <PageContainer className="space-y-6 py-8">
+    <AdminShell title="用户管理" eyebrow="Admin" description="用户检索、查看与维护">
+      <AdminPageContainer className="space-y-6 py-4">
         <header className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">用户管理</h1>
           <Button asChild variant="outline" size="sm">
@@ -226,7 +226,7 @@ export default function AdminUsersPage() {
             </div>
           </section>
         )}
-      </PageContainer>
-    </Layout>
+      </AdminPageContainer>
+    </AdminShell>
   );
 }

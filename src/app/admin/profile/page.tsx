@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { Layout } from "@/components/layout/layout";
-import { PageContainer } from "@/components/layout/PageContainer";
+import { AdminPageContainer } from "@/components/admin/AdminPanel";
+import { AdminShell } from "@/components/admin/AdminShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -181,8 +181,8 @@ export default function AdminProfilePage() {
   };
 
   return (
-    <Layout>
-      <PageContainer className="space-y-6 py-8">
+    <AdminShell title="管理员设置" eyebrow="Admin" description="管理员资料和账号创建">
+      <AdminPageContainer className="space-y-6 py-4">
         <header className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">管理员资料</h1>
           <Button asChild variant="outline" size="sm">
@@ -311,7 +311,7 @@ export default function AdminProfilePage() {
             </section>
           </>
         )}
-      </PageContainer>
-    </Layout>
+      </AdminPageContainer>
+    </AdminShell>
   );
 }

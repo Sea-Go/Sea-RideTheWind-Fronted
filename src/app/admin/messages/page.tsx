@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-import { Layout } from "@/components/layout/layout";
-import { PageContainer } from "@/components/layout/PageContainer";
+import { AdminPageContainer } from "@/components/admin/AdminPanel";
+import { AdminShell } from "@/components/admin/AdminShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -289,8 +289,8 @@ export default function AdminMessagesPage() {
   };
 
   return (
-    <Layout>
-      <PageContainer className="space-y-6 py-8">
+    <AdminShell title="消息中心" eyebrow="Admin" description="通知广播与用户会话">
+      <AdminPageContainer className="space-y-6 py-4">
         <header className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">管理员消息中心</h1>
           <p className="text-muted-foreground text-sm">
@@ -545,7 +545,7 @@ export default function AdminMessagesPage() {
             </section>
           </>
         )}
-      </PageContainer>
-    </Layout>
+      </AdminPageContainer>
+    </AdminShell>
   );
 }

@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { AdminPageContainer } from "@/components/admin/AdminPanel";
+import { AdminShell } from "@/components/admin/AdminShell";
 import { useAppPrompt } from "@/components/common/AppPromptProvider";
-import { Layout } from "@/components/layout/layout";
-import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -204,8 +204,8 @@ export default function AdminUserDetailPage() {
   };
 
   return (
-    <Layout>
-      <PageContainer className="space-y-6 py-8">
+    <AdminShell title="用户详情" eyebrow="Admin" description="用户资料、状态与安全操作">
+      <AdminPageContainer className="space-y-6 py-4">
         <header className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">用户详情</h1>
           <p className="text-muted-foreground text-sm">
@@ -286,7 +286,7 @@ export default function AdminUserDetailPage() {
             )}
           </section>
         )}
-      </PageContainer>
-    </Layout>
+      </AdminPageContainer>
+    </AdminShell>
   );
 }
