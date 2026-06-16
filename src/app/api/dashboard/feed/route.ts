@@ -640,13 +640,17 @@ const loadRecommendFeed = async ({
   }
 
   const task = (async () => {
+    const recommendPayload = buildRecommendPayload(userId, sessionId);
     const payload = await internalRequest<unknown>(origin, RECO_API_PATHS.recommend, {
       method: "POST",
       headers: buildHeaders(null),
-      body: JSON.stringify(buildRecommendPayload(userId, sessionId)),
+      body: JSON.stringify(recommendPayload),
     });
+    const recoRecord = extractSearchDataRecord(payload);
+    const recRequestId =
+      toTrimmedString(recoRecord?.rec_request_id) || recommendPayload.rec_request_id;
     const ids = extractRecommendIds(payload);
-    const explanation = toTrimmedString(extractSearchDataRecord(payload)?.explanation);
+    const explanation = toTrimmedString(recoRecord?.explanation);
     const hydrated = await Promise.all(
       ids.map((articleId, index) => hydrateArticle(origin, articleId, authorization, index)),
     );
@@ -666,14 +670,41 @@ const loadRecommendFeed = async ({
       posts.push(...fallback.posts);
       Object.assign(authorIdMap, fallback.authorIdMap);
     }
+    const attachRecommendation = ids.length > 0;
     const response: DashboardFeedResponse = {
       posts:
         posts.length || !ids.length
-          ? posts
-          : ids.map((id, index) => toRecommendFallbackPost(id, index, explanation)),
+          ? posts.map((post, index) =>
+              attachRecommendation
+                ? {
+                    ...post,
+                    recommendation: {
+                      recRequestId,
+                      userId,
+                      sessionId,
+                      surface: RECOMMEND_SURFACE,
+                      rank: index + 1,
+                    },
+                  }
+                : post,
+            )
+          : ids.map((id, index) => ({
+              ...toRecommendFallbackPost(id, index, explanation),
+              recommendation: {
+                recRequestId,
+                userId,
+                sessionId,
+                surface: RECOMMEND_SURFACE,
+                rank: index + 1,
+              },
+            })),
       authorResults: [],
       searchEvidence: null,
       authorIdMap,
+      userId,
+      sessionId,
+      surface: RECOMMEND_SURFACE,
+      recRequestId,
       fetchedAt: Date.now(),
     };
     feedCache.set(cacheKey, { response, fetchedAt: response.fetchedAt });

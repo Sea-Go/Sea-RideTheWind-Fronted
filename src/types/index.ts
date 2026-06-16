@@ -20,6 +20,13 @@ export interface DashboardPost {
   content: string;
   publishedAt: string;
   searchEvidence?: DashboardSearchEvidence | null;
+  recommendation?: {
+    recRequestId: string;
+    userId: string;
+    sessionId: string;
+    surface: string;
+    rank: number;
+  } | null;
 }
 
 export interface DashboardAuthorSearchResult {
@@ -62,5 +69,9 @@ export interface DashboardFeedResponse {
   authorResults: DashboardAuthorSearchResult[];
   searchEvidence: DashboardSearchEvidenceViewState | null;
   authorIdMap: Record<string, string>;
+  userId?: string;
+  sessionId?: string;
+  surface?: string;
+  recRequestId?: string;
   fetchedAt: number;
 }

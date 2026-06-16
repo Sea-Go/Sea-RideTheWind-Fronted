@@ -17,10 +17,10 @@ interface CardProps extends DashboardPost {
   actionDisabled?: boolean;
   favoriteDisabled?: boolean;
   imagePriority?: boolean;
-  onLike?: (id: string) => void;
-  onDislike?: (id: string) => void;
-  onFavorite?: (post: Pick<DashboardPost, "id" | "title" | "image">) => void;
-  onOpen?: (id: string) => void;
+  onLike?: (post: DashboardPost) => void;
+  onDislike?: (post: DashboardPost) => void;
+  onFavorite?: (post: Pick<DashboardPost, "id" | "title" | "image" | "recommendation">) => void;
+  onOpen?: (post: DashboardPost) => void;
   onPrefetch?: (id: string) => void;
 }
 
@@ -50,7 +50,9 @@ export const Card = memo(function Card({
   author,
   likes,
   content,
+  publishedAt,
   searchEvidence,
+  recommendation,
   likeCount = likes,
   dislikeCount = 0,
   isLiked = false,
@@ -68,13 +70,24 @@ export const Card = memo(function Card({
   const canOpenDetail =
     !id.startsWith("article-") && !id.startsWith("art_") && !id.startsWith("chk_");
   const searchTags = searchEvidence?.tags?.filter(Boolean) ?? [];
+  const currentPost: DashboardPost = {
+    id,
+    title,
+    image,
+    author,
+    likes,
+    content,
+    publishedAt,
+    searchEvidence,
+    recommendation,
+  };
 
   const handleDoubleClick = (event: MouseEvent<HTMLDivElement>) => {
     if (!canOpenDetail || isCardControlTarget(event.target)) {
       return;
     }
 
-    onOpen?.(id);
+    onOpen?.(currentPost);
   };
 
   const handlePrefetch = () => {
@@ -112,6 +125,13 @@ export const Card = memo(function Card({
               <Link
                 href={`/article/${encodeURIComponent(id)}`}
                 className="hover:text-primary underline-offset-4 hover:underline"
+                onClick={(event) => {
+                  if (!onOpen) {
+                    return;
+                  }
+                  event.preventDefault();
+                  onOpen(currentPost);
+                }}
               >
                 {title}
               </Link>
@@ -187,7 +207,7 @@ export const Card = memo(function Card({
               variant={isFavorited ? "default" : "outline"}
               size="sm"
               disabled={favoriteDisabled}
-              onClick={() => onFavorite?.({ id, title, image })}
+              onClick={() => onFavorite?.({ id, title, image, recommendation })}
               className="border-border h-8 w-full rounded-full px-3 text-xs sm:w-auto"
             >
               {isFavorited ? "已收藏" : "收藏"}
@@ -198,7 +218,7 @@ export const Card = memo(function Card({
               variant={isLiked ? "default" : "ghost"}
               size="sm"
               disabled={actionDisabled}
-              onClick={() => onLike?.(id)}
+              onClick={() => onLike?.(currentPost)}
               className="h-7 rounded-full px-2 text-xs"
             >
               赞 {likeCount}
@@ -207,7 +227,7 @@ export const Card = memo(function Card({
               variant={isDisliked ? "destructive" : "ghost"}
               size="sm"
               disabled={actionDisabled}
-              onClick={() => onDislike?.(id)}
+              onClick={() => onDislike?.(currentPost)}
               className="h-7 rounded-full px-2 text-xs"
             >
               踩 {dislikeCount}

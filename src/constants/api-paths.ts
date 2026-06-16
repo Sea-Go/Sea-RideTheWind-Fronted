@@ -137,6 +137,8 @@ const RECO_V1_PREFIX = `${RECO_BFF_PREFIX}/v1`;
 
 export const RECO_API_PATHS = {
   recommend: `${RECO_V1_PREFIX}/reco/recommend`,
+  events: `${RECO_V1_PREFIX}/reco/events`,
+  evaluationSummary: `${RECO_V1_PREFIX}/admin/reco/evaluation/summary`,
   search: `${RECO_V1_PREFIX}/search`,
   searchTitle: `${RECO_V1_PREFIX}/search/title`,
   searchAuthors: `${RECO_V1_PREFIX}/search/authors`,

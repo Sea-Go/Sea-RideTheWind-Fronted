@@ -185,6 +185,55 @@ export interface RecoHealthResponse {
   status: string;
 }
 
+export type RecoEventType =
+  | "impression"
+  | "click"
+  | "like"
+  | "dislike"
+  | "favorite"
+  | "read_complete";
+
+export interface RecoEventItem {
+  rec_request_id: string;
+  user_id?: string;
+  session_id?: string;
+  surface: string;
+  article_id: string;
+  rank?: number;
+  event_type: RecoEventType;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RecoEventPayload {
+  events: RecoEventItem[];
+}
+
+export interface RecoEventResponse {
+  accepted: number;
+}
+
+export interface RecoMetricValue {
+  key: string;
+  label: string;
+  category: string;
+  value: number;
+  unit: string;
+  description: string;
+  source: string;
+}
+
+export interface RecoEvaluationSummary {
+  surface: string;
+  window: string;
+  window_seconds: number;
+  generated_at: string;
+  request_count: number;
+  impression_count: number;
+  click_count: number;
+  conversion_count: number;
+  metric_values: RecoMetricValue[];
+}
+
 export const recommendArticles = (
   payload: RecommendArticlesPayload,
 ): Promise<RecommendArticlesResponse> =>
@@ -241,3 +290,23 @@ export const getRecoHealth = (): Promise<RecoHealthResponse> =>
   request<RecoHealthResponse>(RECO_API_PATHS.health, {
     method: "GET",
   });
+
+export const recordRecoEvents = (payload: RecoEventPayload): Promise<RecoEventResponse> =>
+  request<RecoEventResponse>(RECO_API_PATHS.events, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const getRecoEvaluationSummary = ({
+  surface = "dashboard_recommend",
+  window = "24h",
+}: {
+  surface?: string;
+  window?: string;
+} = {}): Promise<RecoEvaluationSummary> =>
+  request<RecoEvaluationSummary>(
+    `${RECO_API_PATHS.evaluationSummary}?surface=${encodeURIComponent(surface)}&window=${encodeURIComponent(window)}`,
+    {
+      method: "GET",
+    },
+  );

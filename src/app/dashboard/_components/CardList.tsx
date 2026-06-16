@@ -44,6 +44,7 @@ import {
   resolveReactionFinalState,
   toLikeState,
 } from "@/services/like";
+import { type RecoEventType, recordRecoEvents } from "@/services/reco";
 import type {
   DashboardAuthorSearchResult,
   DashboardFeedResponse,
@@ -274,6 +275,34 @@ const canOpenDashboardPost = (postId: string): boolean =>
 
 const buildArticleDetailHref = (postId: string): string => `/article/${encodeURIComponent(postId)}`;
 
+const trackRecommendationEvent = (
+  post: Pick<DashboardPost, "id" | "recommendation">,
+  eventType: RecoEventType,
+  metadata?: Record<string, unknown>,
+): void => {
+  const recommendation = post.recommendation;
+  if (!recommendation?.recRequestId || !canFetchArticleDetail(post.id)) {
+    return;
+  }
+
+  void recordRecoEvents({
+    events: [
+      {
+        rec_request_id: recommendation.recRequestId,
+        user_id: recommendation.userId,
+        session_id: recommendation.sessionId,
+        surface: recommendation.surface,
+        article_id: post.id,
+        rank: recommendation.rank,
+        event_type: eventType,
+        metadata,
+      },
+    ],
+  }).catch((error) => {
+    console.warn("Failed to record recommendation event:", error);
+  });
+};
+
 const buildAuthorDetailHref = (authorResult: DashboardAuthorSearchResult): string =>
   `/author/${encodeURIComponent(authorResult.authorId)}?name=${encodeURIComponent(authorResult.authorName)}`;
 
@@ -376,7 +405,7 @@ export const CardList = ({
   const [authorIdMap, setAuthorIdMap] = useState<Record<string, string>>({});
   const [favoriteDialogPost, setFavoriteDialogPost] = useState<Pick<
     DashboardPost,
-    "id" | "title" | "image"
+    "id" | "title" | "image" | "recommendation"
   > | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [refreshFeedbackTick, setRefreshFeedbackTick] = useState(0);
@@ -650,7 +679,8 @@ export const CardList = ({
     }
   };
 
-  const handleReaction = async (postId: string, targetState: ReactionTarget) => {
+  const handleReaction = async (post: DashboardPost, targetState: ReactionTarget) => {
+    const postId = post.id;
     if (!token) {
       setActionMessage("\u8bf7\u5148\u767b\u5f55\u540e\u518d\u4e92\u52a8");
       return;
@@ -716,6 +746,11 @@ export const CardList = ({
           busy: false,
         },
       }));
+      if (finalState === LIKE_STATE.LIKED) {
+        trackRecommendationEvent(post, "like");
+      } else if (finalState === LIKE_STATE.DISLIKED) {
+        trackRecommendationEvent(post, "dislike");
+      }
     } catch (error) {
       console.warn("Failed to react post:", error);
       const synced = await syncPostReaction(postId, currentMeta);
@@ -732,15 +767,17 @@ export const CardList = ({
     }
   };
 
-  const handleLike = async (postId: string) => {
-    await handleReaction(postId, LIKE_STATE.LIKED);
+  const handleLike = async (post: DashboardPost) => {
+    await handleReaction(post, LIKE_STATE.LIKED);
   };
 
-  const handleDislike = async (postId: string) => {
-    await handleReaction(postId, LIKE_STATE.DISLIKED);
+  const handleDislike = async (post: DashboardPost) => {
+    await handleReaction(post, LIKE_STATE.DISLIKED);
   };
 
-  const handleFavorite = async (post: Pick<DashboardPost, "id" | "title" | "image">) => {
+  const handleFavorite = async (
+    post: Pick<DashboardPost, "id" | "title" | "image" | "recommendation">,
+  ) => {
     if (!token) {
       setActionMessage("请先登录后再收藏");
       return;
@@ -792,12 +829,14 @@ export const CardList = ({
   };
 
   const openPostDetail = useCallback(
-    (postId: string) => {
+    (post: DashboardPost) => {
+      const postId = post.id;
       if (!canOpenDashboardPost(postId)) {
         return;
       }
 
       const href = buildArticleDetailHref(postId);
+      trackRecommendationEvent(post, "click");
       markNavigationStart(href);
       router.push(href);
     },
@@ -1118,6 +1157,9 @@ export const CardList = ({
             busy: false,
           },
         }));
+        trackRecommendationEvent(favoriteDialogPost, "favorite", {
+          favorite_id: favorite.favoriteId,
+        });
         setActionMessage("已加入收藏夹");
         setFavoriteDialogPost(null);
       }}
@@ -1313,7 +1355,7 @@ export const CardList = ({
           if (isCardControlTarget(event.target)) {
             return;
           }
-          openPostDetail(post.id);
+          openPostDetail(post);
         }}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -1398,7 +1440,7 @@ export const CardList = ({
               disabled={meta?.busy}
               onClick={(event) => {
                 event.stopPropagation();
-                void handleLike(post.id);
+                void handleLike(post);
               }}
               className="h-7 rounded-full px-2"
               aria-label="点赞"
@@ -1412,7 +1454,7 @@ export const CardList = ({
               disabled={meta?.busy}
               onClick={(event) => {
                 event.stopPropagation();
-                void handleDislike(post.id);
+                void handleDislike(post);
               }}
               className="h-7 rounded-full px-2"
               aria-label="点踩"
@@ -1426,7 +1468,12 @@ export const CardList = ({
               disabled={favoriteMeta?.busy}
               onClick={(event) => {
                 event.stopPropagation();
-                void handleFavorite({ id: post.id, title: post.title, image: post.image });
+                void handleFavorite({
+                  id: post.id,
+                  title: post.title,
+                  image: post.image,
+                  recommendation: post.recommendation,
+                });
               }}
               className="border-border h-7 rounded-full px-2"
               aria-label={favoriteMeta?.favorited ? "取消收藏" : "收藏"}
