@@ -653,13 +653,13 @@
   color: rgb(226 236 249);
 }
 
+.travel-map-canvas-night .leaflet-control-attribution a {
+  color: rgb(147 197 253);
+}
+
 .travel-map-canvas-night .leaflet-control-zoom a:hover {
   background: rgb(30 41 59 / 94%);
   color: #fff;
-}
-
-.travel-map-canvas-night .leaflet-control-attribution a {
-  color: rgb(147 197 253);
 }
 
 .travel-map-canvas-night .travel-leaflet-popup .leaflet-popup-content-wrapper,

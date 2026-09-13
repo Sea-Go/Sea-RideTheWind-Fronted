@@ -24,6 +24,9 @@ const INVALID_ID_PREFIX = "article-";
 const SEARCH_TOP_K = 20;
 const RECOMMEND_SURFACE = "dashboard_recommend";
 const RECO_FRESH_TTL_MS = 5 * 60 * 1000;
+const USER_LOOKUP_TIMEOUT_MS = 800;
+const RECOMMEND_TIMEOUT_MS = 1500;
+const DASHBOARD_CONTENT_PREVIEW_LENGTH = 220;
 const SEARCH_MODE_LABEL_MAP: Record<DashboardSearchMode, string> = {
   content: "内容搜索",
   title: "标题搜索",
@@ -81,6 +84,24 @@ const splitTagText = (value: unknown): string[] => {
         .map((item) => item.trim())
         .filter(Boolean)
     : [];
+};
+
+const stripPreviewMarkup = (value: string): string =>
+  value
+    .replace(/<[^>]+>/g, " ")
+    .replace(/[#>*_`~\-[\](){}|\\]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const toContentPreview = (value: unknown): string => {
+  const text = stripPreviewMarkup(toTrimmedString(value));
+  if (!text) {
+    return "";
+  }
+  if (text.length <= DASHBOARD_CONTENT_PREVIEW_LENGTH) {
+    return text;
+  }
+  return `${text.slice(0, DASHBOARD_CONTENT_PREVIEW_LENGTH).trim()}...`;
 };
 
 const pickFirstArray = (value: unknown): unknown[] => {
@@ -171,6 +192,25 @@ const internalRequest = async <T>(
   return raw ? (payload as T) : unwrapPayload<T>(payload);
 };
 
+const withTimeoutSignal = async <T>(
+  timeoutMs: number,
+  run: (signal: AbortSignal) => Promise<T>,
+): Promise<T> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    return await run(controller.signal);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+const isAbortError = (error: unknown): boolean =>
+  error instanceof Error && error.name === "AbortError";
+
 const getInternalOrigin = (request: NextRequest): string => {
   const configured = process.env.NEXT_SERVER_INTERNAL_ORIGIN?.trim();
   if (configured) {
@@ -193,17 +233,18 @@ const getCurrentUserId = async (
   }
 
   try {
-    const profile = await internalRequest<{ user?: { uid?: unknown } }>(
-      origin,
-      USER_CENTER_API_PATHS.getUser,
-      {
+    const profile = await withTimeoutSignal(USER_LOOKUP_TIMEOUT_MS, (signal) =>
+      internalRequest<{ user?: { uid?: unknown } }>(origin, USER_CENTER_API_PATHS.getUser, {
         method: "GET",
         headers: buildHeaders(authorization, false),
-      },
+        signal,
+      }),
     );
     return toTrimmedString(profile.user?.uid) || null;
   } catch (error) {
-    console.warn("Dashboard feed fallback to guest user:", error);
+    if (!isAbortError(error)) {
+      console.warn("Dashboard feed fallback to guest user:", error);
+    }
     return null;
   }
 };
@@ -357,7 +398,7 @@ const toDashboardPost = (
     `${INVALID_ID_PREFIX}${index}`;
   const title = toTrimmedString(article.title) || toTrimmedString(article.brief) || FALLBACK_TITLE;
   const content =
-    toTrimmedString(article.brief) || toTrimmedString(article.content) || FALLBACK_CONTENT;
+    toContentPreview(article.brief) || toContentPreview(article.content) || FALLBACK_CONTENT;
   const image = toTrimmedString(article.cover_image_url ?? article.cover) || null;
   const likes =
     typeof article.like_count === "number"
@@ -641,16 +682,29 @@ const loadRecommendFeed = async ({
 
   const task = (async () => {
     const recommendPayload = buildRecommendPayload(userId, sessionId);
-    const payload = await internalRequest<unknown>(origin, RECO_API_PATHS.recommend, {
-      method: "POST",
-      headers: buildHeaders(null),
-      body: JSON.stringify(recommendPayload),
-    });
-    const recoRecord = extractSearchDataRecord(payload);
-    const recRequestId =
-      toTrimmedString(recoRecord?.rec_request_id) || recommendPayload.rec_request_id;
-    const ids = extractRecommendIds(payload);
-    const explanation = toTrimmedString(recoRecord?.explanation);
+    let recRequestId = recommendPayload.rec_request_id;
+    let ids: string[] = [];
+    let explanation = "";
+
+    try {
+      const payload = await withTimeoutSignal(RECOMMEND_TIMEOUT_MS, (signal) =>
+        internalRequest<unknown>(origin, RECO_API_PATHS.recommend, {
+          method: "POST",
+          headers: buildHeaders(null),
+          body: JSON.stringify(recommendPayload),
+          signal,
+        }),
+      );
+      const recoRecord = extractSearchDataRecord(payload);
+      recRequestId = toTrimmedString(recoRecord?.rec_request_id) || recommendPayload.rec_request_id;
+      ids = extractRecommendIds(payload);
+      explanation = toTrimmedString(recoRecord?.explanation);
+    } catch (error) {
+      if (!isAbortError(error)) {
+        console.warn("Dashboard recommend feed failed, using latest articles fallback:", error);
+      }
+    }
+
     const hydrated = await Promise.all(
       ids.map((articleId, index) => hydrateArticle(origin, articleId, authorization, index)),
     );

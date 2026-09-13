@@ -59,15 +59,6 @@ const baseNavItems = [
   { href: "/profile", label: "个人中心", icon: UserIcon },
 ];
 
-const PRIMARY_PREFETCH_PATHS = [
-  USER_HOME_PATH,
-  "/dashboard/hot",
-  "/dashboard/travel-agent",
-  "/post",
-  "/profile",
-] as const;
-const SECONDARY_PREFETCH_PATHS = ["/profile/articles", "/messages", "/profile/favorites"] as const;
-
 interface HeaderAuthState {
   hasAdminSession: boolean;
   hasUserSession: boolean;
@@ -106,8 +97,18 @@ export const Header = () => {
   const shouldApplyTheme = shouldApplyFrontendTheme(pathname);
   const [authState, setAuthState] = useState<HeaderAuthState>(EMPTY_AUTH_STATE);
   const [profileThemeId, setProfileThemeId] = useState(DEFAULT_PROFILE_THEME_ID);
-  const [isAboutOpen, setIsAboutOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [aboutDialogPathname, setAboutDialogPathname] = useState<string | null>(null);
+  const [mobileMenuPathname, setMobileMenuPathname] = useState<string | null>(null);
+  const isAboutOpen = aboutDialogPathname === pathname;
+  const isMobileMenuOpen = mobileMenuPathname === pathname;
+
+  const closeMobileMenu = () => {
+    setMobileMenuPathname(null);
+  };
+
+  const setAboutOpen = (open: boolean) => {
+    setAboutDialogPathname(open ? pathname : null);
+  };
 
   const navItems = useMemo(
     () =>
@@ -199,20 +200,23 @@ export const Header = () => {
   }, [isMobileMenuOpen]);
 
   useEffect(() => {
-    PRIMARY_PREFETCH_PATHS.forEach((href) => {
-      router.prefetch(href);
-    });
-  }, [router]);
-
-  useEffect(() => {
-    if (!isMobileMenuOpen) {
+    if (typeof window === "undefined") {
       return;
     }
 
-    SECONDARY_PREFETCH_PATHS.forEach((href) => {
-      router.prefetch(href);
-    });
-  }, [isMobileMenuOpen, router]);
+    const desktopQuery = window.matchMedia("(min-width: 1024px)");
+    const closeMenuOnDesktop = () => {
+      if (desktopQuery.matches) {
+        setMobileMenuPathname(null);
+      }
+    };
+
+    desktopQuery.addEventListener("change", closeMenuOnDesktop);
+
+    return () => {
+      desktopQuery.removeEventListener("change", closeMenuOnDesktop);
+    };
+  }, []);
 
   const profileTheme = shouldApplyTheme ? profileThemeMap[profileThemeId] : null;
 
@@ -225,7 +229,7 @@ export const Header = () => {
     clearAuthToken();
     clearAdminAuthToken();
     setAuthState(EMPTY_AUTH_STATE);
-    setIsMobileMenuOpen(false);
+    closeMobileMenu();
     markNavigationStart(nextLoginPath);
     router.push(nextLoginPath);
   };
@@ -252,7 +256,10 @@ export const Header = () => {
               ? "bg-primary text-primary-foreground shadow-primary/20 shadow-lg"
               : "text-muted-foreground hover:bg-accent/80 hover:text-primary hover:shadow-sm",
           )}
-          onClick={mode === "mobile" ? () => setIsMobileMenuOpen(false) : undefined}
+          prefetch={false}
+          onFocus={mode === "desktop" ? () => router.prefetch(item.href) : undefined}
+          onPointerEnter={mode === "desktop" ? () => router.prefetch(item.href) : undefined}
+          onClick={mode === "mobile" ? closeMobileMenu : undefined}
         >
           <Icon className={mode === "desktop" ? "h-5 w-5" : "h-5 w-5 shrink-0"} />
           <span>{item.label}</span>
@@ -269,8 +276,8 @@ export const Header = () => {
           mode === "desktop" ? "h-auto w-full px-4 py-3 text-sm" : "h-12 w-full px-4 text-base",
         )}
         onClick={() => {
-          setIsMobileMenuOpen(false);
-          setIsAboutOpen(true);
+          closeMobileMenu();
+          setAboutOpen(true);
         }}
       >
         <InfoIcon className="h-5 w-5" />
@@ -341,7 +348,11 @@ export const Header = () => {
               size="icon"
               className="rounded-full"
               aria-label={isMobileMenuOpen ? "关闭菜单" : "打开菜单"}
-              onClick={() => setIsMobileMenuOpen((open) => !open)}
+              onClick={() => {
+                setMobileMenuPathname((openPathname) =>
+                  openPathname === pathname ? null : pathname,
+                );
+              }}
             >
               {isMobileMenuOpen ? <XIcon className="h-5 w-5" /> : <MenuIcon className="h-5 w-5" />}
             </Button>
@@ -355,7 +366,7 @@ export const Header = () => {
             type="button"
             className="absolute inset-0 bg-black/45 backdrop-blur-sm"
             aria-label="关闭菜单蒙层"
-            onClick={() => setIsMobileMenuOpen(false)}
+            onClick={closeMobileMenu}
           />
           <div
             className="border-border/75 bg-card/95 absolute inset-y-0 right-0 flex w-[min(88vw,22rem)] flex-col border-l shadow-2xl shadow-black/15 backdrop-blur-xl"
@@ -375,7 +386,7 @@ export const Header = () => {
                 size="icon"
                 className="rounded-full"
                 aria-label="关闭菜单"
-                onClick={() => setIsMobileMenuOpen(false)}
+                onClick={closeMobileMenu}
               >
                 <XIcon className="h-5 w-5" />
               </Button>
@@ -426,7 +437,7 @@ export const Header = () => {
       {isAboutOpen ? (
         <HeaderAboutDialog
           open={isAboutOpen}
-          onOpenChange={setIsAboutOpen}
+          onOpenChange={setAboutOpen}
           themeStyle={profileTheme?.style}
         />
       ) : null}

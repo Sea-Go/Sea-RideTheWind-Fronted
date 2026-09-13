@@ -93,13 +93,13 @@
 
 .travel-chat-markdown-user.article-markdown .markdown-body code {
   color: hsl(var(--primary-foreground));
-  background: rgb(255 255 255 / 0.18);
+  background: rgb(255 255 255 / 18%);
 }
 
 .travel-chat-markdown-user.article-markdown .markdown-body pre,
 .travel-chat-markdown-user.article-markdown .markdown-body blockquote,
 .travel-chat-markdown-user.article-markdown .markdown-body th,
 .travel-chat-markdown-user.article-markdown .markdown-body td {
-  border-color: rgb(255 255 255 / 0.28);
-  background: rgb(255 255 255 / 0.12);
+  border-color: rgb(255 255 255 / 28%);
+  background: rgb(255 255 255 / 12%);
 }

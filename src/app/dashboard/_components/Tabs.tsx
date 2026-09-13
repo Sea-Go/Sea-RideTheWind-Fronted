@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 
 import type { DashboardTabSlug } from "@/app/dashboard/_constants/tabs";
 import { Button } from "@/components/ui/button";
@@ -22,12 +22,6 @@ export const Tabs = ({ tabs }: TabsProps) => {
     },
     [router],
   );
-
-  useEffect(() => {
-    tabs.forEach((tab) => {
-      prefetchTab(tab.slug);
-    });
-  }, [prefetchTab, tabs]);
 
   return (
     <div className="scrollbar-hide mb-6 flex gap-3 overflow-x-auto pb-1">
@@ -50,7 +44,7 @@ export const Tabs = ({ tabs }: TabsProps) => {
           >
             <Link
               href={href}
-              prefetch
+              prefetch={false}
               onFocus={() => prefetchTab(tab.slug)}
               onPointerEnter={() => prefetchTab(tab.slug)}
             >

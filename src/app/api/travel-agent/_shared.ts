@@ -5,6 +5,7 @@ import { USER_CENTER_API_PATHS } from "@/constants/api-paths";
 
 const USER_TOKEN_COOKIE_KEY = "user_center_token";
 const ADMIN_TOKEN_COOKIE_KEY = "admin_center_token";
+const USER_LOOKUP_TIMEOUT_MS = 800;
 
 export const getTravelAgentServerUrl = (): string => {
   const value = process.env.TRAVEL_AGENT_SERVER_URL?.trim();
@@ -38,21 +39,47 @@ export const appendUserId = (url: URL, userId: string): URL => {
 };
 
 const resolveUserUid = async (request: NextRequest, token: string): Promise<string | null> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, USER_LOOKUP_TIMEOUT_MS);
+
   try {
-    const response = await fetch(new URL(USER_CENTER_API_PATHS.getUser, request.nextUrl.origin), {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-    });
+    const response = await fetch(
+      new URL(USER_CENTER_API_PATHS.getUser, getInternalOrigin(request)),
+      {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+        signal: controller.signal,
+      },
+    );
     if (!response.ok) {
       return null;
     }
     const payload = (await response.json()) as unknown;
     return extractUid(payload);
   } catch (error) {
-    console.warn("Travel agent fallback to token scoped history:", error);
+    if (!(error instanceof Error && error.name === "AbortError")) {
+      console.warn("Travel agent fallback to token scoped history:", error);
+    }
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
+};
+
+const getInternalOrigin = (request: NextRequest): string => {
+  const configured = process.env.NEXT_SERVER_INTERNAL_ORIGIN?.trim();
+  if (configured) {
+    return configured.replace(/\/+$/, "");
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    return `http://127.0.0.1:${process.env.PORT?.trim() || "3000"}`;
+  }
+
+  return request.nextUrl.origin;
 };
 
 const extractUid = (payload: unknown): string | null => {

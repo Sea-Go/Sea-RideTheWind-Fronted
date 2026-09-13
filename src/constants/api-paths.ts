@@ -134,6 +134,10 @@ export const TASK_CENTER_API_PATHS = {
 // ─── 推荐服务（通过 BFF: /api/reco/*）─────────────────────────────────────
 const RECO_BFF_PREFIX = "/api/reco";
 const RECO_V1_PREFIX = `${RECO_BFF_PREFIX}/v1`;
+// 新版网关前缀（与 11 个 proto 契约对齐：用户前台 /api/v1/v2/reco/*，管理员 /api/v1/v2/admin/*）
+const RECO_V2_PREFIX = "/api/v1/v2";
+const RECO_V2_RECO_PREFIX = `${RECO_V2_PREFIX}/reco`;
+const RECO_V2_ADMIN_PREFIX = `${RECO_V2_PREFIX}/admin`;
 
 export const RECO_API_PATHS = {
   recommend: `${RECO_V1_PREFIX}/reco/recommend`,
@@ -146,4 +150,76 @@ export const RECO_API_PATHS = {
   ingest: `${RECO_V1_PREFIX}/docs/ingest`,
   tools: `${RECO_V1_PREFIX}/tools`,
   health: `${RECO_BFF_PREFIX}/health`,
+  // 新增：v1/v2 契约对齐的用户前台路径
+  recommendStream: `${RECO_V2_RECO_PREFIX}/recommend/stream`,
+  channels: `${RECO_V2_RECO_PREFIX}/channels`,
+  profileMe: `${RECO_V2_RECO_PREFIX}/profile/me`,
+} as const;
+
+// ─── 推荐管理服务（通过 Sea-RideTheWind 网关: /api/v1/v2/admin/*）──────────
+export const ADMIN_RECO_API_PATHS = {
+  // 频道管理
+  listChannelsAdmin: `${RECO_V2_ADMIN_PREFIX}/channels`,
+  createChannel: `${RECO_V2_ADMIN_PREFIX}/channels`,
+  getChannel: (name: string) =>
+    `${RECO_V2_ADMIN_PREFIX}/channels/${encodeURIComponent(name)}`,
+  updateChannel: (name: string) =>
+    `${RECO_V2_ADMIN_PREFIX}/channels/${encodeURIComponent(name)}`,
+  deleteChannel: (name: string) =>
+    `${RECO_V2_ADMIN_PREFIX}/channels/${encodeURIComponent(name)}`,
+  // 质量管理
+  evaluateQuality: `${RECO_V2_ADMIN_PREFIX}/quality/evaluate`,
+  batchEvaluateQuality: `${RECO_V2_ADMIN_PREFIX}/quality/evaluate/batch`,
+  submitQualityFeedback: `${RECO_V2_ADMIN_PREFIX}/quality/feedback`,
+  listQualityFeedback: `${RECO_V2_ADMIN_PREFIX}/quality/feedback`,
+  getQualityReport: (articleId: string) =>
+    `${RECO_V2_ADMIN_PREFIX}/quality/report/${encodeURIComponent(articleId)}`,
+  // 重排管理
+  listRerankModels: `${RECO_V2_ADMIN_PREFIX}/rerank/models`,
+  getModelVersion: `${RECO_V2_ADMIN_PREFIX}/rerank/version`,
+  updateModelVersion: `${RECO_V2_ADMIN_PREFIX}/rerank/version`,
+  getRerankABTest: `${RECO_V2_ADMIN_PREFIX}/rerank/abtest`,
+  updateRerankABTest: `${RECO_V2_ADMIN_PREFIX}/rerank/abtest`,
+  rerankInfer: `${RECO_V2_ADMIN_PREFIX}/rerank/infer`,
+  // 协同过滤管理
+  getCFConfig: `${RECO_V2_ADMIN_PREFIX}/cf/config`,
+  updateCFConfig: `${RECO_V2_ADMIN_PREFIX}/cf/config`,
+  getSimilarUsers: `${RECO_V2_ADMIN_PREFIX}/cf/similar/users`,
+  getSimilarItems: `${RECO_V2_ADMIN_PREFIX}/cf/similar/items`,
+  // 画像管理
+  getProfileAdmin: (userId: string) =>
+    `${RECO_V2_ADMIN_PREFIX}/profile/${encodeURIComponent(userId)}`,
+  tuneProfile: `${RECO_V2_ADMIN_PREFIX}/profile/tune`,
+  // 评估管理
+  listEvalCases: `${RECO_V2_ADMIN_PREFIX}/eval/cases`,
+  createEvalCase: `${RECO_V2_ADMIN_PREFIX}/eval/cases`,
+  deleteEvalCase: (caseId: string) =>
+    `${RECO_V2_ADMIN_PREFIX}/eval/cases/${encodeURIComponent(caseId)}`,
+  runEval: `${RECO_V2_ADMIN_PREFIX}/eval/run`,
+  getEvalReport: `${RECO_V2_ADMIN_PREFIX}/eval/reports/drift`,
+  submitAnnotation: `${RECO_V2_ADMIN_PREFIX}/eval/annotate`,
+  // CPU 管理
+  getCPUProfile: `${RECO_V2_ADMIN_PREFIX}/cpu/profile`,
+  getPProf: `${RECO_V2_ADMIN_PREFIX}/cpu/pprof`,
+  listPools: `${RECO_V2_ADMIN_PREFIX}/cpu/pools`,
+  listCacheStats: `${RECO_V2_ADMIN_PREFIX}/cpu/cache`,
+  getMaxprocs: `${RECO_V2_ADMIN_PREFIX}/cpu/maxprocs`,
+  updateMaxprocs: `${RECO_V2_ADMIN_PREFIX}/cpu/maxprocs`,
+  // 图谱管理
+  queryGraph: `${RECO_V2_ADMIN_PREFIX}/graph/query`,
+  executeCypher: `${RECO_V2_ADMIN_PREFIX}/graph/cypher`,
+  recallByGraph: `${RECO_V2_ADMIN_PREFIX}/graph/recall`,
+  entityLink: `${RECO_V2_ADMIN_PREFIX}/graph/entity_link`,
+  imageSearch: `${RECO_V2_ADMIN_PREFIX}/graph/image_search`,
+  getGraphSchema: `${RECO_V2_ADMIN_PREFIX}/graph/schema`,
+  // Skill 管理
+  listSkills: `${RECO_V2_ADMIN_PREFIX}/skill/list`,
+  getSkill: (name: string) =>
+    `${RECO_V2_ADMIN_PREFIX}/skill/${encodeURIComponent(name)}`,
+  registerSkill: `${RECO_V2_ADMIN_PREFIX}/skill/register`,
+  unregisterSkill: (name: string) =>
+    `${RECO_V2_ADMIN_PREFIX}/skill/${encodeURIComponent(name)}`,
+  invokeSkill: `${RECO_V2_ADMIN_PREFIX}/skill/invoke`,
+  enableSkill: (name: string) =>
+    `${RECO_V2_ADMIN_PREFIX}/skill/${encodeURIComponent(name)}/enable`,
 } as const;
