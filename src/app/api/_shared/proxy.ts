@@ -46,14 +46,16 @@ const buildResponseHeaders = (response: Response): Headers => {
   if (contentType) {
     headers.set("content-type", contentType);
   }
+  if (contentType?.includes("text/event-stream")) {
+    headers.set("Cache-Control", "no-cache, no-transform");
+    headers.set("X-Accel-Buffering", "no");
+  }
   return headers;
 };
 
 export const createProxyHandler = (
   options: CreateProxyHandlerOptions,
 ): ((request: NextRequest, context: ProxyRouteContext) => Promise<Response>) => {
-  const serverUrl = getRequiredServerUrl(options.envVarName, options.proxyName);
-
   return async (request: NextRequest, context: ProxyRouteContext): Promise<Response> => {
     const { path } = await context.params;
     const upstreamPath = options.resolveUpstreamPath(path);
@@ -67,17 +69,18 @@ export const createProxyHandler = (
 
     const method = request.method.toUpperCase();
     const upstreamBody = BODYLESS_METHODS.has(method) ? undefined : await request.arrayBuffer();
-    const upstreamUrl = `${serverUrl}${upstreamPath}${request.nextUrl.search}`;
-
     try {
+      const serverUrl = getRequiredServerUrl(options.envVarName, options.proxyName);
+      const upstreamUrl = `${serverUrl}${upstreamPath}${request.nextUrl.search}`;
       const upstreamResponse = await fetch(upstreamUrl, {
         method,
         headers: buildUpstreamHeaders(request),
         body: upstreamBody && upstreamBody.byteLength > 0 ? upstreamBody : undefined,
         cache: "no-store",
+        signal: request.signal,
       });
 
-      return new Response(await upstreamResponse.arrayBuffer(), {
+      return new Response(upstreamResponse.body, {
         status: upstreamResponse.status,
         statusText: upstreamResponse.statusText,
         headers: buildResponseHeaders(upstreamResponse),

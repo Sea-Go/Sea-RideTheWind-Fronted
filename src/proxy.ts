@@ -9,6 +9,13 @@ const PUBLIC_USER_ROUTES = new Set([USER_LOGIN_ROUTE]);
 
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+  const isDemoPage =
+    process.env.SEA_ENABLE_DEMO === "1" &&
+    request.nextUrl.searchParams.get("demo") === "1" &&
+    (/^\/(?:community|knowledge|learn|search|interests|editor|companion)(?:\/|$)/.test(pathname) ||
+      pathname === "/" ||
+      /^\/article\/demo-/.test(pathname));
+  if (isDemoPage) return NextResponse.next();
   const userToken = request.cookies.get(USER_TOKEN_COOKIE_KEY)?.value;
   const adminToken = request.cookies.get(ADMIN_TOKEN_COOKIE_KEY)?.value;
 

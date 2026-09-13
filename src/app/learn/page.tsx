@@ -1,9 +1,9 @@
-import { HomePage } from "@/features/sea/pages/HomePage";
+import { LearnPage } from "@/features/sea/pages/LearnPage";
 import { SeaRoute, type SeaSearchParams } from "@/features/sea/route-context";
 export default function Page({ searchParams }: { searchParams: SeaSearchParams }) {
   return (
     <SeaRoute searchParams={searchParams}>
-      <HomePage />
+      <LearnPage />
     </SeaRoute>
   );
 }

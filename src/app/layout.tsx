@@ -6,7 +6,7 @@ import { FrontendThemeProvider } from "@/components/profile/FrontendThemeProvide
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "识海社区",
+  title: "Sea 识海 · 与世界保持好奇",
   description: "识海社区中文内容平台",
 };
 
