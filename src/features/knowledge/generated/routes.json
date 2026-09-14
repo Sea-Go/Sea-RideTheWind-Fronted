@@ -13,6 +13,14 @@
   },
   {
     "method": "POST",
+    "path": "knowledge/answer-sessions/{session_id}/searches"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/answer-sessions/{session_id}/searches/{search_id}"
+  },
+  {
+    "method": "POST",
     "path": "knowledge/builds/{build_id}/cancel"
   },
   {
