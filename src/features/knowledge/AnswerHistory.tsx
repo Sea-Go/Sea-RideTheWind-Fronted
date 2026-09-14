@@ -16,6 +16,7 @@ import {
   knowledgeAnswerHistory,
   type ProductAnswerCitationStates,
 } from "./api";
+import { ProductSearchForm } from "./ProductSearchForm";
 
 import "./knowledge.css";
 
@@ -28,17 +29,18 @@ const subscribeSession = (change: () => void) => {
   };
 };
 
-export function AnswerHistoryEntry() {
+export function AnswerHistoryEntry({ moduleId = "" }: { moduleId?: string }) {
   const router = useRouter();
   const [sessionId, setSessionId] = useState("");
+  const moduleQuery = moduleId ? `?module_id=${encodeURIComponent(moduleId)}` : "";
   return (
     <div className="sea-content knowledge-answer-history">
       <SeaLink href="/knowledge">← 返回知识书架</SeaLink>
       <div className="sea-page-heading">
         <div>
           <span className="sea-eyebrow">ACCEPTED ANSWERS</span>
-          <h1>已接纳的知识问答</h1>
-          <p>输入已有的知识问答会话 ID，读取该会话中已正式接纳的答案。</p>
+          <h1>知识问答</h1>
+          <p>新建知识问答会话，或继续查看已有会话中已正式接纳的答案。</p>
         </div>
       </div>
       <form
@@ -46,7 +48,7 @@ export function AnswerHistoryEntry() {
         onSubmit={(event: FormEvent<HTMLFormElement>) => {
           event.preventDefault();
           const id = sessionId.trim();
-          if (id) router.push(`/knowledge/answer-sessions/${encodeURIComponent(id)}`);
+          if (id) router.push(`/knowledge/answer-sessions/${encodeURIComponent(id)}${moduleQuery}`);
         }}
       >
         <label htmlFor="knowledge-answer-session">知识问答会话 ID</label>
@@ -59,11 +61,19 @@ export function AnswerHistoryEntry() {
             required
           />
           <button className="sea-button" type="submit">
-            查看历史
+            进入会话
           </button>
         </div>
       </form>
-      <Notice>当前学习对话尚未提供与知识问答会话的关联入口。请使用已获得的知识问答会话 ID。</Notice>
+      <button
+        className="sea-button"
+        onClick={() =>
+          router.push(`/knowledge/answer-sessions/session_${crypto.randomUUID()}${moduleQuery}`)
+        }
+      >
+        新建知识问答会话
+      </button>
+      <Notice>当前学习对话尚未提供与知识问答会话的关联入口。已有会话请使用原会话 ID。</Notice>
     </div>
   );
 }
@@ -144,9 +154,11 @@ function AnswerCard({
 export function AnswerHistory({
   sessionId,
   answerId = "",
+  moduleId = "",
 }: {
   sessionId: string;
   answerId?: string;
+  moduleId?: string;
 }) {
   const token = useSyncExternalStore(subscribeSession, getAuthToken, () => null);
   if (!token)
@@ -163,11 +175,23 @@ export function AnswerHistory({
       key={`${token}/${sessionId}/${answerId}`}
       sessionId={sessionId}
       answerId={answerId}
+      token={token}
+      moduleId={moduleId}
     />
   );
 }
 
-function AuthorizedAnswerHistory({ sessionId, answerId }: { sessionId: string; answerId: string }) {
+function AuthorizedAnswerHistory({
+  sessionId,
+  answerId,
+  token,
+  moduleId,
+}: {
+  sessionId: string;
+  answerId: string;
+  token: string;
+  moduleId: string;
+}) {
   const [items, setItems] = useState<AcceptedAnswer[]>([]);
   const [single, setSingle] = useState<AcceptedAnswer | null>(null);
   const [citationStates, setCitationStates] = useState<ProductAnswerCitationStates | null>(null);
@@ -258,6 +282,7 @@ function AuthorizedAnswerHistory({ sessionId, answerId }: { sessionId: string; a
           <p className="knowledge-id">会话：{sessionId}</p>
         </div>
       </div>
+      {!answerId && <ProductSearchForm sessionId={sessionId} token={token} moduleId={moduleId} />}
       <Notice>
         这里保存的是当时已接纳的答案。来源撤回后，历史答案仍保留；请以详情页的当前引用状态判断来源是否仍可读。
       </Notice>

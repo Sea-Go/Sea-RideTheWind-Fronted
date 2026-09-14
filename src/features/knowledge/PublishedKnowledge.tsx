@@ -81,6 +81,12 @@ export function PublishedModule({ moduleId }: { moduleId: string }) {
             {snapshot.release.wiki_revision_ids.length} 个 Wiki 页
           </p>
           <p className="knowledge-id">{snapshot.release.release_id}</p>
+          <SeaLink
+            href={`/knowledge/answer-sessions?module_id=${encodeURIComponent(moduleId)}`}
+            className="sea-button"
+          >
+            向这个知识模块提问 →
+          </SeaLink>
         </div>
       </section>
       {error && <Notice error>{error}</Notice>}
