@@ -9,9 +9,11 @@ export default async function Page({
   searchParams: SeaSearchParams;
 }) {
   const { sessionId } = await params;
+  const query = await searchParams;
+  const moduleId = typeof query.module_id === "string" ? query.module_id : "";
   return (
     <SeaRoute searchParams={searchParams}>
-      <AnswerHistory key={sessionId} sessionId={sessionId} />
+      <AnswerHistory key={sessionId} sessionId={sessionId} moduleId={moduleId} />
     </SeaRoute>
   );
 }

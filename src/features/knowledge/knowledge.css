@@ -103,3 +103,64 @@
   display: block;
   overflow-wrap: anywhere;
 }
+.knowledge-search {
+  margin: 1.5rem 0;
+  padding: clamp(1rem, 3vw, 2rem);
+  border: 1px solid var(--sea-line);
+  border-radius: 1rem;
+}
+.knowledge-search h2 {
+  margin: 0.3rem 0;
+}
+.knowledge-search p {
+  margin: 0.5rem 0 1.25rem;
+}
+.knowledge-search-row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 2fr) repeat(2, minmax(8rem, 1fr));
+  gap: 1rem;
+}
+.knowledge-search label {
+  display: block;
+  margin: 0.8rem 0;
+  font-weight: 600;
+}
+.knowledge-search input,
+.knowledge-search select,
+.knowledge-search textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.45rem;
+  padding: 0.75rem;
+  border: 1px solid var(--sea-line);
+  border-radius: 0.6rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 400;
+}
+.knowledge-search textarea {
+  resize: vertical;
+}
+.knowledge-search-operation {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--sea-line);
+  border-radius: 0.75rem;
+}
+.knowledge-search-operation small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.knowledge-search-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+@media (width <= 48rem) {
+  .knowledge-search-row {
+    grid-template-columns: 1fr;
+  }
+}
