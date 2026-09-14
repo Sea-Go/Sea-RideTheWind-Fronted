@@ -40,3 +40,66 @@
   padding: 0;
   border: 0;
 }
+.knowledge-shelf-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.knowledge-answer-entry {
+  max-width: 46rem;
+  margin: 2rem 0;
+  padding: 1.5rem;
+  border: 1px solid var(--sea-line);
+  border-radius: 1rem;
+}
+.knowledge-answer-entry label {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+.knowledge-answer-entry > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.knowledge-answer-entry input {
+  flex: 1;
+  min-width: 12rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--sea-line);
+  border-radius: 0.6rem;
+  background: transparent;
+  color: inherit;
+}
+.knowledge-answer-card {
+  margin: 1.5rem 0;
+  padding: clamp(1rem, 3vw, 2rem);
+  border: 1px solid var(--sea-line);
+  border-radius: 1rem;
+}
+.knowledge-answer-card h2 {
+  margin: 1rem 0;
+}
+.knowledge-answer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+}
+.knowledge-answer-citations {
+  margin: 1.5rem 0;
+  padding: 1.25rem;
+  border: 1px solid var(--sea-line);
+  border-radius: 0.75rem;
+}
+.knowledge-answer-citations ol {
+  padding-left: 1.5rem;
+}
+.knowledge-answer-citations li {
+  margin-top: 1rem;
+}
+.knowledge-answer-citations small {
+  display: block;
+  overflow-wrap: anywhere;
+}

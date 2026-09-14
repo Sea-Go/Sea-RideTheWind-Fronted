@@ -2,6 +2,8 @@ import { getAuthToken } from "@/services/auth";
 import { request, withBearerAuthorization } from "@/services/request";
 
 import type {
+  AcceptedAnswer,
+  AcceptedAnswersPage,
   ActivateReq,
   Build,
   CancelBuildReq,
@@ -16,6 +18,7 @@ import type {
   ListModulesResp,
   ListRevisionsResp,
   Module,
+  ProductAnswerCitationStates,
   Release,
   ReleaseState,
   Revision,
@@ -99,6 +102,26 @@ export const knowledgeRead = {
   publishedRevision: (id: string, release: string, revision: string, signal?: AbortSignal) =>
     get<Revision>(
       `${modulePath(id)}/releases/${part(release)}/revisions/${part(revision)}`,
+      signal,
+    ),
+};
+
+// Product answer history is scoped by RTW to the verified User Center JWT.
+// The browser supplies only a logical session ID, pagination, and an answer ID.
+export const knowledgeAnswerHistory = {
+  list: (sessionId: string, afterOrdinal = 0, signal?: AbortSignal) =>
+    get<AcceptedAnswersPage>(
+      `answer-sessions/${part(sessionId)}/accepted-answers?limit=20${afterOrdinal ? `&after_ordinal=${afterOrdinal}` : ""}`,
+      signal,
+    ),
+  answer: (sessionId: string, answerId: string, signal?: AbortSignal) =>
+    get<AcceptedAnswer>(
+      `answer-sessions/${part(sessionId)}/accepted-answers/${part(answerId)}`,
+      signal,
+    ),
+  citationStates: (sessionId: string, answerId: string, signal?: AbortSignal) =>
+    get<ProductAnswerCitationStates>(
+      `answer-sessions/${part(sessionId)}/accepted-answers/${part(answerId)}/citations`,
       signal,
     ),
 };
