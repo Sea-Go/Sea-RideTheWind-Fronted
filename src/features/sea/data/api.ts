@@ -32,7 +32,12 @@ export async function communityPage(
     { signal },
   );
   const items = result.list ?? result.articles ?? result.items ?? result.records ?? [];
-  return { items: items.map(mapArticle), hasMore: items.length === 8 };
+  // The article list endpoint has no status filter yet. Keep review drafts and
+  // withdrawn articles out of the public feed while paging by upstream rows.
+  return {
+    items: items.filter((article) => article.status === 2).map(mapArticle),
+    hasMore: items.length === 8 && (result.total === undefined || page * 8 < result.total),
+  };
 }
 export function knowledgePage(cursor: string | undefined, signal: AbortSignal) {
   return seaRequest<{ items: KnowledgeModule[]; next_cursor?: string }>(
