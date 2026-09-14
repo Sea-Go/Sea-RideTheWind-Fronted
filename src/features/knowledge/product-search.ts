@@ -89,7 +89,13 @@ export const knowledgeProductSearch = {
   create: (sessionId: string, operation: SearchOperation, signal?: AbortSignal) =>
     requestSearch(searchPath(sessionId), {
       method: "POST",
-      body: JSON.stringify({ ...operation.input, idempotency_key: operation.idempotencyKey }),
+      body: JSON.stringify({
+        module_id: operation.input.module_id,
+        query: operation.input.query,
+        depth: operation.input.depth,
+        intelligence: operation.input.intelligence,
+        idempotency_key: operation.idempotencyKey,
+      }),
       signal,
     }),
   get: (sessionId: string, searchId: string, signal?: AbortSignal) =>
