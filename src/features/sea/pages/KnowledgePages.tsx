@@ -82,10 +82,16 @@ export function KnowledgeShelf() {
           <span className="active">全部模块</span>
           <span>原始资料 + Wiki</span>
         </div>
-        <SeaLink href="/knowledge/workbench" className="sea-text-link">
-          管理员工作台
-          <ArrowRight size={16} />
-        </SeaLink>
+        <div className="knowledge-shelf-actions">
+          <SeaLink href="/knowledge/answer-sessions" className="sea-text-link">
+            已接纳问答
+            <ArrowRight size={16} />
+          </SeaLink>
+          <SeaLink href="/knowledge/workbench" className="sea-text-link">
+            管理员工作台
+            <ArrowRight size={16} />
+          </SeaLink>
+        </div>
       </div>
       {data.error && <Notice error>知识服务暂不可用：{data.error}</Notice>}
       {data.loading && <p>正在打开书架…</p>}

@@ -27,7 +27,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pat
     request.headers.get("authorization") ||
     (request.cookies.get("user_center_token")?.value &&
       `Bearer ${request.cookies.get("user_center_token")?.value}`) ||
-    (request.cookies.get("admin_center_token")?.value &&
+    (!pathname.startsWith("knowledge/answer-sessions/") &&
+      request.cookies.get("admin_center_token")?.value &&
       `Bearer ${request.cookies.get("admin_center_token")?.value}`);
   const headers = new Headers({
     Accept: request.headers.get("accept") || "application/json",
