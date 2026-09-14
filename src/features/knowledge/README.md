@@ -64,3 +64,5 @@ KNOWLEDGE_PG_BIN=/path/to/postgresql/bin node scripts/knowledge-acceptance.cjs /
 
 验收脚本只创建随机端口的独立本地 PostgreSQL、Go/Next进程和对象目录。`KNOWLEDGE_KEEP_RUNNING=1`
 可留给人工 UI 验收；结束发送 SIGINT/SIGTERM 会停止该脚本创建的服务。日志和随机测试凭据只在临时目录，不提交远端。
+
+聚合契约补充：发布配置可明确指定sum_maxsim或mean_maxsim，页面按原值提交，不在两者之间换算。maxsim仅保留早期结构fixture的兼容输入，真实多向量模型需使用固定数学聚合与对应表示契约；BGE-M3为mean_maxsim。

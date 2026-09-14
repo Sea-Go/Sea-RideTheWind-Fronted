@@ -82,6 +82,13 @@ test("release input requires three independent, complete representation profiles
     ...(lane === "multivector" ? { mask: "attention", aggregation: "maxsim" } : {}),
   }));
   assert.deepEqual(parseProfiles(JSON.stringify(profiles)), profiles);
+  for (const aggregation of ["sum_maxsim", "mean_maxsim"]) {
+    const explicit = profiles.map((p) => p.lane === "multivector" ? { ...p, aggregation } : p);
+    assert.deepEqual(parseProfiles(JSON.stringify(explicit)), explicit);
+  }
+  const unknown = profiles.map((p) => p.lane === "multivector" ? { ...p, aggregation: "unknown" } : p);
+  assert.throws(() => parseProfiles(JSON.stringify(unknown)));
+
   assert.throws(() => parseProfiles("[]"));
   assert.throws(() => parseProfiles(JSON.stringify([profiles[0], profiles[0], profiles[2]])));
   assert.throws(() =>

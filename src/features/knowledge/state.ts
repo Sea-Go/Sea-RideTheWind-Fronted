@@ -50,8 +50,11 @@ export function parseProfiles(text: string): RetrievalProfile[] {
       [row.mask, row.aggregation].some((v) => typeof v !== "string" || !v.trim())
     )
       throw new Error("Multi-vector 还需要 mask 和 aggregation。");
-    if (row.lane === "multivector" && row.aggregation !== "maxsim")
-      throw new Error("Multi-vector 的 aggregation 必须为 maxsim。");
+    if (
+      row.lane === "multivector" &&
+      !["maxsim", "sum_maxsim", "mean_maxsim"].includes(String(row.aggregation))
+    )
+      throw new Error("Multi-vector 需指定 sum_maxsim 或 mean_maxsim；maxsim 仅保留旧结构配置。");
     if (row.lane !== "multivector" && (row.mask || row.aggregation))
       throw new Error("mask 和 aggregation 仅属于 Multi-vector。");
     lanes.add(String(row.lane));
