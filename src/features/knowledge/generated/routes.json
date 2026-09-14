@@ -24,12 +24,36 @@
     "path": "knowledge/modules/{module_id}/activation"
   },
   {
+    "method": "GET",
+    "path": "knowledge/modules/{module_id}/builds"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/modules/{module_id}/builds/{build_id}"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/modules/{module_id}/compiles"
+  },
+  {
     "method": "POST",
     "path": "knowledge/modules/{module_id}/compiles"
   },
   {
     "method": "GET",
+    "path": "knowledge/modules/{module_id}/compiles/{compile_id}"
+  },
+  {
+    "method": "GET",
     "path": "knowledge/modules/{module_id}/published"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/modules/{module_id}/published-releases/{release_id}"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/modules/{module_id}/releases"
   },
   {
     "method": "POST",
@@ -41,7 +65,23 @@
   },
   {
     "method": "GET",
+    "path": "knowledge/modules/{module_id}/releases/{release_id}"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/modules/{module_id}/releases/{release_id}/revisions"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/modules/{module_id}/releases/{release_id}/revisions/{revision_id}"
+  },
+  {
+    "method": "GET",
     "path": "knowledge/modules/{module_id}/revisions"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/modules/{module_id}/revisions/{revision_id}"
   },
   {
     "method": "POST",
@@ -62,5 +102,9 @@
   {
     "method": "GET",
     "path": "knowledge/workbench/modules"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/workbench/modules/{module_id}"
   }
 ]

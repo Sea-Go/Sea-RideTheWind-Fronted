@@ -133,7 +133,7 @@ test("BFF forwards 409 unchanged, and current state is not manufactured on error
 });
 
 function renderWorkbench(snapshot) {
-  const slots = [snapshot];
+  const slots = [{ module: { title: "测试模块", sources: 0, pages: 0 }, next: {}, ...snapshot }];
   let cursor = 0;
   const hooks = {
     useState(initial) {
@@ -174,6 +174,7 @@ function renderWorkbench(snapshot) {
     "./api": require("../src/features/knowledge/api.ts"),
     "./state": require("../src/features/knowledge/state.ts"),
     "./knowledge.css": {},
+    "./RevisionCompare": { RevisionCompare: "RevisionCompare" },
   };
   const module = { exports: {} };
   new Function("require", "module", "exports", compiled)(
@@ -237,7 +238,7 @@ for (const state of ["NOT_BUILT", "BUILDING", "FAILED", "CANCELLED", "SUPERSEDED
     } else assert.equal(button, undefined);
   });
 }
-test("metadata without source content cannot be opened as an empty editable revision", () => {
+test("editing metadata fetches a fixed body and preserves existing input on failure", async (t) => {
   const page = renderWorkbench({
     state: { build_state: "NOT_BUILT" },
     revisions: [{ revision_id: "r1", kind: "source", title: "Book A", source_refs: [] }],
@@ -245,9 +246,88 @@ test("metadata without source content cannot be opened as an empty editable revi
     builds: [],
     compiles: [],
   });
-  const button = page.find(
-    (node) => node.type === "button" && page.nodeText(node) === "正文读取待接入",
+  page
+    .find((n) => n.type === "textarea" && n.props.required)
+    .props.onChange({ target: { value: "尚未保存的原文" } });
+  t.mock.method(global, "fetch", async (url) => {
+    assert.equal(url, "/api/sea/knowledge/modules/m1/revisions/r1");
+    return Response.json({ code: 410, msg: "revision withdrawn", data: null }, { status: 410 });
+  });
+  page.find((n) => n.type === "button" && page.nodeText(n) === "基于此修订编辑").props.onClick();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(
+    page.find((n) => n.type === "textarea" && n.props.required).props.value,
+    "尚未保存的原文",
   );
-  assert.ok(button);
-  assert.equal(button.props.disabled, true);
+  assert.ok(page.text().includes("revision withdrawn"));
+});
+test("refreshed history publishes the selected old READY build using the current pointer", async (t) => {
+  const page = renderWorkbench({
+    state: {
+      active_release_id: "new",
+      active_build_id: "new-build",
+      candidate_release_id: "new",
+      build_id: "new-build",
+      pointer_revision: 7,
+      build_state: "READY",
+    },
+    revisions: [],
+    releases: [
+      { release_id: "old", ordinal: 1, source_revision_ids: [], wiki_revision_ids: [] },
+      { release_id: "new", ordinal: 2, source_revision_ids: [], wiki_revision_ids: [] },
+    ],
+    compiles: [],
+    builds: [{ build_id: "old-build", release_id: "old", state: "READY", generation: 1 }],
+  });
+  page.find((n) => n.type === "button" && page.nodeText(n) === "候选与发布").props.onClick();
+  page
+    .find((n) => n.type === "textarea" && n.props.rows === 3)
+    .props.onChange({ target: { value: "确认回滚" } });
+  let sent;
+  t.mock.method(global, "fetch", async (_url, init) => {
+    sent = JSON.parse(init.body);
+    return Response.json({
+      code: 200,
+      msg: "ok",
+      data: {
+        active_release_id: "old",
+        active_build_id: "old-build",
+        pointer_revision: 8,
+        build_state: "READY",
+      },
+    });
+  });
+  page.find((n) => n.type === "button" && page.nodeText(n) === "回滚到此就绪版本").props.onClick();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(sent.release_id, "old");
+  assert.equal(sent.build_id, "old-build");
+  assert.equal(sent.expected_pointer_revision, 7);
+  assert.ok(sent.idempotency_key);
+  assert.ok(page.text().includes("手动切换成功"));
+});
+test("fixed reading links bind release and revision; locators follow backend literal blank lines", () => {
+  const { revisionHref, sourceParagraph } = require("../src/features/knowledge/state.ts");
+  assert.equal(
+    revisionHref("m1", "published-r1", { revision_id: "source-v1", kind: "source" }, "paragraph:2"),
+    "/knowledge/m1/sources?release=published-r1&revision=source-v1&locator=paragraph%3A2#source-location",
+  );
+  assert.equal(
+    sourceParagraph("第一块\r\n\r\n第二块\n \n仍然第二块", "paragraph:2"),
+    "第二块\n \n仍然第二块",
+  );
+  assert.equal(sourceParagraph("第一块", "paragraph:2"), null);
+});
+test("public reading routes remain public and workbench keeps its existing login behavior", () => {
+  const { proxy } = require("../src/proxy.ts");
+  for (const route of [
+    "/knowledge",
+    "/knowledge/m1",
+    "/knowledge/m1/read",
+    "/knowledge/m1/sources",
+  ]) {
+    assert.equal(proxy(new NextRequest(`http://localhost${route}`)).status, 200);
+  }
+  for (const route of ["/workbench/modules", "/knowledge/workbench", "/knowledge/m1/workbench"]) {
+    assert.equal(proxy(new NextRequest(`http://localhost${route}`)).status, 307);
+  }
 });

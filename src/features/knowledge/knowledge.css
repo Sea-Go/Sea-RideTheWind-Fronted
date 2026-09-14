@@ -34,3 +34,9 @@
 .knowledge-revisions small {
   display: block;
 }
+
+.sea-knowledge-workbench .knowledge-editor-fields {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}

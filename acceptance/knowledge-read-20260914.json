@@ -1,0 +1,84 @@
+{
+  "background": "BG-2026-09-13-r2",
+  "started_at": "2026-09-14T03:53:43.991Z",
+  "provider_commit": "52e0bd4e70e1db99e35fed15075d6bc4c9fa777f",
+  "checks": [
+    "module creation stays out of the published shelf",
+    "administrator workbench contains the unpublished module",
+    "frozen candidate is NOT_BUILT and never automatically published",
+    "build cancellation is preserved",
+    "published shelf contains only the manually activated version",
+    "BFF duplicate activation replays the same business result",
+    "stale publication returns 409 and preserves current pointer",
+    "book A, revised interpretation, and book B create three immutable releases",
+    "rollback uses an older READY build and increases the pointer revision",
+    "administrator module detail survives reload",
+    "revision lists are paged and immutable editor bodies are read separately",
+    "reloaded history retains READY CANCELLED SUPERSEDED and pending states",
+    "public historical body remains pinned after rollback and metadata lists are paged",
+    "opaque cursor preserves membership when later candidates are added",
+    "unpublished releases and nonmembers cannot be read as public evidence",
+    "withdrawn release members make public history return 410 rather than another revision"
+  ],
+  "limitations": [
+    "Synthetic admin JWT on an isolated local PostgreSQL instance",
+    "Local content-addressed object backend",
+    "H06 structural fixture only; no real AI compilation, Dense/Sparse/Multi-vector model or query quality",
+    "No production deployment"
+  ],
+  "fixture": {
+    "module_id": "module_eec1c102-62c3-4195-bdef-98e86db35163",
+    "unpublished_release": "release_7d3149d7-d119-4c26-afe9-53b0ca7fa824",
+    "withdrawn_module": "module_62dc4de7-35ea-4581-b41d-5b7066d877b7",
+    "withdrawn_release": "release_2a9bdbe6-2a83-47b1-a31d-533f7c22bb8f",
+    "withdrawn_wiki": "revision_4b2c8b13-a6c1-4703-ad84-403c85ff616e",
+    "source_a": "revision_f6725f14-1cab-4bf6-b20d-e229ae67265d",
+    "source_b": "revision_d5d49b26-b5a2-4f2e-8433-7bc9a09e7b1d",
+    "wiki1": "revision_2ce1e9c8-fced-4089-a9a3-bbd11c7f2c2c",
+    "wiki2": "revision_a9381745-8651-4eb6-8ab7-15e21caeeb45",
+    "wiki3": "revision_6ce26eff-f4cf-439b-89db-7dbf6ded9e03",
+    "release1": "release_78e159aa-6956-4320-8a42-5537a902661e",
+    "release2": "release_a1af1299-456d-49b6-928e-facb1994ed1c",
+    "release3": "release_a0d88be4-b61d-481a-a1e7-3b673e2a7484",
+    "build1": "build_fd786949-e52a-44e6-aed9-1413298873d7",
+    "build2": "build_94ef635d-a365-4372-ad0c-333d169cd7eb",
+    "build3": "build_40805624-900b-4037-b8ec-d12a53588c88",
+    "superseded_build": "build_8c6d0af2-7a9a-4d7d-8ad1-b588b14ed863",
+    "cancelled_build": "build_c90ae726-ef46-4543-aca5-419a905ba8d9",
+    "superseded_compile": "compile_76a8a738-e484-44a1-b904-1a0538ef27c8"
+  },
+  "completed_at": "2026-09-14T03:53:50.996Z",
+  "browser_checks": [
+    {
+      "action": "加载书A原文与Wiki第三版真实正文，追加Wiki第四版",
+      "revision_id": "revision_bf71e7f2-d4f6-4c54-92eb-75cc0a58064e"
+    },
+    {
+      "action": "对比第二版与第四版非空且独立的正文"
+    },
+    {
+      "action": "刷新后从历史READY构建发布v3，再刷新选择v1回滚",
+      "pointer_revisions": [4, 5, 6]
+    },
+    {
+      "action": "通过历史列表取消等待中的编制任务",
+      "compile_id": "compile_4c181afb-63fa-445e-8ac8-cd2bab1e3112"
+    },
+    {
+      "action": "回滚后固定第二版Wiki正文和原文paragraph:1引用均可读"
+    },
+    {
+      "action": "未发布候选显示not found，撤回来源关联版本显示unavailable，均不回退其他正文"
+    },
+    {
+      "action": "最终构建复验比较两侧独立React key，选择v2与v4后仅显示两个正文区域，无残留请选择节点"
+    }
+  ],
+  "browser_method": "CUA native Chrome after extension-session discovery timed out; only a new disposable localhost tab was used",
+  "tests": {
+    "node_contract_and_component_tests": 57,
+    "production_runtime": "Node 22.22.0 / Next 16.1.3",
+    "production_build": "passed, 62 static pages",
+    "scope": "product read/write and structural H06 acceptance; not real search/index quality"
+  }
+}

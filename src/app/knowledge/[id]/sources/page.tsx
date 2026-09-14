@@ -7,10 +7,17 @@ export default async function Page({
   params: Promise<{ id: string }>;
   searchParams: SeaSearchParams;
 }) {
-  const { id } = await params;
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const text = (value: string | string[] | undefined) => (typeof value === "string" ? value : "");
   return (
     <SeaRoute searchParams={searchParams}>
-      <KnowledgeReader id={id} source />
+      <KnowledgeReader
+        id={id}
+        releaseId={text(query.release)}
+        revisionId={text(query.revision)}
+        locator={text(query.locator)}
+        source
+      />
     </SeaRoute>
   );
 }

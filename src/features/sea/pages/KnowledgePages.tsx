@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 
 import { KnowledgeWorkbench as LiveKnowledgeWorkbench } from "@/features/knowledge/KnowledgeWorkbench";
+import { PublishedModule, PublishedReader } from "@/features/knowledge/PublishedKnowledge";
 import { WorkbenchModules } from "@/features/knowledge/WorkbenchModules";
 
 import {
@@ -137,6 +138,10 @@ export function KnowledgeShelf() {
   );
 }
 export function KnowledgeModulePage({ id }: { id: string }) {
+  const { demo } = useSea();
+  return demo ? <DemoModulePage key={id} id={id} /> : <PublishedModule key={id} moduleId={id} />;
+}
+function DemoModulePage({ id }: { id: string }) {
   const { demo } = useSea();
   const [knowledgeModule, setModule] = useState<KnowledgeModule | undefined>(
     demo ? modules.find((m) => m.id === id) : undefined,
@@ -280,6 +285,33 @@ export function KnowledgeModulePage({ id }: { id: string }) {
   );
 }
 export function KnowledgeReader({
+  source = false,
+  id = "mountain",
+  releaseId = "",
+  revisionId = "",
+  locator = "",
+}: {
+  source?: boolean;
+  id?: string;
+  releaseId?: string;
+  revisionId?: string;
+  locator?: string;
+}) {
+  const { demo } = useSea();
+  return demo ? (
+    <DemoKnowledgeReader source={source} id={id} />
+  ) : (
+    <PublishedReader
+      key={`${id}:${releaseId}:${revisionId}:${locator}:${source}`}
+      moduleId={id}
+      source={source}
+      releaseId={releaseId}
+      revisionId={revisionId}
+      locator={locator}
+    />
+  );
+}
+function DemoKnowledgeReader({
   source = false,
   id = "mountain",
 }: {

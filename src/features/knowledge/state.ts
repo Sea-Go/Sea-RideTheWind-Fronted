@@ -50,6 +50,10 @@ export function parseProfiles(text: string): RetrievalProfile[] {
       [row.mask, row.aggregation].some((v) => typeof v !== "string" || !v.trim())
     )
       throw new Error("Multi-vector 还需要 mask 和 aggregation。");
+    if (row.lane === "multivector" && row.aggregation !== "maxsim")
+      throw new Error("Multi-vector 的 aggregation 必须为 maxsim。");
+    if (row.lane !== "multivector" && (row.mask || row.aggregation))
+      throw new Error("mask 和 aggregation 仅属于 Multi-vector。");
     lanes.add(String(row.lane));
   }
   return value as RetrievalProfile[];
@@ -69,4 +73,26 @@ export class CommandKeys {
   complete(scope: string, data: unknown) {
     this.keys.delete(JSON.stringify([scope, data]));
   }
+}
+
+export function revisionHref(
+  moduleId: string,
+  releaseId: string,
+  revision: Pick<Revision, "revision_id" | "kind">,
+  locator = "",
+) {
+  const q = new URLSearchParams({ release: releaseId, revision: revision.revision_id });
+  if (locator) q.set("locator", locator);
+  return `/knowledge/${encodeURIComponent(moduleId)}/${revision.kind === "source" ? "sources" : "read"}?${q}${locator ? "#source-location" : ""}`;
+}
+export function sourceParagraph(content: string, locator: string): string | null {
+  const match = /^paragraph:([1-9]\d*)$/.exec(locator);
+  if (!match) return null;
+  return (
+    content
+      .replace(/\r\n/g, "\n")
+      .trim()
+      .split("\n\n")
+      .filter((p) => p.trim())[Number(match[1]) - 1] ?? null
+  );
 }

@@ -270,6 +270,7 @@ process.on("SIGTERM", () => {
   });
   check("module creation stays out of the published shelf", () => assert.ok(module.id));
   const publicDraft = await call("modules", "GET", undefined, 200, false, true);
+  await call(`modules/${module.id}`, "GET", undefined, 404, false, true);
   assert.equal(
     publicDraft.items.some((m) => m.id === module.id),
     false,
@@ -300,11 +301,11 @@ process.on("SIGTERM", () => {
   const cancelled = await call(`releases/${r1.release_id}/index-builds`, "POST", {
     idempotency_key: key(),
   });
-  await call(`builds/${cancelled.build_id}/cancel`, "POST", {
+  const cancellation = await call(`builds/${cancelled.build_id}/cancel`, "POST", {
     reason: "隔离取消验收",
     idempotency_key: key(),
   });
-  check("build cancellation is preserved", () => assert.ok(cancelled.build_id));
+  check("build cancellation is preserved", () => assert.equal(cancellation.state, "CANCELLED"));
   const b1 = await ready(r1);
   let pointer = await call(`modules/${module.id}/activation`, "PUT", {
     release_id: r1.release_id,
@@ -393,8 +394,176 @@ process.on("SIGTERM", () => {
     idempotency_key: key(),
   });
   await call(`modules/${module.id}/compiles`, "POST", { ...compileInput, idempotency_key: key() });
+  const draftDetail = await call(`workbench/modules/${module.id}`);
+  check("administrator module detail survives reload", () =>
+    assert.equal(draftDetail.id, module.id),
+  );
+  const revisionPage = await call(`modules/${module.id}/revisions?limit=1`);
+  const sourceBody = await call(`modules/${module.id}/revisions/${a.revision_id}`);
+  const wikiBody = await call(`modules/${module.id}/revisions/${wiki2.revision_id}`);
+  check("revision lists are paged and immutable editor bodies are read separately", () => {
+    assert.equal(revisionPage.items.length, 1);
+    assert.ok(revisionPage.next_cursor);
+    assert.equal(sourceBody.content, "海拔影响温度。\n\n坡向影响光照。");
+    assert.ok(wikiBody.content.includes("第二版"));
+    assert.equal(
+      crypto.createHash("sha256").update(sourceBody.content).digest("hex"),
+      sourceBody.content_hash,
+    );
+    assert.equal(
+      crypto.createHash("sha256").update(wikiBody.content).digest("hex"),
+      wikiBody.content_hash,
+    );
+  });
+  const historyBuilds = await call(`modules/${module.id}/builds?limit=100`);
+  const historyCompiles = await call(`modules/${module.id}/compiles?limit=100`);
+  check("reloaded history retains READY CANCELLED SUPERSEDED and pending states", () => {
+    assert.equal(
+      historyBuilds.items.find((b) => b.build_id === abandoned.build_id).state,
+      "SUPERSEDED",
+    );
+    assert.equal(
+      historyBuilds.items.find((b) => b.build_id === cancelled.build_id).state,
+      "CANCELLED",
+    );
+    assert.equal(historyBuilds.items.find((b) => b.build_id === b1.build_id).state, "READY");
+    assert.equal(
+      historyCompiles.items.find((c) => c.compile_id === compile1.compile_id).state,
+      "SUPERSEDED",
+    );
+    assert.ok(historyCompiles.items.some((c) => c.state === "CANCELLED"));
+    assert.ok(historyCompiles.items.some((c) => c.state === "BUILDING"));
+  });
+  await call(`modules/${module.id}/builds/${b1.build_id}`);
+  await call(`modules/${module.id}/compiles/${compile1.compile_id}`);
+  const historical = await call(
+    `modules/${module.id}/published-releases/${r2.release_id}`,
+    "GET",
+    undefined,
+    200,
+    false,
+    true,
+  );
+  const historicalBody = await call(
+    `modules/${module.id}/releases/${r2.release_id}/revisions/${wiki2.revision_id}`,
+    "GET",
+    undefined,
+    200,
+    false,
+    true,
+  );
+  const publicRevisions = await call(
+    `modules/${module.id}/releases/${r2.release_id}/revisions?limit=1`,
+    "GET",
+    undefined,
+    200,
+    false,
+    true,
+  );
+  check("public historical body remains pinned after rollback and metadata lists are paged", () => {
+    assert.equal(historical.release_id, r2.release_id);
+    assert.equal(historicalBody.content, wikiBody.content);
+    assert.equal(publicRevisions.items.length, 1);
+    assert.ok(publicRevisions.next_cursor);
+  });
+  await call(
+    `modules/${module.id}/releases/${r1.release_id}/revisions/${bookB.revision_id}`,
+    "GET",
+    undefined,
+    404,
+    false,
+    true,
+  );
+  const firstPage = await call(`modules/${module.id}/releases?limit=1`);
+  const neverPublished = await release(module, [a, bookB], wiki3);
+  const seen = [firstPage.items[0].release_id];
+  let cursor = firstPage.next_cursor;
+  while (cursor) {
+    const page = await call(
+      `modules/${module.id}/releases?limit=1&cursor=${encodeURIComponent(cursor)}`,
+    );
+    seen.push(...page.items.map((r) => r.release_id));
+    cursor = page.next_cursor;
+  }
+  check("opaque cursor preserves membership when later candidates are added", () => {
+    assert.equal(new Set(seen).size, 3);
+    assert.equal(seen.includes(neverPublished.release_id), false);
+  });
+  await call(
+    `modules/${module.id}/published-releases/${neverPublished.release_id}`,
+    "GET",
+    undefined,
+    404,
+    false,
+    true,
+  );
+  await call(
+    `modules/${module.id}/releases/${neverPublished.release_id}/revisions/${wiki3.revision_id}`,
+    "GET",
+    undefined,
+    404,
+    false,
+    true,
+  );
+  check("unpublished releases and nonmembers cannot be read as public evidence", () =>
+    assert.ok(neverPublished.release_id),
+  );
+  const withdrawnModule = await call("modules", "POST", {
+    title: "撤回规则 · 隔离 fixture",
+    idempotency_key: key(),
+  });
+  const withdrawnSource = await source(withdrawnModule, "撤回资料", "该资料仅用于撤回规则验收。");
+  const withdrawnWiki = await call(
+    `modules/${withdrawnModule.id}/wiki-pages/withdrawn/revisions`,
+    "POST",
+    {
+      title: "撤回知识",
+      content: "必须保留明确不可用状态。",
+      source_refs: [{ revision_id: withdrawnSource.revision_id, locator: "paragraph:1" }],
+      idempotency_key: key(),
+    },
+  );
+  const withdrawnRelease = await release(withdrawnModule, [withdrawnSource], withdrawnWiki);
+  const withdrawnBuild = await ready(withdrawnRelease);
+  await call(`modules/${withdrawnModule.id}/activation`, "PUT", {
+    release_id: withdrawnRelease.release_id,
+    build_id: withdrawnBuild.build_id,
+    expected_pointer_revision: 0,
+    reason: "撤回规则结构fixture",
+    idempotency_key: key(),
+  });
+  await call(`modules/${withdrawnModule.id}/withdrawals`, "POST", {
+    target_kind: "revision",
+    target_id: withdrawnSource.revision_id,
+    reason: "验证正式内容撤回",
+    idempotency_key: key(),
+  });
+  await call(
+    `modules/${withdrawnModule.id}/releases/${withdrawnRelease.release_id}/revisions/${withdrawnWiki.revision_id}`,
+    "GET",
+    undefined,
+    410,
+    false,
+    true,
+  );
+  await call(
+    `modules/${withdrawnModule.id}/published-releases/${withdrawnRelease.release_id}`,
+    "GET",
+    undefined,
+    410,
+    false,
+    true,
+  );
+  check(
+    "withdrawn release members make public history return 410 rather than another revision",
+    () => assert.ok(withdrawnSource.revision_id),
+  );
   report.fixture = {
     module_id: module.id,
+    unpublished_release: neverPublished.release_id,
+    withdrawn_module: withdrawnModule.id,
+    withdrawn_release: withdrawnRelease.release_id,
+    withdrawn_wiki: withdrawnWiki.revision_id,
     source_a: a.revision_id,
     source_b: bookB.revision_id,
     wiki1: wiki1.revision_id,

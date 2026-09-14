@@ -19,6 +19,12 @@ export function proxy(request: NextRequest) {
   const userToken = request.cookies.get(USER_TOKEN_COOKIE_KEY)?.value;
   const adminToken = request.cookies.get(ADMIN_TOKEN_COOKIE_KEY)?.value;
 
+  const isPublicKnowledge =
+    pathname === "/knowledge" ||
+    (/^\/knowledge\/[^/]+(?:\/(?:read|sources))?$/.test(pathname) &&
+      pathname !== "/knowledge/workbench");
+  if (isPublicKnowledge) return NextResponse.next();
+
   const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
   const isAdminLoginRoute = pathname === "/admin/login";
   const isAdminRegisterRoute = pathname === "/admin/register";

@@ -7,15 +7,21 @@ import {
   type Build,
   type Compile,
   knowledge,
+  knowledgeRead,
+  type Module,
   type Release,
   type ReleaseState,
   type Revision,
 } from "./api";
-import { CommandKeys, isPending, latestRevisions, parseProfiles, statusName } from "./state";
+import { RevisionCompare } from "./RevisionCompare";
+import { CommandKeys, isPending, parseProfiles, statusName } from "./state";
 
 import "./knowledge.css";
 
+type HistoryKind = "revisions" | "releases" | "builds" | "compiles";
 type Snapshot = {
+  module: Module;
+  next: Partial<Record<HistoryKind, string>>;
   state: ReleaseState;
   revisions: Revision[];
   releases: Release[];
@@ -50,32 +56,46 @@ export function KnowledgeWorkbench({ moduleId }: { moduleId: string }) {
   const [chunking, setChunking] = useState("");
   const [profiles, setProfiles] = useState("");
   const [reason, setReason] = useState("");
-  const [compareLeft, setCompareLeft] = useState("");
-  const [compareRight, setCompareRight] = useState("");
+  const [readBusy, setReadBusy] = useState(false);
+  const [pollError, setPollError] = useState("");
+  const readController = useRef<AbortController | null>(null);
+  const refreshGeneration = useRef(0);
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      readController.current?.abort();
     };
   }, []);
   useEffect(() => {
     const controller = new AbortController();
+    const generation = ++refreshGeneration.current;
     Promise.all([
       knowledge.current(moduleId, controller.signal),
-      knowledge.revisions(moduleId, controller.signal),
+      knowledgeRead.module(moduleId, controller.signal),
+      knowledgeRead.revisions(moduleId, "", controller.signal),
+      knowledgeRead.releases(moduleId, "", controller.signal),
+      knowledgeRead.builds(moduleId, "", controller.signal),
+      knowledgeRead.compiles(moduleId, "", controller.signal),
     ])
-      .then(([state, revisions]) => {
-        if (controller.signal.aborted) return;
-        setSnapshot((previous) => ({
+      .then(([state, module, revisions, releases, builds, compiles]) => {
+        if (controller.signal.aborted || generation !== refreshGeneration.current) return;
+        setSnapshot({
           state,
-          revisions: revisions.items || [],
-          releases: previous?.releases || [],
-          builds: (previous?.builds || []).map((build) =>
-            build.build_id === state.build_id ? { ...build, state: state.build_state } : build,
-          ),
-          compiles: previous?.compiles || [],
-        }));
+          module,
+          revisions: revisions.items,
+          releases: releases.items,
+          builds: builds.items,
+          compiles: compiles.items,
+          next: {
+            revisions: revisions.next_cursor,
+            releases: releases.next_cursor,
+            builds: builds.next_cursor,
+            compiles: compiles.next_cursor,
+          },
+        });
         setError("");
+        setPollError("");
       })
       .catch((e) => {
         if (!controller.signal.aborted) setError(e.message);
@@ -85,17 +105,145 @@ export function KnowledgeWorkbench({ moduleId }: { moduleId: string }) {
       });
     return () => controller.abort();
   }, [moduleId, tick]);
+  const pendingBuilds =
+    tab === "候选与发布"
+      ? (snapshot?.builds || [])
+          .filter((b) => isPending(b.state))
+          .map((b) => b.build_id)
+          .join(",")
+      : "";
+  const pendingCompiles =
+    tab === "编制任务"
+      ? (snapshot?.compiles || [])
+          .filter((c) => isPending(c.state))
+          .map((c) => c.compile_id)
+          .join(",")
+      : "";
+  useEffect(() => {
+    if ((!pendingBuilds && !pendingCompiles) || busy) return;
+    const controller = new AbortController();
+    let polling = false;
+    const poll = async () => {
+      if (document.visibilityState === "hidden" || polling) return;
+      polling = true;
+      const generation = refreshGeneration.current;
+      try {
+        const [state, builds, compiles] = await Promise.all([
+          knowledge.current(moduleId, controller.signal),
+          Promise.all(
+            pendingBuilds
+              .split(",")
+              .filter(Boolean)
+              .map((id) => knowledgeRead.build(moduleId, id, controller.signal)),
+          ),
+          Promise.all(
+            pendingCompiles
+              .split(",")
+              .filter(Boolean)
+              .map((id) => knowledgeRead.compile(moduleId, id, controller.signal)),
+          ),
+        ]);
+        if (controller.signal.aborted || generation !== refreshGeneration.current) return;
+        setPollError("");
+        const terminal = [...builds, ...compiles].some((item) => !isPending(item.state));
+        if (terminal) {
+          setTick((value) => value + 1);
+          return;
+        }
+        setSnapshot(
+          (previous) =>
+            previous && {
+              ...previous,
+              state,
+              builds: previous.builds.map(
+                (b) => builds.find((next) => next.build_id === b.build_id) || b,
+              ),
+              compiles: previous.compiles.map(
+                (c) => compiles.find((next) => next.compile_id === c.compile_id) || c,
+              ),
+            },
+        );
+      } catch (e) {
+        if (!controller.signal.aborted)
+          setPollError(e instanceof Error ? e.message : "任务状态刷新失败");
+      } finally {
+        polling = false;
+      }
+    };
+    const interval = window.setInterval(() => void poll(), 5000);
+    const visible = () => {
+      if (document.visibilityState !== "hidden") void poll();
+    };
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      controller.abort();
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, [moduleId, pendingBuilds, pendingCompiles, busy]);
   const refresh = () => {
     setLoading(true);
     setTick((value) => value + 1);
   };
+  async function more(kind: HistoryKind) {
+    const cursor = snapshot?.next[kind];
+    if (!cursor || loading) return;
+    const generation = refreshGeneration.current;
+    setLoading(true);
+    try {
+      const page = await knowledgeRead[kind](moduleId, cursor);
+      if (!mounted.current || generation !== refreshGeneration.current) return;
+      setSnapshot(
+        (previous) =>
+          previous && {
+            ...previous,
+            [kind]: [...previous[kind], ...page.items],
+            next: { ...previous.next, [kind]: page.next_cursor },
+          },
+      );
+    } catch (e) {
+      if (mounted.current) setError(e instanceof Error ? e.message : "历史加载失败");
+    } finally {
+      if (mounted.current && generation === refreshGeneration.current) setLoading(false);
+    }
+  }
+  async function editRevision(revision: Revision) {
+    readController.current?.abort();
+    const controller = new AbortController();
+    readController.current = controller;
+    setReadBusy(true);
+    setError("");
+    try {
+      const r = await knowledgeRead.revision(moduleId, revision.revision_id, controller.signal);
+      if (controller.signal.aborted) return;
+      if (typeof r.content !== "string" || !r.content.trim())
+        throw new Error("服务未返回完整正文，保留当前编辑输入。");
+      if (r.kind === "source") {
+        setSourceBase(r);
+        setSourceTitle(r.title);
+        setSourceText(r.content);
+        setSourceOrigin(r.provenance);
+      } else {
+        setWikiBase(r);
+        setPageId(r.entity_id);
+        setWikiTitle(r.title);
+        setWikiText(r.content);
+        setReferences(r.source_refs || []);
+      }
+      setTab("资料与修订");
+    } catch (e) {
+      if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "读取正文失败");
+    } finally {
+      if (!controller.signal.aborted) setReadBusy(false);
+    }
+  }
   async function command<T>(
     scope: string,
     input: object,
     perform: (key: string) => Promise<T>,
     success: (result: T) => void,
   ) {
-    if (inFlight.current) return;
+    if (inFlight.current || readBusy) return;
     inFlight.current = true;
     setBusy(true);
     setError("");
@@ -116,8 +264,7 @@ export function KnowledgeWorkbench({ moduleId }: { moduleId: string }) {
       if (mounted.current) setBusy(false);
     }
   }
-  const sources = latestRevisions(snapshot?.revisions || [], "source");
-  const pages = latestRevisions(snapshot?.revisions || [], "wiki");
+
   const allSources = (snapshot?.revisions || []).filter((r) => r.kind === "source" && !r.withdrawn);
   const toggle = (value: string, values: string[], setter: (v: string[]) => void) =>
     setter(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
@@ -310,14 +457,13 @@ export function KnowledgeWorkbench({ moduleId }: { moduleId: string }) {
     );
   }
   const state = snapshot?.state;
-  const left = snapshot?.revisions.find((r) => r.revision_id === compareLeft);
-  const right = snapshot?.revisions.find((r) => r.revision_id === compareRight);
+
   return (
     <div className="sea-content sea-knowledge-workbench">
       <div className="sea-breadcrumb">
         <SeaLink href="/workbench/modules">管理模块</SeaLink>
         <span>/</span>
-        <span className="knowledge-id">{moduleId}</span>
+        <span className="knowledge-id">{snapshot?.module.title || moduleId}</span>
       </div>
       <div className="sea-page-heading compact">
         <div>
@@ -330,8 +476,10 @@ export function KnowledgeWorkbench({ moduleId }: { moduleId: string }) {
         </button>
       </div>
       {error && <Notice error>{error}</Notice>}
+      {pollError && <Notice error>自动刷新暂不可用，当前显示上次读取的状态：{pollError}</Notice>}
       {message && <Notice>{message}</Notice>}
       {loading && <p role="status">正在读取知识工作台…</p>}
+      {readBusy && <p role="status">正在读取修订正文，当前输入保持不变…</p>}
       {!snapshot ? (
         <EmptyState title={loading ? "读取中" : "工作台暂不可用"}>
           需要具有知识维护权限的登录身份和可连接的产品服务。<SeaLink href="/login">登录</SeaLink>
@@ -349,9 +497,9 @@ export function KnowledgeWorkbench({ moduleId }: { moduleId: string }) {
               <strong className="knowledge-id">{state?.candidate_release_id || "尚未冻结"}</strong>
             </div>
             <div>
-              <span>原文与 Wiki</span>
+              <span>正式版原文与 Wiki</span>
               <strong>
-                {sources.length} / {pages.length}
+                {snapshot.module.sources} / {snapshot.module.pages}
               </strong>
               <small>各自保留独立历史</small>
             </div>
@@ -376,82 +524,95 @@ export function KnowledgeWorkbench({ moduleId }: { moduleId: string }) {
           {tab === "资料与修订" && (
             <div className="sea-two-col">
               <section>
+                {snapshot.next.revisions && (
+                  <button
+                    className="sea-button"
+                    disabled={loading}
+                    onClick={() => void more("revisions")}
+                  >
+                    加载更早修订
+                  </button>
+                )}
                 <form onSubmit={saveSource}>
-                  <h2>原始资料</h2>
-                  <p>支持 UTF-8 Markdown 或纯文本。每次保存创建独立修订，保留出处。</p>
-                  <label className="sea-field">
-                    资料标题
-                    <input
-                      required
-                      value={sourceTitle}
-                      onChange={(e) => setSourceTitle(e.target.value)}
-                    />
-                  </label>
-                  <label className="sea-field">
-                    出处说明
-                    <input
-                      required
-                      value={sourceOrigin}
-                      onChange={(e) => setSourceOrigin(e.target.value)}
-                      placeholder="书名、作者、页码或原始链接"
-                    />
-                  </label>
-                  <label className="sea-field">
-                    导入文本文件
-                    <input
-                      type="file"
-                      accept=".md,.markdown,.txt,text/plain,text/markdown"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        if (file.size > 4 * 1024 * 1024) {
-                          setError("文本文件超过 4 MiB，请拆分资料后导入。");
-                          return;
-                        }
-                        try {
-                          const text = new TextDecoder("utf-8", { fatal: true }).decode(
-                            await file.arrayBuffer(),
-                          );
-                          setSourceText(text);
-                          if (!sourceTitle) setSourceTitle(file.name.replace(/\.[^.]+$/, ""));
-                        } catch {
-                          setError("文件必须为有效 UTF-8 文本，当前不支持 PDF/OCR。");
-                        }
-                      }}
-                    />
-                  </label>
-                  <label className="sea-field">
-                    原文正文
-                    <textarea
-                      required
-                      rows={10}
-                      value={sourceText}
-                      onChange={(e) => setSourceText(e.target.value)}
-                    />
-                  </label>
-                  {sourceBase && <p className="knowledge-id">基于修订 {sourceBase.revision_id}</p>}
-                  <div className="sea-actions">
-                    <button
-                      className="sea-button primary"
-                      disabled={busy || !sourceText.trim() || !sourceOrigin.trim()}
-                    >
-                      {sourceBase ? "保存原文新修订" : "保存原始资料"}
-                    </button>
-                    {sourceBase && (
-                      <button
-                        type="button"
-                        className="sea-button"
-                        onClick={() => {
-                          setSourceBase(null);
-                          setSourceTitle("");
-                          setSourceText("");
-                          setSourceOrigin("");
+                  <fieldset disabled={readBusy} className="knowledge-editor-fields">
+                    <h2>原始资料</h2>
+                    <p>支持 UTF-8 Markdown 或纯文本。每次保存创建独立修订，保留出处。</p>
+                    <label className="sea-field">
+                      资料标题
+                      <input
+                        required
+                        value={sourceTitle}
+                        onChange={(e) => setSourceTitle(e.target.value)}
+                      />
+                    </label>
+                    <label className="sea-field">
+                      出处说明
+                      <input
+                        required
+                        value={sourceOrigin}
+                        onChange={(e) => setSourceOrigin(e.target.value)}
+                        placeholder="书名、作者、页码或原始链接"
+                      />
+                    </label>
+                    <label className="sea-field">
+                      导入文本文件
+                      <input
+                        type="file"
+                        accept=".md,.markdown,.txt,text/plain,text/markdown"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > 4 * 1024 * 1024) {
+                            setError("文本文件超过 4 MiB，请拆分资料后导入。");
+                            return;
+                          }
+                          try {
+                            const text = new TextDecoder("utf-8", { fatal: true }).decode(
+                              await file.arrayBuffer(),
+                            );
+                            setSourceText(text);
+                            if (!sourceTitle) setSourceTitle(file.name.replace(/\.[^.]+$/, ""));
+                          } catch {
+                            setError("文件必须为有效 UTF-8 文本，当前不支持 PDF/OCR。");
+                          }
                         }}
-                      >
-                        新建另一份资料
-                      </button>
+                      />
+                    </label>
+                    <label className="sea-field">
+                      原文正文
+                      <textarea
+                        required
+                        rows={10}
+                        value={sourceText}
+                        onChange={(e) => setSourceText(e.target.value)}
+                      />
+                    </label>
+                    {sourceBase && (
+                      <p className="knowledge-id">基于修订 {sourceBase.revision_id}</p>
                     )}
-                  </div>
+                    <div className="sea-actions">
+                      <button
+                        className="sea-button primary"
+                        disabled={busy || !sourceText.trim() || !sourceOrigin.trim()}
+                      >
+                        {sourceBase ? "保存原文新修订" : "保存原始资料"}
+                      </button>
+                      {sourceBase && (
+                        <button
+                          type="button"
+                          className="sea-button"
+                          onClick={() => {
+                            setSourceBase(null);
+                            setSourceTitle("");
+                            setSourceText("");
+                            setSourceOrigin("");
+                          }}
+                        >
+                          新建另一份资料
+                        </button>
+                      )}
+                    </div>
+                  </fieldset>
                 </form>
                 <h3>原文历史</h3>
                 {snapshot.revisions
@@ -467,109 +628,106 @@ export function KnowledgeWorkbench({ moduleId }: { moduleId: string }) {
                       </div>
                       <button
                         className="sea-button"
-                        disabled={busy || r.withdrawn || r.content === undefined}
-                        onClick={() => {
-                          setSourceBase(r);
-                          setSourceTitle(r.title);
-                          setSourceText(r.content || "");
-                          setSourceOrigin(r.provenance);
-                        }}
+                        disabled={busy || readBusy || r.withdrawn}
+                        onClick={() => void editRevision(r)}
                       >
-                        {r.content === undefined ? "正文读取待接入" : "基于此修订编辑"}
+                        基于此修订编辑
                       </button>
                     </div>
                   ))}
               </section>
               <section>
                 <form onSubmit={saveWiki}>
-                  <h2>Wiki 知识页</h2>
-                  <label className="sea-field">
-                    页面标识
-                    <input
-                      required
-                      value={pageId}
-                      disabled={Boolean(wikiBase)}
-                      onChange={(e) => setPageId(e.target.value)}
-                      placeholder="如 climate-and-mountains"
-                    />
-                  </label>
-                  <label className="sea-field">
-                    知识页标题
-                    <input
-                      required
-                      value={wikiTitle}
-                      onChange={(e) => setWikiTitle(e.target.value)}
-                    />
-                  </label>
-                  <label className="sea-field">
-                    知识页正文
-                    <textarea
-                      required
-                      rows={10}
-                      value={wikiText}
-                      onChange={(e) => setWikiText(e.target.value)}
-                    />
-                  </label>
-                  <fieldset>
-                    <legend>绑定来源修订与段落</legend>
+                  <fieldset disabled={readBusy} className="knowledge-editor-fields">
+                    <h2>Wiki 知识页</h2>
                     <label className="sea-field">
-                      原文修订
-                      <select value={sourceRef} onChange={(e) => setSourceRef(e.target.value)}>
-                        <option value="">请选择</option>
-                        {allSources.map((r) => (
-                          <option key={r.revision_id} value={r.revision_id}>
-                            {r.title} · {r.revision_id}
-                          </option>
-                        ))}
-                      </select>
+                      页面标识
+                      <input
+                        required
+                        value={pageId}
+                        disabled={Boolean(wikiBase)}
+                        onChange={(e) => setPageId(e.target.value)}
+                        placeholder="如 climate-and-mountains"
+                      />
                     </label>
                     <label className="sea-field">
-                      段落定位
-                      <input value={locator} onChange={(e) => setLocator(e.target.value)} />
+                      知识页标题
+                      <input
+                        required
+                        value={wikiTitle}
+                        onChange={(e) => setWikiTitle(e.target.value)}
+                      />
                     </label>
-                    <button type="button" className="sea-button" onClick={addReference}>
-                      加入来源引用
-                    </button>
-                    {references.map((ref, i) => (
-                      <p key={`${ref.revision_id}:${ref.locator}`} className="knowledge-id">
-                        {ref.revision_id} · {ref.locator}{" "}
+                    <label className="sea-field">
+                      知识页正文
+                      <textarea
+                        required
+                        rows={10}
+                        value={wikiText}
+                        onChange={(e) => setWikiText(e.target.value)}
+                      />
+                    </label>
+                    <fieldset>
+                      <legend>绑定来源修订与段落</legend>
+                      <label className="sea-field">
+                        原文修订
+                        <select value={sourceRef} onChange={(e) => setSourceRef(e.target.value)}>
+                          <option value="">请选择</option>
+                          {allSources.map((r) => (
+                            <option key={r.revision_id} value={r.revision_id}>
+                              {r.title} · {r.revision_id}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="sea-field">
+                        段落定位
+                        <input value={locator} onChange={(e) => setLocator(e.target.value)} />
+                      </label>
+                      <button type="button" className="sea-button" onClick={addReference}>
+                        加入来源引用
+                      </button>
+                      {references.map((ref, i) => (
+                        <p key={`${ref.revision_id}:${ref.locator}`} className="knowledge-id">
+                          {ref.revision_id} · {ref.locator}{" "}
+                          <button
+                            type="button"
+                            onClick={() => setReferences(references.filter((_, n) => n !== i))}
+                          >
+                            移除
+                          </button>
+                        </p>
+                      ))}
+                    </fieldset>
+                    {wikiBase && (
+                      <p className="knowledge-id">
+                        基于修订 {wikiBase.revision_id}，并发修改会返回冲突。
+                      </p>
+                    )}
+                    <div className="sea-actions">
+                      <button
+                        className="sea-button primary"
+                        disabled={busy || !wikiText.trim() || !references.length}
+                      >
+                        保存 Wiki 新修订
+                      </button>
+                      {wikiBase && (
                         <button
                           type="button"
-                          onClick={() => setReferences(references.filter((_, n) => n !== i))}
+                          className="sea-button"
+                          onClick={() => {
+                            setWikiBase(null);
+                            setPageId("");
+                            setWikiTitle("");
+                            setWikiText("");
+                            setReferences([]);
+                          }}
                         >
-                          移除
+                          新建另一知识页
                         </button>
-                      </p>
-                    ))}
+                      )}
+                    </div>
                   </fieldset>
-                  {wikiBase && (
-                    <p className="knowledge-id">
-                      基于修订 {wikiBase.revision_id}，并发修改会返回冲突。
-                    </p>
-                  )}
-                  <div className="sea-actions">
-                    <button
-                      className="sea-button primary"
-                      disabled={busy || !wikiText.trim() || !references.length}
-                    >
-                      保存 Wiki 新修订
-                    </button>
-                    {wikiBase && (
-                      <button
-                        type="button"
-                        className="sea-button"
-                        onClick={() => {
-                          setWikiBase(null);
-                          setPageId("");
-                          setWikiTitle("");
-                          setWikiText("");
-                          setReferences([]);
-                        }}
-                      >
-                        新建另一知识页
-                      </button>
-                    )}
-                  </div>
                 </form>
                 <h3>Wiki 历史</h3>
                 {snapshot.revisions
@@ -585,16 +743,10 @@ export function KnowledgeWorkbench({ moduleId }: { moduleId: string }) {
                       </div>
                       <button
                         className="sea-button"
-                        disabled={busy || r.withdrawn || r.content === undefined}
-                        onClick={() => {
-                          setWikiBase(r);
-                          setPageId(r.entity_id);
-                          setWikiTitle(r.title);
-                          setWikiText(r.content || "");
-                          setReferences(r.source_refs || []);
-                        }}
+                        disabled={busy || readBusy || r.withdrawn}
+                        onClick={() => void editRevision(r)}
                       >
-                        {r.content === undefined ? "正文读取待接入" : "基于此修订编辑"}
+                        基于此修订编辑
                       </button>
                     </div>
                   ))}
@@ -640,11 +792,18 @@ export function KnowledgeWorkbench({ moduleId }: { moduleId: string }) {
               </label>
               {snapshot.compiles.map((c) => (
                 <div className="sea-note-card" key={c.compile_id}>
-                  <h3>{statusName(c.state)}</h3>
+                  <h3>{c.state === "BUILDING" ? "正在编制" : statusName(c.state)}</h3>
                   <p className="knowledge-id">
                     任务 {c.compile_id} · 页面 {c.page_id}
                   </p>
                   {c.revision_id && <p className="knowledge-id">候选修订 {c.revision_id}</p>}
+                  {c.state === "BUILDING" && (
+                    <p>
+                      {c.attempt_id
+                        ? `执行尝试：${c.attempt_id}`
+                        : "已受理，等待编制 worker 领取。"}
+                    </p>
+                  )}
                   {c.error_code && <Notice error>{c.error_code}</Notice>}
                   {isPending(c.state) && (
                     <button
@@ -657,62 +816,38 @@ export function KnowledgeWorkbench({ moduleId }: { moduleId: string }) {
                   )}
                 </div>
               ))}
+              {snapshot.next.compiles && (
+                <button
+                  className="sea-button"
+                  disabled={loading}
+                  onClick={() => void more("compiles")}
+                >
+                  加载更早编制
+                </button>
+              )}
               {!snapshot.compiles.length && <p>尚无可显示的编制任务。</p>}
             </section>
           )}
           {tab === "修订比较" && (
-            <section>
-              <h2>比较固定修订</h2>
-              <Notice>当前列表仅提供修订元数据，正文读接口待接入。不会以空正文替代原文。</Notice>
-              <p>两侧直接展示所选修订正文。切换正式版本不会改写这里的历史内容。</p>
-              <div className="sea-two-col">
-                {[
-                  [compareLeft, setCompareLeft],
-                  [compareRight, setCompareRight],
-                ].map(([value, setter], i) => (
-                  <label className="sea-field" key={i}>
-                    {i ? "候选修订" : "基准修订"}
-                    <select
-                      value={value as string}
-                      onChange={(e) => (setter as (v: string) => void)(e.target.value)}
-                    >
-                      <option value="">选择具体修订</option>
-                      {snapshot.revisions.map((r) => (
-                        <option key={r.revision_id} value={r.revision_id}>
-                          {r.kind} · {r.title} · {r.revision_id}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ))}
-              </div>
-              <div className="sea-diff">
-                {[left, right].map((r, i) => (
-                  <div key={i}>
-                    {r ? (
-                      <>
-                        <h3>{r.title}</h3>
-                        <p className="knowledge-id">
-                          {r.revision_id} · {r.content_hash}
-                        </p>
-                        <pre className="knowledge-body">
-                          {r.content ?? "未取得正文，不能进行比较。"}
-                        </pre>
-                      </>
-                    ) : (
-                      <p>请选择修订。</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
+            <>
+              <RevisionCompare moduleId={moduleId} revisions={snapshot.revisions} />
+              {snapshot.next.revisions && (
+                <button
+                  className="sea-button"
+                  disabled={loading}
+                  onClick={() => void more("revisions")}
+                >
+                  加载更早修订
+                </button>
+              )}
+            </>
           )}
           {tab === "候选与发布" && (
             <section>
               <h2>冻结候选版本</h2>
-              <Notice>
-                候选与构建明细仅保留本页实际回执；刷新页面后的历史清单和就绪构建选择待接入。正式发布状态由上方服务端指针显示。
-              </Notice>
+              <p>
+                候选和构建历史由服务端读取。选择具体就绪构建可发布或回滚，正式版本以活动指针为准。
+              </p>
               <form onSubmit={freezeRelease}>
                 <div className="sea-two-col">
                   <RevisionPicker
@@ -847,6 +982,13 @@ export function KnowledgeWorkbench({ moduleId }: { moduleId: string }) {
                   <p className="knowledge-id">
                     {b.release_id} · 构建 {b.build_id} · 第 {b.generation} 代
                   </p>
+                  {b.state === "BUILDING" && (
+                    <p>
+                      {b.attempt_id
+                        ? `执行尝试：${b.attempt_id}`
+                        : "已受理，等待构建 worker 领取。"}
+                    </p>
+                  )}
                   {b.error_code && <Notice error>{b.error_code}</Notice>}
                   <div className="sea-actions">
                     {isPending(b.state) && (
@@ -869,14 +1011,37 @@ export function KnowledgeWorkbench({ moduleId }: { moduleId: string }) {
                         }
                         onClick={() => activate(b.release_id, b.build_id)}
                       >
-                        {b.release_id === state?.candidate_release_id
-                          ? "手动发布此版本"
-                          : "回滚到此就绪版本"}
+                        {(snapshot.releases.find((r) => r.release_id === b.release_id)?.ordinal ??
+                          Infinity) <
+                        (snapshot.releases.find((r) => r.release_id === state?.active_release_id)
+                          ?.ordinal ?? 0)
+                          ? "回滚到此就绪版本"
+                          : "手动发布此版本"}
                       </button>
                     )}
                   </div>
                 </div>
               ))}
+              <div className="sea-actions">
+                {snapshot.next.releases && (
+                  <button
+                    className="sea-button"
+                    disabled={loading}
+                    onClick={() => void more("releases")}
+                  >
+                    加载更早候选
+                  </button>
+                )}
+                {snapshot.next.builds && (
+                  <button
+                    className="sea-button"
+                    disabled={loading}
+                    onClick={() => void more("builds")}
+                  >
+                    加载更早构建
+                  </button>
+                )}
+              </div>
               {!snapshot.releases.length && !state?.candidate_release_id && (
                 <EmptyState title="还没有候选版本">先保存原始资料与 Wiki，再冻结候选。</EmptyState>
               )}
