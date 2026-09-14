@@ -48,7 +48,9 @@ test("community and title suggestions consume the existing response envelopes", 
     requests.push({ url, init });
     return url.includes("search/title")
       ? envelope({ items: [{ title: "海洋环流" }] })
-      : envelope({ articles: [{ article_id: "ocean-42", title: "海洋与气候", like_count: 3 }] });
+      : envelope({
+          articles: [{ article_id: "ocean-42", title: "海洋与气候", like_count: 3, status: 2 }],
+        });
   });
   const signal = new AbortController().signal;
   const feed = await communityPage(2, signal);
@@ -63,6 +65,41 @@ test("community and title suggestions consume the existing response envelopes", 
     "search_request_id",
     "topk",
   ]);
+});
+
+test("public community feed keeps stable article IDs and hides non-published states", async (t) => {
+  t.mock.method(global, "fetch", async () =>
+    envelope({
+      articles: [
+        { id: "article-1", title: "已发布", status: 2 },
+        { id: "article-2", title: "待审核", status: 3 },
+        { id: "article-3", title: "已撤回", status: 1 },
+        { id: "article-4", title: "已拒绝", status: 4 },
+      ],
+      total: 4,
+    }),
+  );
+  const feed = await communityPage(1, new AbortController().signal);
+  assert.deepEqual(
+    feed.items.map((item) => item.id),
+    ["article-1"],
+  );
+  assert.equal(feed.hasMore, false);
+});
+
+test("community pagination follows upstream rows even when a full page is under review", async (t) => {
+  t.mock.method(global, "fetch", async () =>
+    envelope({
+      articles: Array.from({ length: 8 }, (_, index) => ({
+        id: `reviewing-${index}`,
+        status: 3,
+      })),
+      total: 9,
+    }),
+  );
+  const feed = await communityPage(1, new AbortController().signal);
+  assert.deepEqual(feed.items, []);
+  assert.equal(feed.hasMore, true);
 });
 
 test("activation binds the supplied module and expected pointer revision", async (t) => {
