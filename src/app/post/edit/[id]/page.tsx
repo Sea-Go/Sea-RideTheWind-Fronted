@@ -12,7 +12,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { buildCoverPreviewSrc } from "@/lib/cover-preview";
-import { type ArticleItem, deleteArticle, getArticle, updateArticle } from "@/services/article";
+import {
+  type ArticleItem,
+  deleteArticle,
+  getAuthorArticle,
+  updateArticle,
+} from "@/services/article";
 import {
   ADMIN_FRONTEND_SESSION_MESSAGE,
   getFrontendAccessState,
@@ -93,7 +98,7 @@ export default function EditPostPage() {
       try {
         const [profile, articlePayload] = await Promise.all([
           getUserProfile(token),
-          getArticle(articleId, { token, incr_view: false }),
+          getAuthorArticle(token, articleId),
         ]);
 
         const article = toArticleItem(articlePayload);

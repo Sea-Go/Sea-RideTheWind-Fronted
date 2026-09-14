@@ -33,7 +33,9 @@ const {
   readEventStream,
   suggest,
 } = require("../src/features/sea/data/api.ts");
+const { getArticle, getAuthorArticle } = require("../src/services/article.ts");
 const { createProxyHandler } = require("../src/app/api/_shared/proxy.ts");
+const articleRoute = require("../src/app/api/article/[...path]/route.ts");
 const productRoute = require("../src/app/api/sea/[...path]/route.ts");
 const { NextRequest } = require("next/server");
 Module._resolveFilename = resolveFilename;
@@ -41,6 +43,55 @@ if (previousTsLoader) require.extensions[".ts"] = previousTsLoader;
 else delete require.extensions[".ts"];
 
 const envelope = (data) => Response.json({ code: 200, msg: "ok", data });
+
+test("author edit reads an unpublished draft through the JWT BFF, while public detail keeps its old URL", async (t) => {
+  const previous = process.env.ARTICLE_API_SERVER_URL;
+  process.env.ARTICLE_API_SERVER_URL = "http://127.0.0.1:1";
+  t.after(() => {
+    if (previous === undefined) delete process.env.ARTICLE_API_SERVER_URL;
+    else process.env.ARTICLE_API_SERVER_URL = previous;
+  });
+  const upstreamPaths = [];
+  t.mock.method(global, "fetch", async (url, init) => {
+    if (url.startsWith("/api/article/")) {
+      const request = new NextRequest(`http://localhost${url}`, {
+        method: init.method,
+        headers: init.headers,
+      });
+      return articleRoute.GET(request, {
+        params: Promise.resolve({ path: url.slice("/api/article/".length).split("/") }),
+      });
+    }
+    const upstream = new URL(url);
+    upstreamPaths.push(upstream.pathname);
+    if (upstream.pathname === "/v1/me/article/article-42") {
+      assert.equal(init.headers.get("authorization"), "Bearer author-token");
+      return envelope({ article: { id: "article-42", status: 3, content: "待审核的作者草稿" } });
+    }
+    assert.equal(upstream.pathname, "/v1/article/article-42");
+    assert.equal(init.headers.get("authorization"), null);
+    return envelope({ article: { id: "article-42", status: 2, content: "已审公开修订" } });
+  });
+
+  assert.equal(
+    (await getAuthorArticle("author-token", "article-42")).article.content,
+    "待审核的作者草稿",
+  );
+  assert.equal((await getArticle("article-42")).article.content, "已审公开修订");
+  assert.deepEqual(upstreamPaths, ["/v1/me/article/article-42", "/v1/article/article-42"]);
+});
+
+test("missing or wrong author login never falls back to the public detail route", async (t) => {
+  const urls = [];
+  t.mock.method(global, "fetch", async (url) => {
+    urls.push(url);
+    return Response.json({ code: 403, msg: "无权读取这篇文章", data: null }, { status: 403 });
+  });
+  await assert.rejects(getAuthorArticle("", "article-42"), /登录后才能读取/);
+  assert.deepEqual(urls, []);
+  await assert.rejects(getAuthorArticle("other-user-token", "article-42"), /无权读取这篇文章/);
+  assert.deepEqual(urls, ["/api/article/v1/me/article/article-42"]);
+});
 
 test("community and title suggestions consume the existing response envelopes", async (t) => {
   const requests = [];
