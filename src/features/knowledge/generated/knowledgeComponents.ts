@@ -29,6 +29,46 @@ export interface AcceptCompileReq {
 }
 export interface AcceptCompileReqParams {}
 
+export interface AcceptSearchCitationsReq {
+  search_id: string;
+  pack_json: string;
+  pack_hash: string;
+}
+
+export interface AcceptedAnswer {
+  answer_id: string;
+  search_id: string;
+  subject: AcceptedSubjectRef;
+  session_id: string;
+  status: string;
+  accepted_ordinal: number;
+  accepted_at: string;
+  turn_json: string;
+}
+
+export interface AcceptedAnswerEnvelope {
+  code: number;
+  msg: string;
+  data: AcceptedAnswer;
+}
+
+export interface AcceptedAnswersPage {
+  items: Array<AcceptedAnswer>;
+  next_ordinal?: number;
+}
+
+export interface AcceptedAnswersPageEnvelope {
+  code: number;
+  msg: string;
+  data: AcceptedAnswersPage;
+}
+
+export interface AcceptedSubjectRef {
+  authority_id: string;
+  tenant_id: string;
+  subject_id: string;
+}
+
 export interface ActivateReq {
   release_id: string;
   build_id: string;
@@ -75,6 +115,41 @@ export interface CancelCompileReq {
 }
 export interface CancelCompileReqParams {}
 
+export interface CitationChunk {
+  chunk_id: string;
+  revision_id: string;
+  content_id: string;
+  source_kind: string;
+  original: CitationObject;
+  location: CitationLocation;
+  text: string;
+  text_hash: string;
+  encoding_key: string;
+  duplicate_of?: string;
+  previous_id?: string;
+  next_id?: string;
+  required: boolean;
+}
+
+export interface CitationChunkEnvelope {
+  code: number;
+  msg: string;
+  data: CitationChunk;
+}
+
+export interface CitationLocation {
+  locator: string;
+  original_byte_start: number;
+  original_byte_end: number;
+  normalized_rune_start: number;
+  normalized_rune_end: number;
+}
+
+export interface CitationObject {
+  key: string;
+  sha256: string;
+}
+
 export interface ClaimBuildReq {
   lease_expires_at: string;
   generation: number;
@@ -94,6 +169,14 @@ export interface ClaimCompileReq {
   input_hash: string;
 }
 export interface ClaimCompileReqParams {}
+
+export interface CommitAcceptedAnswerReq {
+  answer_id: string;
+  search_id: string;
+  subject: AcceptedSubjectRef;
+  session_id: string;
+  turn_json: string;
+}
 
 export interface Compile {
   error_code: string;
@@ -172,6 +255,24 @@ export interface CreateWikiReq {
   idempotency_key: string;
 }
 export interface CreateWikiReqParams {}
+
+export interface GetAcceptedAnswerReq {}
+export interface GetAcceptedAnswerReqParams {
+  authority_id: string;
+  tenant_id: string;
+  subject_id: string;
+  session_id: string;
+}
+
+export interface ListAcceptedAnswersReq {}
+export interface ListAcceptedAnswersReqParams {
+  authority_id: string;
+  tenant_id: string;
+  subject_id: string;
+  session_id: string;
+  after_ordinal?: number;
+  limit?: number;
+}
 
 export interface ListBuildsResp {
   items: Array<Build>;
@@ -278,6 +379,31 @@ export interface ModuleReleasePathParams {}
 export interface ModuleRevisionPath {}
 export interface ModuleRevisionPathParams {}
 
+export interface ProductAcceptedAnswerReq {}
+export interface ProductAcceptedAnswerReqParams {}
+
+export interface ProductAcceptedAnswersReq {}
+export interface ProductAcceptedAnswersReqParams {
+  after_ordinal?: number;
+  limit?: number;
+}
+
+export interface ProductAnswerCitationStates {
+  answer_id: string;
+  search_id: string;
+  status: string;
+  module_id: string;
+  release_id: string;
+  publication_revision: string;
+  citations: Array<SearchCitationReference>;
+}
+
+export interface ProductAnswerCitationStatesEnvelope {
+  code: number;
+  msg: string;
+  data: ProductAnswerCitationStates;
+}
+
 export interface PublishedRevisionPath {}
 export interface PublishedRevisionPathParams {}
 
@@ -285,6 +411,15 @@ export interface PublishedRevisionsReq {}
 export interface PublishedRevisionsReqParams {
   limit?: number;
   cursor?: string;
+}
+
+export interface ReadSearchSourceReq {
+  module_id: string;
+  release_id: string;
+  generation: number;
+  publication_revision: string;
+  revision_id: string;
+  chunk_id: string;
 }
 
 export interface Receipt {
@@ -371,6 +506,65 @@ export interface RevisionEnvelope {
 
 export interface RevisionPath {}
 export interface RevisionPathParams {}
+
+export interface SearchCitationPath {}
+export interface SearchCitationPathParams {}
+
+export interface SearchCitationReceipt {
+  search_id: string;
+  pack_hash: string;
+  durable_ref: string;
+}
+
+export interface SearchCitationReceiptEnvelope {
+  code: number;
+  msg: string;
+  data: SearchCitationReceipt;
+}
+
+export interface SearchCitationRecord {
+  search_id: string;
+  pack_hash: string;
+  durable_ref: string;
+  module_id: string;
+  release_id: string;
+  generation: number;
+  publication_revision: string;
+  evidence: Array<SearchCitationReference>;
+}
+
+export interface SearchCitationRecordEnvelope {
+  code: number;
+  msg: string;
+  data: SearchCitationRecord;
+}
+
+export interface SearchCitationReference {
+  evidence_id: string;
+  source_kind: string;
+  content_id: string;
+  revision_id: string;
+  chunk_id: string;
+  original: CitationObject;
+  locator: CitationLocation;
+  quote_hash: string;
+  state: string;
+}
+
+export interface SearchSnapshot {
+  module_id: string;
+  release_id: string;
+  generation: number;
+  publication_revision: string;
+  indexes: { [key: string]: CitationObject };
+  valid_revision_ids: Array<string>;
+}
+
+export interface SearchSnapshotEnvelope {
+  code: number;
+  msg: string;
+  data: SearchSnapshot;
+}
 
 export interface SourceRef {
   revision_id: string;

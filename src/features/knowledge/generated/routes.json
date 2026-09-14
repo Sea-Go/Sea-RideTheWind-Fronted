@@ -1,5 +1,17 @@
 [
   {
+    "method": "GET",
+    "path": "knowledge/answer-sessions/{session_id}/accepted-answers"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/answer-sessions/{session_id}/accepted-answers/{answer_id}"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/answer-sessions/{session_id}/accepted-answers/{answer_id}/citations"
+  },
+  {
     "method": "POST",
     "path": "knowledge/builds/{build_id}/cancel"
   },
