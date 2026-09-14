@@ -76,9 +76,15 @@
   ],
   "browser_method": "CUA native Chrome after extension-session discovery timed out; only a new disposable localhost tab was used",
   "tests": {
-    "node_contract_and_component_tests": 57,
+    "node_contract_and_component_tests": 58,
     "production_runtime": "Node 22.22.0 / Next 16.1.3",
     "production_build": "passed, 62 static pages",
     "scope": "product read/write and structural H06 acceptance; not real search/index quality"
+  },
+  "contract_refresh": {
+    "provider_commit": "8ddc034f66c027f92e737796d8ed6bba559362e9",
+    "changes": "Optional limit in generated pagination Params; optional next_cursor/content in provider Swagger; no runtime or path changes",
+    "validation": "58 Node tests and project typecheck passed, including default pagination and terminal-page generated-type consumers",
+    "browser_repeated": false
   }
 }

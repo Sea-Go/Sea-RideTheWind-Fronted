@@ -197,7 +197,7 @@ export interface ListCompilesRespEnvelope {
 
 export interface ListModulesReq {}
 export interface ListModulesReqParams {
-  limit: number;
+  limit?: number;
   cursor?: string;
 }
 
@@ -265,7 +265,7 @@ export interface ModuleEnvelope {
 
 export interface ModulePageReq {}
 export interface ModulePageReqParams {
-  limit: number;
+  limit?: number;
   cursor?: string;
 }
 
@@ -283,7 +283,7 @@ export interface PublishedRevisionPathParams {}
 
 export interface PublishedRevisionsReq {}
 export interface PublishedRevisionsReqParams {
-  limit: number;
+  limit?: number;
   cursor?: string;
 }
 

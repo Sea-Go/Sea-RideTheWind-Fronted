@@ -331,3 +331,37 @@ test("public reading routes remain public and workbench keeps its existing login
     assert.equal(proxy(new NextRequest(`http://localhost${route}`)).status, 307);
   }
 });
+
+test("generated consumer types accept default pagination and terminal pages", () => {
+  const os = require("node:os");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sea-knowledge-type-consumer-"));
+  try {
+    const fixture = path.join(dir, "consumer.ts");
+    const source = path.join(root, "src/features/knowledge/generated/knowledgeComponents");
+    fs.writeFileSync(
+      fixture,
+      `import type { ListModulesReqParams, ModulePageReqParams, PublishedRevisionsReqParams, ListModulesResp, ListRevisionsResp, ListBuildsResp, ListCompilesResp, ListReleasesResp } from ${JSON.stringify(source)};
+const defaults: [ListModulesReqParams, ModulePageReqParams, PublishedRevisionsReqParams] = [{}, {}, {}];
+const terminal: [ListModulesResp, ListRevisionsResp, ListBuildsResp, ListCompilesResp, ListReleasesResp] = [{items:[]},{items:[]},{items:[]},{items:[]},{items:[]}];
+void defaults; void terminal;
+`,
+    );
+    const program = ts.createProgram([fixture], {
+      noEmit: true,
+      strict: true,
+      skipLibCheck: true,
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.CommonJS,
+      types: [],
+    });
+    const errors = ts
+      .getPreEmitDiagnostics(program)
+      .filter((d) => d.category === ts.DiagnosticCategory.Error);
+    assert.deepEqual(
+      errors.map((d) => ts.flattenDiagnosticMessageText(d.messageText, "\n")),
+      [],
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

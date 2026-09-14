@@ -36,7 +36,7 @@ node scripts/sync-knowledge-contract.cjs /path/to/rtw-checkout
 
 ## 2026-09-14 验收
 
-- 57项定向 Node 契约/组件测试通过，覆盖生成产品路径与方法、幂等命令、错误透传、状态分辨、正文读取失败保留输入、重载历史回滚参数、固定阅读链接/定位、公开阅读与工作台路由，及既有学习流回归。
+- 58项定向 Node 契约/组件测试通过，覆盖生成产品路径与方法、幂等命令、错误透传、状态分辨、正文读取失败保留输入、重载历史回滚参数、固定阅读链接/定位、公开阅读与工作台路由，及既有学习流回归。
 - 类型检查、Node22.22.0 下 Next16.1.3 生产构建及 standalone 资源准备通过（62个静态页面）；scoped
   ESLint无错误，保留本地SVG图片优化提示；新 CSS Stylelint、git diff
   whitespace检查通过。
@@ -45,6 +45,9 @@ node scripts/sync-knowledge-contract.cjs /path/to/rtw-checkout
 - 实际 Chrome 通过 CUA 原生操作验收：读取已有原文/Wiki后追加第四修订，比较第二/第四版正文；刷新后从历史构建发布v3，再刷新回滚v1，指针4→5→6；取消历史编制任务；回滚后第二版固定正文与原文段落仍可读；未发布/撤回页面均显示不可读。
 
 记录：[读链验收](../../../acceptance/knowledge-read-20260914.json)；先前写链阶段记录保留在[阶段验收](../../../acceptance/knowledge-20260914.json)。浏览器扩展会话超时后使用 CUA 原生 Chrome，仅操作新建的本地验收标签页。
+
+补充生成契约验收：`8ddc034`
+不改变路径、wire 或业务行为；重新生成后，三个分页 Params 可省略 limit，所有列表末页可省略 next_cursor 的 TypeScript 消费编译通过。58项契约/组件测试与全项目类型检查通过；未重复不变业务的浏览器验收。
 
 ## 仍未验收的边界
 
