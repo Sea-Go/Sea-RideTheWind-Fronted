@@ -38,6 +38,7 @@ export const ARTICLE_API_PATHS = {
   upload: `${ARTICLE_BFF_PREFIX}/v1/upload`,
   create: `${ARTICLE_BFF_PREFIX}/v1/article`,
   getById: (id: string) => `${ARTICLE_BFF_PREFIX}/v1/article/${encodeURIComponent(id)}`,
+  getAuthorById: (id: string) => `${ARTICLE_BFF_PREFIX}/v1/me/article/${encodeURIComponent(id)}`,
   updateById: (id: string) => `${ARTICLE_BFF_PREFIX}/v1/article/${encodeURIComponent(id)}`,
   deleteById: (id: string) => `${ARTICLE_BFF_PREFIX}/v1/article/${encodeURIComponent(id)}`,
   list: `${ARTICLE_BFF_PREFIX}/v1/articles`,

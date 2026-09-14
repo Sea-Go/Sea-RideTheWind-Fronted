@@ -206,6 +206,17 @@ export const getArticle = (id: string, options?: GetArticleOptions): Promise<Art
     },
   );
 
+export const getAuthorArticle = async (token: string, id: string): Promise<ArticleResponse> => {
+  if (!token.trim()) {
+    throw new Error("登录后才能读取自己的文章。");
+  }
+
+  return request<ArticleResponse>(ARTICLE_API_PATHS.getAuthorById(id), {
+    method: "GET",
+    headers: withBearerAuthorization(token),
+  });
+};
+
 export const listArticles = (params?: ListArticlesParams): Promise<ArticleListResponse> =>
   request<ArticleListResponse>(
     appendQueryParams(ARTICLE_API_PATHS.list, {
