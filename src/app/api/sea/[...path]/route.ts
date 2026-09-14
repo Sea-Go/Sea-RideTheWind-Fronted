@@ -1,18 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-// Proposed RTW product contracts. No upstream configured => explicit unavailable. Never synthesizes success.
+
+import { isKnowledgeRoute } from "@/server/knowledge-routes";
+// Knowledge paths are generated from RTW. Other product interfaces remain separate. No fixtures.
 const allowed =
-  /^(?:knowledge\/modules(?:\/[^/]+(?:\/(?:sources|releases(?:\/current)?|activation|wiki-pages(?:\/[^/]+(?:\/revisions)?)?))?)?|knowledge\/releases\/[^/]+\/index-builds|learning\/conversations(?:\/[^/]+\/messages)?|learning\/answers\/[^/]+(?:\/(?:cancel|citations\/[^/]+))?|intelligence\/(?:search|recommendations))$/;
+  /^(?:learning\/conversations(?:\/[^/]+\/messages)?|learning\/answers\/[^/]+(?:\/(?:cancel|citations\/[^/]+))?|intelligence\/(?:search|recommendations))$/;
 export async function GET(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
   const pathname = path.map(encodeURIComponent).join("/");
-  if (!allowed.test(pathname))
+  if (
+    !(pathname.startsWith("knowledge/")
+      ? isKnowledgeRoute(pathname, request.method)
+      : allowed.test(pathname))
+  )
     return NextResponse.json({ code: 404, msg: "未知产品契约路径", data: null }, { status: 404 });
   const base = process.env.SEA_PRODUCT_API_SERVER_URL;
   if (!base)
     return NextResponse.json(
       {
         code: 503,
-        msg: "知识与全站学习产品接口待接入，请配置 SEA_PRODUCT_API_SERVER_URL 并核对接口草案",
+        msg: "产品服务尚未配置，请设置 SEA_PRODUCT_API_SERVER_URL",
         data: null,
       },
       { status: 503 },

@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 
+import { KnowledgeWorkbench as LiveKnowledgeWorkbench } from "@/features/knowledge/KnowledgeWorkbench";
+import { WorkbenchModules } from "@/features/knowledge/WorkbenchModules";
+
 import {
   ArrowLeft,
   ArrowRight,
@@ -83,14 +86,14 @@ export function KnowledgeShelf() {
           <ArrowRight size={16} />
         </SeaLink>
       </div>
-      {data.error && <Notice error>知识服务待接入：{data.error}</Notice>}
+      {data.error && <Notice error>知识服务暂不可用：{data.error}</Notice>}
       {data.loading && <p>正在打开书架…</p>}
       <div className="sea-book-grid">
         {data.items.map((m) => (
           <SeaLink key={m.id} href={`/knowledge/${m.id}`} className="sea-book-card">
             <div className="sea-book-art">
               <img
-                src={`/sea/${m.image}.svg`}
+                src={`/sea/${["mountain", "planetarium", "summer", "ocean"].includes(m.image) ? m.image : "book-orbits"}.svg`}
                 width="350"
                 height="230"
                 alt={`${m.title}原创封面`}
@@ -419,6 +422,15 @@ export function KnowledgeReader({
   );
 }
 export function KnowledgeWorkbench({ moduleId }: { moduleId?: string }) {
+  const { demo } = useSea();
+  if (demo) return <DemoKnowledgeWorkbench moduleId={moduleId} />;
+  return moduleId ? (
+    <LiveKnowledgeWorkbench key={moduleId} moduleId={moduleId} />
+  ) : (
+    <WorkbenchModules />
+  );
+}
+function DemoKnowledgeWorkbench({ moduleId }: { moduleId?: string }) {
   const { demo, ready } = useSea();
   const selectedModuleId = moduleId || (demo ? "mountain" : "");
   const [state, setState] = useState<ReleaseState | null>(demo ? demoRelease : null);

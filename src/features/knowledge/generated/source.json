@@ -1,0 +1,7 @@
+{
+  "contract": "api/knowledge.api",
+  "provider_commit": "627c1c9bb63088f59fb9429160158ba6ba2bc46d",
+  "api_sha256": "ecb7abd9e1a041e36ff4bcfd3a2fbf0d12d07f7ce64f81c1c7741d8d2e38cb3c",
+  "generator": "goctl 1.9.2",
+  "background": "BG-2026-09-13-r2"
+}

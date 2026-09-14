@@ -1,0 +1,36 @@
+.knowledge-id {
+  overflow-wrap: anywhere;
+  font-size: 0.82rem;
+}
+.sea-knowledge-workbench .sea-tabs {
+  flex-wrap: wrap;
+}
+.sea-knowledge-workbench .sea-tabs button {
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+}
+.sea-knowledge-workbench fieldset {
+  min-width: 0;
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--sea-line);
+  border-radius: 0.75rem;
+}
+.sea-knowledge-workbench details {
+  margin: 1rem 0;
+}
+.sea-knowledge-workbench summary {
+  cursor: pointer;
+}
+.knowledge-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: inherit;
+  line-height: 1.8;
+}
+.knowledge-revisions .sea-checkbox {
+  align-items: start;
+}
+.knowledge-revisions small {
+  display: block;
+}

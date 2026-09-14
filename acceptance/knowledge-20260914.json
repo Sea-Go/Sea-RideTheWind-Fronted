@@ -1,0 +1,60 @@
+{
+  "background": "BG-2026-09-13-r2",
+  "started_at": "2026-09-14T03:28:03.907Z",
+  "provider_commit": "627c1c9bb63088f59fb9429160158ba6ba2bc46d",
+  "checks": [
+    "module creation stays out of the published shelf",
+    "administrator workbench contains the unpublished module",
+    "frozen candidate is NOT_BUILT and never automatically published",
+    "build cancellation is preserved",
+    "published shelf contains only the manually activated version",
+    "BFF duplicate activation replays the same business result",
+    "stale publication returns 409 and preserves current pointer",
+    "book A, revised interpretation, and book B create three immutable releases",
+    "rollback uses an older READY build and increases the pointer revision"
+  ],
+  "limitations": [
+    "Synthetic admin JWT on an isolated local PostgreSQL instance",
+    "Local content-addressed object backend",
+    "H06 structural fixture only; no real AI compilation, Dense/Sparse/Multi-vector model or query quality",
+    "No production deployment"
+  ],
+  "fixture": {
+    "module_id": "module_cb3a7df0-43a0-4005-8fa6-80818360d9c5",
+    "source_a": "revision_bee1c50b-82d4-4bdc-a4b3-4876811c3a97",
+    "source_b": "revision_da91a8e4-d782-4803-9623-4fc03c3127e5",
+    "wiki1": "revision_0745abed-00cb-48fb-9f09-c5a8673b607d",
+    "wiki2": "revision_b7271145-beeb-4ce7-b1bf-c4c1d771df06",
+    "wiki3": "revision_e1a09c9d-d2c7-4f61-be22-c5c50316832d",
+    "release1": "release_9c525766-eb9d-4606-8968-c967ff436ab6",
+    "release2": "release_a9283b34-413c-42fa-b078-ea409121ee3b",
+    "release3": "release_4e9ce042-543b-4675-b9d3-207fc43a0213",
+    "build1": "build_d4d7773a-87bc-4d4a-9128-c17d3d36dc03",
+    "build2": "build_17537be9-583b-49fb-9ecb-6133a6ba35e0",
+    "build3": "build_26f1bb21-fdd5-46eb-8d3f-ae0436b0fcbe",
+    "superseded_build": "build_8165a7a9-a9d6-416a-a477-2844ab04967d",
+    "cancelled_build": "build_9d822f71-3431-4462-9fc0-ed39c7c29e03",
+    "superseded_compile": "compile_11df22ab-32a4-44af-90ff-7b84e1c4c611"
+  },
+  "completed_at": "2026-09-14T03:28:15.444Z",
+  "browser_checks": [
+    {
+      "action": "真实页面手动发布结构 fixture",
+      "module_id": "module_cb3a7df0-43a0-4005-8fa6-80818360d9c5",
+      "pointer_before": 4,
+      "pointer_after": 5,
+      "release_id": "release_4e9ce042-543b-4675-b9d3-207fc43a0213"
+    },
+    {
+      "action": "真实页面新建草稿、原文与 Wiki",
+      "module_id": "module_bd12c4af-5257-4803-8518-5632d5deef22",
+      "source_revision_id": "revision_a3fe54a7-4cd0-4706-ab5c-6b395d4a3af9",
+      "wiki_revision_id": "revision_3c39bbe5-b979-4886-917f-12fa965c2c26",
+      "active_release": "尚未发布"
+    },
+    {
+      "action": "缺正文读取的历史编辑入口保持禁用"
+    }
+  ],
+  "checks_scope": "真实 HTTP/BFF 和浏览器产品命令；H06 为结构 fixture，不是完整 WS03-B/L3 算法验收"
+}

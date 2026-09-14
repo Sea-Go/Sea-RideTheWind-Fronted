@@ -1,0 +1,66 @@
+[
+  {
+    "method": "POST",
+    "path": "knowledge/builds/{build_id}/cancel"
+  },
+  {
+    "method": "POST",
+    "path": "knowledge/compiles/{compile_id}/cancel"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/modules"
+  },
+  {
+    "method": "POST",
+    "path": "knowledge/modules"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/modules/{module_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "knowledge/modules/{module_id}/activation"
+  },
+  {
+    "method": "POST",
+    "path": "knowledge/modules/{module_id}/compiles"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/modules/{module_id}/published"
+  },
+  {
+    "method": "POST",
+    "path": "knowledge/modules/{module_id}/releases"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/modules/{module_id}/releases/current"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/modules/{module_id}/revisions"
+  },
+  {
+    "method": "POST",
+    "path": "knowledge/modules/{module_id}/sources"
+  },
+  {
+    "method": "POST",
+    "path": "knowledge/modules/{module_id}/wiki-pages/{page_id}/revisions"
+  },
+  {
+    "method": "POST",
+    "path": "knowledge/modules/{module_id}/withdrawals"
+  },
+  {
+    "method": "POST",
+    "path": "knowledge/releases/{release_id}/index-builds"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/workbench/modules"
+  }
+]
