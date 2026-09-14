@@ -6,6 +6,8 @@ worker。此前阶段交付的缺失读面现已接通。
 
 ## 产品能力
 
+- 已接纳知识问答历史从知识书架进入，按已知逻辑会话 ID 查看 RTW 用户态产品记录、固定答案及当前引用可用性；具体合同与局部验收见
+  [ANSWER_HISTORY_ACCEPTANCE.md](ANSWER_HISTORY_ACCEPTANCE.md)。当前学习对话尚未交付对应的权威知识会话 ID。
 - `/workbench/modules`
   读取管理员模块列表、建立草稿；单模块工作台读取草稿详情。`/knowledge`
   及模块目录只读取有效已发布版本。
