@@ -141,11 +141,23 @@
   },
   {
     "method": "GET",
+    "path": "knowledge/modules/{module_id}/wiki-pages/{page_id}/fact-set-revisions/{fact_set_revision_id}"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/modules/{module_id}/wiki-pages/{page_id}/fact-sets/{source_scope_revision}"
+  },
+  {
+    "method": "GET",
     "path": "knowledge/modules/{module_id}/wiki-pages/{page_id}/head"
   },
   {
     "method": "POST",
     "path": "knowledge/modules/{module_id}/wiki-pages/{page_id}/revisions"
+  },
+  {
+    "method": "POST",
+    "path": "knowledge/modules/{module_id}/wiki-pages/{page_id}/revisions/{wiki_revision_id}/fact-sets"
   },
   {
     "method": "GET",

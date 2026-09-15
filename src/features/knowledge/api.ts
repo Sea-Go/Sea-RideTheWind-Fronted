@@ -15,6 +15,7 @@ import type {
   CreateReleaseReq,
   CreateSourceReq,
   CreateWikiReq,
+  FreezeWikiFactSetReq,
   JudgeWikiFactReq,
   ListModulesResp,
   ListRevisionsResp,
@@ -25,6 +26,7 @@ import type {
   ReleaseState,
   Revision,
   WikiFactJudgmentRecord,
+  WikiFactSetRecord,
   WikiPageHeadSnapshot,
 } from "./generated/knowledgeComponents";
 
@@ -163,6 +165,26 @@ export const knowledgeQuality = {
       method: "POST",
       body: JSON.stringify(input),
     }),
+};
+
+const wikiFactSetPath = (moduleId: string, pageId: string) => `${wikiPagePath(moduleId, pageId)}`;
+/** Product admin routes only. Original Event bytes belong to the Worker API. */
+export const knowledgeFactSets = {
+  scope: (moduleId: string, pageId: string, sourceScopeRevision: string, signal?: AbortSignal) =>
+    adminGet<WikiFactSetRecord>(
+      `${wikiFactSetPath(moduleId, pageId)}/fact-sets/${part(sourceScopeRevision)}`,
+      signal,
+    ),
+  revision: (moduleId: string, pageId: string, factSetRevisionId: string, signal?: AbortSignal) =>
+    adminGet<WikiFactSetRecord>(
+      `${wikiFactSetPath(moduleId, pageId)}/fact-set-revisions/${part(factSetRevisionId)}`,
+      signal,
+    ),
+  freeze: (moduleId: string, pageId: string, wikiRevisionId: string, input: FreezeWikiFactSetReq) =>
+    adminPost<WikiFactSetRecord>(
+      `${wikiFactSetPath(moduleId, pageId)}/revisions/${part(wikiRevisionId)}/fact-sets`,
+      input,
+    ),
 };
 
 // Product answer history is scoped by RTW to the verified User Center JWT.
