@@ -1,7 +1,7 @@
 # 知识工作台产品客户端
 
 背景 BG-2026-09-13-r2；任务 WS03-B 和知识域 WS03-A；消费 H02，H03/H06 由 RTW 映射到产品 API。当前产品契约从 RTW 固定质量源
-`6865022` 的 goctl 1.9.2 输出同步，不代理 internal
+`d10d1d3` 的 goctl 1.9.2 输出同步，不代理 internal
 worker。此前阶段交付的缺失读面现已接通。
 
 ## 产品能力
@@ -16,6 +16,7 @@ worker。此前阶段交付的缺失读面现已接通。
   `paragraph:N`。加载正文期间锁定编辑表单；失败保留原输入，不以空文本替代正文。
 - Wiki“事实核验”对一个固定原文事实与一个不可变 Wiki 修订记录人工 0–3/无法判定，按原字节核证据、旧判断 CAS 复核，并独立显示 Wiki 编辑 head 与活动 Release。撤回来源正文不可重读时保留既有判断列表；不从单 Fact 推断页面质量或自动发布。局部验收与身份边界见
   [WIKI_FACT_REVIEW_ACCEPTANCE.md](WIKI_FACT_REVIEW_ACCEPTANCE.md)。
+- Wiki“事实目录”按已接纳编制全部来源或人工同页来源链给出待 RTW 核准的预览；管理员显式声明预期事实全集、逐条原字节片段和 required 标记，CAS 冻结同范围目录，按指定目录修订 ID 查看旧历史。正式撤回来源停止新证明但旧目录片段可查；这不是客观完整性证明、UserCenter UID、D07 或发布指针。技术与本地 PG/浏览器验收见 [WIKI_FACT_SET_ACCEPTANCE.md](WIKI_FACT_SET_ACCEPTANCE.md)。
 - 修订比较左右独立读取固定正文，可比较历史与新版本。后续发布/回滚不会静默替换选定修订。
 - 修订、候选 release、build、compile 均沿服务端 `next_cursor`
   分页读取。人工刷新返回最新一页；后续页保持提供方游标的成员上界。大正文仅按选中修订读取，不批量加载整本内容。
