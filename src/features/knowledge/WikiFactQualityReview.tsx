@@ -256,22 +256,7 @@ export function WikiFactQualityReview({
           {loading && <p role="status">正在读取当前编辑头与事实判断…</p>}
           {!loading && !items.length && !error && <p>目前没有已记录的事实判断。</p>}
           {items.map((item) => (
-            <article key={item.fact_id} className="sea-source-link">
-              <div>
-                <strong>
-                  {item.assessment === "undetermined"
-                    ? "无法判定 · 不打数字分"
-                    : `${assessmentNames[item.assessment] || item.assessment} · ${item.grade ?? "?"} 分`}
-                </strong>
-                <p>{item.reason}</p>
-                <small className="knowledge-id">
-                  {item.source_revision_id} · {item.locator} · {item.fact_id}
-                </small>
-                <small>
-                  管理员账号标识 {item.actor_id} · 评阅修订 {item.judge_revision}
-                </small>
-              </div>
-            </article>
+            <WikiFactHistoryEntry key={item.fact_id} item={item} />
           ))}
           {cursor && (
             <button className="sea-button" disabled={loading} onClick={() => void more()}>
@@ -281,5 +266,73 @@ export function WikiFactQualityReview({
         </div>
       )}
     </section>
+  );
+}
+
+function WikiFactHistoryEntry({ item }: { item: WikiFactJudgmentRecord }) {
+  const titleId = `wiki-fact-history-${item.judge_revision_id}`;
+  const detailRows: [string, string][] = [
+    ["原文修订 ID", item.source_revision_id],
+    ["原文正文 SHA-256", item.source_content_sha256],
+    ["原文事实片段 SHA-256", item.source_quote_sha256],
+    ["原文引文字节范围", `${item.source_byte_start}:${item.source_byte_end}`],
+    ["Wiki 修订 ID", item.wiki_revision_id],
+    ["Wiki 正文 SHA-256", item.wiki_content_sha256],
+    ["Wiki 断言 SHA-256", item.wiki_claim_sha256 || "未记录"],
+    ["精确来源引用", item.citation_present ? "有" : "无"],
+    ["事实 ID", item.fact_id],
+    ["判断 ID", item.judgment_id],
+    ["评阅修订 ID", item.judge_revision_id],
+    ["上次评阅修订 ID", item.base_judge_revision_id || "初次判断"],
+    ["管理员账号标识", item.actor_id],
+    ["评阅时间", item.judged_at],
+    ["等级合同", item.rubric_version],
+    ["技术判断类别", item.assessment],
+    ["技术等级", item.grade || "无法判定，不打数字分"],
+    ["模块 ID", item.module_id],
+    ["Wiki 页面 ID", item.page_id],
+    ["Wiki 上次正文修订 ID", item.base_wiki_revision_id || "初版"],
+    ["Wiki 来源", item.wiki_origin_kind],
+    ["来源编制 ID", item.origin_compile_id || "无"],
+    ["评阅时原文已撤回", item.source_withdrawn ? "是" : "否"],
+    ["评阅时 Wiki 已撤回", item.wiki_withdrawn ? "是" : "否"],
+    ["记录合同版本", item.schema_version],
+    ["事件 ID", item.event_id || "未记录"],
+    ["事件原字节 SHA-256", item.event_raw_sha256 || "未记录"],
+    ["事件 JCS SHA-256", item.event_jcs_sha256 || "未记录"],
+  ];
+
+  return (
+    <article className="wiki-fact-history-entry" aria-labelledby={titleId}>
+      <header className="wiki-fact-history-head">
+        <h4 id={titleId}>
+          {item.assessment === "undetermined"
+            ? "无法判定 · 不打数字分"
+            : `${assessmentNames[item.assessment] || item.assessment} · ${item.grade ?? "?"} 分`}
+        </h4>
+        <span>评阅修订 {item.judge_revision}</span>
+      </header>
+      <p className="wiki-fact-history-reason">{item.reason}</p>
+      <p className="wiki-fact-history-source">来源段落 {item.locator}</p>
+      <details className="wiki-fact-history-evidence">
+        <summary>查看固定证据与完整标识</summary>
+        <div className="wiki-fact-history-evidence-body">
+          <h5>原文事实片段</h5>
+          <blockquote>{item.source_quote}</blockquote>
+          <h5>Wiki 中的对应断言</h5>
+          <blockquote>{item.wiki_claim_text || "未记录断言"}</blockquote>
+          <dl className="wiki-fact-history-fields">
+            {detailRows.map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>
+                  <code>{value}</code>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </details>
+    </article>
   );
 }
