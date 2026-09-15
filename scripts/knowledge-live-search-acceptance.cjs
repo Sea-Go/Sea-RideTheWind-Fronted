@@ -636,6 +636,7 @@ let resultWritten = false;
         schema_version: "sea.web.real-browser-handoff.v1",
         stage: "withdrawn",
         refresh_url: `${webBase}${sessionPath}/${encodeURIComponent(product.answer_id)}`,
+        history_url: `${webBase}${sessionPath}?module_id=${encodeURIComponent(ready.module_id)}`,
         answer_id: product.answer_id,
         result_file: files.browserWithdrawnResult,
       });
@@ -664,6 +665,8 @@ let resultWritten = false;
         citation_state: "unavailable",
         quote_visible: false,
         fixed_revision_link_visible: false,
+        history_list_valid_answer_visible: true,
+        unreadable_warning_visible: true,
       });
       report.browser.withdrawn = observation.observed;
       report.browser.withdrawn_path_sha256 = sha256(current.pathname);
