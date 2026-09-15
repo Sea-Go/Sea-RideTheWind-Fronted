@@ -432,16 +432,11 @@ let resultWritten = false;
         session_url: sessionURL,
         login_username: ready.login_username,
         login_password: ready.login_password,
-        storage_key: `sea:knowledge-search:${ready.session_id}`,
-        storage_operation: {
-          input: {
-            module_id: requestBody.module_id,
-            query: requestBody.query,
-            depth: requestBody.depth,
-            intelligence: requestBody.intelligence,
-          },
-          idempotencyKey: ready.idempotency_key,
-          searchId: "",
+        input: {
+          module_id: requestBody.module_id,
+          query: requestBody.query,
+          depth: requestBody.depth,
+          intelligence: requestBody.intelligence,
         },
         result_file: files.browserSearchResult,
       });
@@ -468,7 +463,7 @@ let resultWritten = false;
       assert.ok(answerID && !answerID.includes("/"));
       assert.deepEqual(observation.observed, {
         hydrated_search_controls: true,
-        fixed_key_retry_clicked: true,
+        search_submitted: true,
         accepted_answer_heading: true,
         answer_visible: true,
         citation_state: "available",
@@ -498,7 +493,7 @@ let resultWritten = false;
         current_path_sha256: sha256(current.pathname),
       };
       report.checks.push(
-        "A real browser hydrated the search controls and submitted the fixed logical request",
+        "A real browser hydrated the search controls and submitted one product search request",
       );
     } else {
       const created = await httpJSON(
@@ -523,13 +518,15 @@ let resultWritten = false;
       200,
     );
     equalJSON(recovered.payload.data, product);
-    const replayed = await httpJSON(
-      "same-key-replay-through-next-bff",
-      productPath,
-      { method: "POST", token: ownerToken, cookie: ownerToken, body: requestBody },
-      200,
-    );
-    equalJSON(replayed.payload.data, product);
+    if (!browserMode) {
+      const replayed = await httpJSON(
+        "same-key-replay-through-next-bff",
+        productPath,
+        { method: "POST", token: ownerToken, cookie: ownerToken, body: requestBody },
+        200,
+      );
+      equalJSON(replayed.payload.data, product);
+    }
     await httpJSON(
       "other-user-fixed-search-isolation",
       operationPath,
@@ -544,7 +541,9 @@ let resultWritten = false;
     );
     assert.deepEqual(otherHistory.payload.data.items, []);
     report.checks.push(
-      "Web BFF POST replay and fixed GET recovered one RTW operation without cross-user exposure",
+      browserMode
+        ? "Web BFF fixed GET recovered the browser-created RTW operation without cross-user exposure"
+        : "Web BFF POST replay and fixed GET recovered one RTW operation without cross-user exposure",
     );
 
     writeJSONExclusive(files.webSearchResult, {
