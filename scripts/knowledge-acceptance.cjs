@@ -648,6 +648,8 @@ process.on("SIGTERM", () => {
           locator: "paragraph:1",
           source_quote: quote,
           source_quote_sha256: crypto.createHash("sha256").update(Buffer.from(quote)).digest("hex"),
+          wiki_claim_text: quote,
+          wiki_claim_sha256: crypto.createHash("sha256").update(Buffer.from(quote)).digest("hex"),
           assessment: "covered",
           grade: "3",
           rubric_version: "sea.wiki.fact-coverage.v1",
