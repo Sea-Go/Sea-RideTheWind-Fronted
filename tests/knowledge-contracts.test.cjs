@@ -185,6 +185,7 @@ function renderWorkbench(snapshot) {
     "./knowledge.css": {},
     "./RevisionCompare": { RevisionCompare: "RevisionCompare" },
     "./WikiFactQualityReview": { WikiFactQualityReview: "WikiFactQualityReview" },
+    "./WikiFactSetWorkbench": { WikiFactSetWorkbench: "WikiFactSetWorkbench" },
   };
   const module = { exports: {} };
   new Function("require", "module", "exports", compiled)(
