@@ -1,7 +1,11 @@
 # 已登录知识会话搜索入口
 
-状态：**LOCAL_VERIFIED（2026-09-14）**。前端与 RTW H02 产品合同、Next
-BFF 转发和现有已接纳答案读面完成本地合同验收；没有把真实浏览器、RTW、BTW、三路索引与模型串成同一次端到端验收。H02 整体仍为
+状态：**LOCAL_VERIFIED（2026-09-14）；真实 Next BFF
+HTTP 跨仓链 INTEGRATED（2026-09-15）**。前端与 RTW H02 产品合同、Next
+BFF 转发和现有已接纳答案读面完成本地合同验收；真实 User
+Center、Next 生产服务、RTW、BTW 正式
+`cmd/api`、DataCenter 固定 BGE-M3 三路表示及 RTW
+PostgreSQL 已在同一次 HTTP 联验中通过。真实浏览器 DOM/视觉、线上模型和规模效果仍未验收，H02 整体仍为
 **PARTIAL**。
 
 ## 产品流程和边界
@@ -12,6 +16,11 @@ BFF 转发和现有已接纳答案读面完成本地合同验收；没有把真�
 `crypto.randomUUID()` 建立符合 RTW 格式的幂等键，只向
 `POST /v1/knowledge/answer-sessions/:session_id/searches`
 发送这五个字段。SubjectRef、SearchSnapshot、SearchID、AnswerID 都由服务端确定，浏览器不从客户端身份或页面版本推断。
+
+SubjectRef 的产品身份语义只有 **RTW User Center（`rtw-user-center`）权威来源 +
+User Center 全局 UID**。后端现有三段编码 `rtw.identity/platform/<UID>`
+中，`platform` 是固定 realm 常量，不是租户；网页不新增、保存或发送
+`tenant_id`，也不根据域名、模块或会话推断租户。
 
 RTW 返回 202 时，网页每 3 秒 GET 固定 `search_id`；503 或 GET 的
 `retryable_failure`
@@ -48,6 +57,17 @@ H02 的产品搜索接受与恢复合同、现有答案历史读面；`[D1]` Nex
 执行
 `node --test tests/knowledge-product-search.test.cjs tests/knowledge-answer-history.test.cjs tests/knowledge-contracts.test.cjs tests/sea-contracts.test.cjs`、`pnpm typecheck`、`pnpm lint`、`pnpm build`、`git diff --check`。75 项 Node 测试通过，包含五字段 POST 与用户 JWT、503 固定 ID、202/200
 GET 回查、409、伪成功拒收、成功 AnswerID、当前标签页同账号恢复和 BFF 状态/正文转发。类型检查与 63 页 Next 构建通过；全量 lint 退出 0，仓库原有 66 条未改文件的 warning。测试机器 Node
-26.3.1，项目声明 Node
-22.22.0；未用正式版本 Node 重验。针对 RTW 的真实 go-zero/User
-RPC/PG、BTW 真实签发空证据子链已有后端独立验收；此分支未做同一次真实浏览器到后端双进程验收，也未验证有证据的模型答案、客户端 SSE/Tools 或生产部署。
+26.3.1，项目声明 Node 22.22.0；未用正式版本 Node 重验。
+
+2026-09-15 运行
+`node scripts/knowledge-live-search-acceptance.cjs <RTW> <BTW> <DataCenter>`，同一次真实进程链完成两账号 User
+Center 登录、生产 Next 页面路由与 BFF、产品 POST、同键重放、固定 GET 恢复、另一 UID 隔离、RTW
+PG 答案/引用/历史读取，以及来源撤回后的 `available→unavailable`。BTW 使用正式
+`cmd/api` 和 tRPC-Agent-Go Graph/Runner，DataCenter 使用固定官方 BGE-M3
+Dense/Sparse/Multi-vector 表示与三路本地精确检索。最终报告
+`/private/tmp/sea-web-live-search-final-pass-20260915113215-51465/report.json`
+为 `passed`，SHA256 为
+`3fb132882ac876aa8b4c6a15e0d6f49198198f4b273b48af7db4d2e73974d144`；RTW/DataCenter 子进程与脚本均退出 0，且没有残留联验进程。报告不含 JWT、口令、DSN 或签名密钥。
+
+这次只把生产 Next 页面路由壳作为 HTTP 证据；登录态页面内容和 `sessionStorage`
+依赖客户端水合，没有把原始 HTML 误写成浏览器验收。未运行真实浏览器 DOM/视觉；固定模型和两块隔离语料也不验证模型答案质量、检索相关性、规模效果、客户端 SSE/Tools 或生产部署。
