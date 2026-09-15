@@ -84,3 +84,39 @@ fail；`pnpm typecheck`、变更五个源码文件的 ESLint（0 error、0
 warning）、`pnpm exec next build`（63个静态页面）与 `git diff --check`
 通过。当前 Node26.3.1 与声明 Node22.22.0 不同，构建工具打印引擎警告；本项只使用本地 v1/v2 响应夹具，没有实际 RTW
 v2 生产者、数据库双投影、五仓同轮迁移、真实 v2 用户浏览器或部署证据。原有 v1 实际浏览器 L3/L4 报告继续按其固定提交解释，不能借它宣称 v2 浏览器已验。
+
+## 2026-09-15 版本化历史读候选
+
+Web 候选固定开发集成基点 `28096d532fdf7a1117639ef3c344c74a96a96f95`，独立分支
+`feat/knowledge-v2-history-candidate`。`/api/sea/knowledge/...`
+的正式历史页面默认仍走 RTW `/v1`；只有服务端在隔离本机验收中显式设置
+`SEA_KNOWLEDGE_HISTORY_READ_VERSION=v2`，三条
+`answer-sessions/:session_id/accepted-answers` 的 list/detail/citations GET 才走
+`/v2/knowledge`。配置为其他值时历史读返回明确 503。浏览器没有版本选择或主体参数入口；v2
+BFF 只接受 list 的
+`limit/after_ordinal`，拒绝重复分页键、`version`、SubjectRef 字段以及 detail/citations 的 query。v1
+BFF 保持旧 query 原样透传，RTW 仍只按 User JWT 决定历史主体。v2 无 User
+JWT 本地 401，不借管理员 Cookie/Worker
+token；已认证请求保留 RTW 上游 401/404 等 HTTP 状态和原始 envelope，不开放 v2 写入、管理、SSE 或任意代理路径。
+
+v2 DTO 和三条 GET 路由只由
+`node scripts/sync-knowledge-contract.cjs <RTW checkout> --v2-history-only`
+从固定 RTW `bedaa02d0fa587a5e9f798b8ff9f42c800f98e3e` 的
+`api/knowledge.api`、goctl 1.9.2
+Swagger/TypeScript 生成物同步。`generated/source-v2-history.json` 锁定 DSL
+SHA256 `0cc506d50784348ab2ed4a4012bb5182f25a0e3e5ae65b4690d67536325b91a9`
+及原生成 TypeScript SHA256
+`4c939cd48f13622730563e137420db5564dceebacca27ee1951ed88b488f2581`。同步脚本按 TypeScript
+AST 提取五个历史 v2 DTO 及依赖，未手写生成字段；旧
+`knowledgeComponents.ts/routes.json/source.json`
+相对 Web 基点逐字不变。引用当前状态响应也在客户端严格拒绝重复 JSON 键；如同一引用有相冲突的
+`unavailable/available`，详情页在核验前不展示旧摘录和来源链接。有效 v1/v2 引用状态仍按原固定元数据核对。
+
+本候选的 L1/L2 包括生成重跑零差异、旧 v1 三份生成文件原字节不变、88 项 Node 定向/回归测试通过、`pnpm typecheck`、`pnpm lint`
+与 `pnpm build`
+退出 0；全仓 lint 的既有 66 条 warning 不在改动文件。测试运行于 Node
+26.3.1，仓库声明 Node 22.22.0。本机一次隔离 PostgreSQL、真实 User Center、RTW
+HTTP、两套 Next BFF 的交接中，第二轮业务断言和 RTW
+Go 测试通过，但 Web 协调进程因旧定时器最终退出 143，不能记整轮 L3
+PASS；第三轮在 User RPC
+race 链接时遇 ENOSPC，未启动 HTTP，也不能记通过。真实 v2 浏览器、当前四仓集成头同轮验收、生产旧行 preflight 与部署均未完成，正式用户尚未切 v2。
