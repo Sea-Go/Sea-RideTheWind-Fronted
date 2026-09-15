@@ -66,3 +66,21 @@ JWT 产品 GET；67 项 Node 定向/回归测试通过，覆盖 BFF 不借用管
 16 的产品读及撤回反例测试；本分支尚未与那些进程做同一次浏览器到数据库联验，也未验真实登录账户/部署。因此不把本次页面或合同测试记为 H02 整体验收。
 
 2026-09-15 当前Web开发集成头增加逐条隔离测试：早期不匹配record加新有效answer时，列表只显示新答案并报告旧记录数量；固定详情对不匹配record仍拒绝。该测试与真实浏览器同次链均通过，浏览器在来源撤回后回到`search-facade-session`列表，看到3条暂不可读提示和第4条可查看的`Evidence`答案卡；随后固定详情仍显示`已撤回或不可用`且隐藏旧摘录/链接。完整同次报告及SHA见[搜索入口验收](PRODUCT_SEARCH_ACCEPTANCE.md#验收记录)。这证明本机产品读面不会被一条旧结构记录整页阻断；旧记录本身尚未完成格式迁移，也没有上线或跨浏览器验收。
+
+2026-09-15 的 SubjectRef v2
+**消费者先行局部交接**：Web 产品历史响应在生成 SDK 之外定义两版主体适配，旧三元组仅接受
+`rtw.identity/platform/<规范正整数UID>`；新结构仅接受
+`{issuer:"rtw.identity",subject_id:"<UID>"}`，`platform`
+不代表实际租户。列表逐条把外层主体与不可变 `turn_json`
+中的主体规范化后比较；外层 v2 加原始 v1
+turn、纯 v1/v1、纯 v2/v2 均可读；不同 UID、错 issuer、额外字段、非规范/超 int64
+UID 拒读。固定详情保持整条严格门禁。历史 GET 的原始 envelope 和 turn 的 JSON 解码拒绝重复对象键，避免
+`JSON.parse`
+把冲突字段覆写后再比较。请求仍只发 session/AnswerID/分页，不由客户端签发主体；不手改
+`generated/`，也不改 RTW 已接受历史的原文/hash。
+
+从独立干净树的 `46e9998` 完整执行 `node --test tests/*.test.cjs`：84 pass、0
+fail；`pnpm typecheck`、变更五个源码文件的 ESLint（0 error、0
+warning）、`pnpm exec next build`（63个静态页面）与 `git diff --check`
+通过。当前 Node26.3.1 与声明 Node22.22.0 不同，构建工具打印引擎警告；本项只使用本地 v1/v2 响应夹具，没有实际 RTW
+v2 生产者、数据库双投影、五仓同轮迁移、真实 v2 用户浏览器或部署证据。原有 v1 实际浏览器 L3/L4 报告继续按其固定提交解释，不能借它宣称 v2 浏览器已验。
