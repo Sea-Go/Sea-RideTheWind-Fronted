@@ -25,6 +25,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pat
       { status: 503 },
     );
   if (
+    version === "v2" &&
     isKnowledgeHistoryRead(pathname, request.method) &&
     !hasAllowedHistoryQuery(pathname, request.nextUrl.searchParams)
   )
