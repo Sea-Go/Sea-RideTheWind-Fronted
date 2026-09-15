@@ -200,6 +200,7 @@ const read = async (base, route, token, expected, cookie = "") => {
   return { raw, data: JSON.parse(raw).data };
 };
 const release = (target) => fs.writeFileSync(target, "", { flag: "wx", mode: 0o600 });
+const escapePattern = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const readBrowserAX = (stage, page, url) => {
   const file = path.join(evidence, `browser-${stage}-${page}.ax.txt`);
   const stat = fs.statSync(file);
@@ -243,13 +244,19 @@ const browserHandoff = async (stage, base, sessionId, answerId, expected, child)
   for (const check of required) assert.equal(observation.observed[check], true, check);
   const detail = readBrowserAX(stage, "detail", detailURL);
   assert.ok(detail.ax.includes("已接纳答案"), "fixed answer is absent from browser AX");
+  const citedQuote = new RegExp(`接纳时摘录：\\s*${escapePattern(expected.quote)}(?:\\s|$)`);
   if (stage === "available") {
     const list = readBrowserAX(stage, "list", historyURL);
-    for (const phrase of ["本会话的已接纳答案", "第 1 条已接纳记录", "第 2 条已接纳记录"])
-      assert.ok(list.ax.includes(phrase), `own history AX is missing ${phrase}`);
+    assert.ok(list.ax.includes("本会话的已接纳答案"), "own history title is absent from browser AX");
+    for (const [index, id] of expected.answerIds.entries()) {
+      const ordinal = index + 1;
+      const cardOrdinal = new RegExp(`文本 第\\s*\\n\\s*\\d+ 文本 ${ordinal}\\s*\\n\\s*\\d+ 文本\\s+条已接纳记录`);
+      assert.ok(cardOrdinal.test(list.ax) && list.ax.includes(`${new URL(historyURL).host}${new URL(historyURL).pathname}/${encodeURIComponent(id)}`),
+        `own history AX is missing fixed answer ${ordinal}`);
+    }
     for (const phrase of ["当前可用", "接纳时摘录", "打开固定修订"])
       assert.ok(detail.ax.includes(phrase), `available detail AX is missing ${phrase}`);
-    assert.ok(detail.ax.includes(`接纳时摘录：${expected.quote}`),
+    assert.ok(citedQuote.test(detail.ax),
       "browser detail displayed the wrong cited quote");
     assert.ok(detail.ax.includes(expected.href), "browser detail linked to the wrong fixed revision");
     report.browser ??= { mode: "CUA-observed local browser", login: "disposable local JWT handoff", stages: {} };
@@ -259,7 +266,7 @@ const browserHandoff = async (stage, base, sessionId, answerId, expected, child)
     assert.ok(detail.ax.includes("已撤回或不可用"), "withdrawn citation is absent from browser AX");
     for (const phrase of ["接纳时摘录", "打开固定修订"])
       assert.ok(!detail.ax.includes(phrase), `withdrawn detail AX still exposes ${phrase}`);
-    assert.ok(!detail.ax.includes(`接纳时摘录：${expected.quote}`) && !detail.ax.includes(expected.href),
+    assert.ok(!citedQuote.test(detail.ax) && !detail.ax.includes(expected.href),
       "withdrawn browser detail retained the cited quote or fixed revision link");
     report.browser.stages.withdrawn = { operator_observed: observation.observed,
       detail_ax_sha256: detail.sha256 };
@@ -350,7 +357,7 @@ async function main() {
       revision: citationKey.revision_id,
       ...(evidence.locator?.locator ? { locator: evidence.locator.locator } : {}),
     })}`;
-    const browserExpected = { quote: ready.expected_quote, href: fixedSourceHref };
+    const browserExpected = { quote: ready.expected_quote, href: fixedSourceHref, answerIds: ready.answer_ids };
     assert.equal((await read(v2Base, answerRoute, ready.other_token, 404)).data, null);
     await read(
       v2Base,
