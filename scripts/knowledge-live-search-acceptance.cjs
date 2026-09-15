@@ -27,6 +27,13 @@ const baselines = {
   btw: "62a74683874f49f958079e4d1d1e51851ea118cb",
   dc: "f59a676a3439f66122e0ec579cd22f030719e058",
 };
+const exactHeads = {
+  btw: process.env.SEA_WEB_EXPECTED_BTW_SHA?.trim() || baselines.btw,
+  dc: process.env.SEA_WEB_EXPECTED_DC_SHA?.trim() || baselines.dc,
+};
+for (const [name, revision] of Object.entries(exactHeads)) {
+  assert.match(revision, /^[0-9a-f]{40}$/, `${name} expected head must be a full commit SHA`);
+}
 const git = (root, ...args) => cp.execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 const head = (root) => git(root, "rev-parse", "HEAD");
 const requireAncestor = (root, baseline) => {
@@ -34,14 +41,21 @@ const requireAncestor = (root, baseline) => {
 };
 requireAncestor(web, baselines.web);
 requireAncestor(rtw, baselines.rtw);
-assert.equal(head(btw), baselines.btw, "BTW checkout must remain at the fixed integration head");
+assert.equal(
+  head(btw),
+  exactHeads.btw,
+  "BTW checkout must remain at the reviewed integration head",
+);
 assert.equal(
   head(dc),
-  baselines.dc,
-  "DataCenter checkout must remain at the fixed integration head",
+  exactHeads.dc,
+  "DataCenter checkout must remain at the reviewed integration head",
 );
 
 const requestedEvidence = process.env.SEA_WEB_LIVE_EVIDENCE_DIR?.trim();
+const browserMode = process.env.SEA_WEB_REAL_BROWSER === "1";
+if (browserMode)
+  assert.ok(requestedEvidence, "real-browser mode requires a known evidence directory");
 const evidence = requestedEvidence
   ? path.resolve(requestedEvidence)
   : fs.mkdtempSync(path.join(os.tmpdir(), "sea-web-live-search-"));
@@ -56,6 +70,10 @@ const files = Object.fromEntries(
     "historyAvailableRelease",
     "historyWithdrawnReady",
     "historyWithdrawnRelease",
+    "browserSearchReady",
+    "browserSearchResult",
+    "browserWithdrawnReady",
+    "browserWithdrawnResult",
   ].map((name) => [name, path.join(evidence, `${name}.json`)]),
 );
 const report = {
@@ -75,13 +93,20 @@ const report = {
     summary_model: "fixed local OpenAI-compatible model fixture after accepted evidence",
     search_runtime: "formal BreakTheWaves cmd/api with tRPC-Agent-Go Graph/Runner",
     persistence: "RTW isolated PostgreSQL",
+    browser: browserMode ? "real local browser hydration and interaction" : "not run",
   },
   checks: [],
   http: [],
   limitations: [
     "The summary model is a deterministic local fixture; this run does not measure LLM answer quality.",
     "The corpus is a two-chunk isolated fixture; this run does not measure retrieval relevance or scale.",
-    "Browser sessionStorage and visual rendering require a separate real-browser observation.",
+    ...(browserMode
+      ? [
+          "One local browser session is observed; this is not a cross-browser or accessibility audit.",
+        ]
+      : [
+          "Browser sessionStorage and visual rendering require a separate real-browser observation.",
+        ]),
     "No production deployment or shared database is used.",
   ],
 };
@@ -157,6 +182,13 @@ const writeJSONExclusive = (target, value) => {
   fs.writeFileSync(target, `${JSON.stringify(value, null, 2)}\n`, { flag: "wx", mode: 0o600 });
 };
 const readJSON = (target) => JSON.parse(fs.readFileSync(target, "utf8"));
+const readPrivateJSON = (target) => {
+  const info = fs.statSync(target);
+  assert.ok(info.isFile());
+  assert.equal(info.mode & 0o077, 0);
+  assert.ok(info.size > 0 && info.size <= 64 << 10);
+  return readJSON(target);
+};
 const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const loopback = (value) => {
   const parsed = new URL(value);
@@ -390,13 +422,93 @@ let resultWritten = false;
       idempotency_key: ready.idempotency_key,
     };
     const productPath = `${webBase}/api/sea/knowledge/answer-sessions/${encodeURIComponent(ready.session_id)}/searches`;
-    const created = await httpJSON(
-      "product-search-through-next-bff",
-      productPath,
-      { method: "POST", token: ownerToken, cookie: ownerToken, body: requestBody },
-      200,
-    );
-    const product = created.payload.data;
+    let product;
+    if (browserMode) {
+      const sessionURL = `${webBase}${sessionPath}?module_id=${encodeURIComponent(ready.module_id)}`;
+      writeJSONExclusive(files.browserSearchReady, {
+        schema_version: "sea.web.real-browser-handoff.v1",
+        stage: "search",
+        login_url: `${webBase}/login?next=${encodeURIComponent(`${sessionPath}?module_id=${encodeURIComponent(ready.module_id)}`)}`,
+        session_url: sessionURL,
+        login_username: ready.login_username,
+        login_password: ready.login_password,
+        storage_key: `sea:knowledge-search:${ready.session_id}`,
+        storage_operation: {
+          input: {
+            module_id: requestBody.module_id,
+            query: requestBody.query,
+            depth: requestBody.depth,
+            intelligence: requestBody.intelligence,
+          },
+          idempotencyKey: ready.idempotency_key,
+          searchId: "",
+        },
+        result_file: files.browserSearchResult,
+      });
+      await waitFor(
+        "real browser search observation",
+        async () => (fs.existsSync(files.browserSearchResult) ? files.browserSearchResult : null),
+        rtwState,
+        12 * 60 * 1000,
+      );
+      const observation = readPrivateJSON(files.browserSearchResult);
+      assert.deepEqual(Object.keys(observation).sort(), [
+        "current_url",
+        "observed",
+        "schema_version",
+        "stage",
+      ]);
+      assert.equal(observation.schema_version, "sea.web.real-browser-observation.v1");
+      assert.equal(observation.stage, "search-completed");
+      const current = new URL(observation.current_url);
+      assert.equal(current.origin, webBase);
+      const answerPrefix = `${sessionPath}/`;
+      assert.ok(current.pathname.startsWith(answerPrefix));
+      const answerID = decodeURIComponent(current.pathname.slice(answerPrefix.length));
+      assert.ok(answerID && !answerID.includes("/"));
+      assert.deepEqual(observation.observed, {
+        hydrated_search_controls: true,
+        fixed_key_retry_clicked: true,
+        accepted_answer_heading: true,
+        answer_visible: true,
+        citation_state: "available",
+        quote_visible: true,
+        fixed_revision_link_visible: true,
+      });
+      fs.rmSync(files.browserSearchReady);
+      const accepted = await httpJSON(
+        "browser-created-answer-through-next-bff",
+        `${webBase}/api/sea/knowledge/answer-sessions/${encodeURIComponent(ready.session_id)}/accepted-answers/${encodeURIComponent(answerID)}`,
+        { token: ownerToken, cookie: ownerToken },
+        200,
+      );
+      assert.equal(accepted.payload.data.answer_id, answerID);
+      assert.ok(accepted.payload.data.search_id);
+      const browserOperation = await httpJSON(
+        "browser-created-search-recovered-through-next-bff",
+        `${productPath}/${encodeURIComponent(accepted.payload.data.search_id)}`,
+        { token: ownerToken, cookie: ownerToken },
+        200,
+      );
+      product = browserOperation.payload.data;
+      assert.equal(product.answer_id, answerID);
+      report.browser = {
+        mode: "real-local-browser",
+        search: observation.observed,
+        current_path_sha256: sha256(current.pathname),
+      };
+      report.checks.push(
+        "A real browser hydrated the search controls and submitted the fixed logical request",
+      );
+    } else {
+      const created = await httpJSON(
+        "product-search-through-next-bff",
+        productPath,
+        { method: "POST", token: ownerToken, cookie: ownerToken, body: requestBody },
+        200,
+      );
+      product = created.payload.data;
+    }
     assert.equal(product.status, "succeeded");
     assert.ok(product.search_id && product.answer_id && product.answer?.trim());
     assert.equal(product.citations?.length, 1);
@@ -519,6 +631,46 @@ let resultWritten = false;
       { token: otherToken, cookie: otherToken },
       404,
     );
+    if (browserMode) {
+      writeJSONExclusive(files.browserWithdrawnReady, {
+        schema_version: "sea.web.real-browser-handoff.v1",
+        stage: "withdrawn",
+        refresh_url: `${webBase}${sessionPath}/${encodeURIComponent(product.answer_id)}`,
+        answer_id: product.answer_id,
+        result_file: files.browserWithdrawnResult,
+      });
+      await waitFor(
+        "real browser withdrawn citation observation",
+        async () =>
+          fs.existsSync(files.browserWithdrawnResult) ? files.browserWithdrawnResult : null,
+        rtwState,
+        8 * 60 * 1000,
+      );
+      const observation = readPrivateJSON(files.browserWithdrawnResult);
+      assert.deepEqual(Object.keys(observation).sort(), [
+        "current_url",
+        "observed",
+        "schema_version",
+        "stage",
+      ]);
+      assert.equal(observation.schema_version, "sea.web.real-browser-observation.v1");
+      assert.equal(observation.stage, "withdrawn-observed");
+      const current = new URL(observation.current_url);
+      assert.equal(current.origin, webBase);
+      assert.equal(current.pathname, `${sessionPath}/${encodeURIComponent(product.answer_id)}`);
+      assert.deepEqual(observation.observed, {
+        accepted_answer_heading: true,
+        answer_visible: true,
+        citation_state: "unavailable",
+        quote_visible: false,
+        fixed_revision_link_visible: false,
+      });
+      report.browser.withdrawn = observation.observed;
+      report.browser.withdrawn_path_sha256 = sha256(current.pathname);
+      report.checks.push(
+        "The same browser refreshed the fixed answer after withdrawal and hid the quote and source link",
+      );
+    }
     report.checks.push(
       "RTW withdrawal changed the same Web citation to unavailable while retaining its historical answer",
     );
@@ -576,6 +728,9 @@ let resultWritten = false;
     console.error(`Evidence directory: ${evidence}`);
     process.exitCode = 1;
   } finally {
+    try {
+      fs.rmSync(files.browserSearchReady);
+    } catch {}
     if (!resultWritten) {
       // The RTW process is terminated below; no forged result is written.
     }
