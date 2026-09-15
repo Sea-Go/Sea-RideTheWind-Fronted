@@ -34,6 +34,19 @@
 .knowledge-revisions small {
   display: block;
 }
+.wiki-review-evidence {
+  min-width: 0;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  border: 1px solid var(--sea-line);
+  border-radius: 0.75rem;
+}
+.wiki-review-evidence .knowledge-body {
+  max-height: 18rem;
+  padding: 1rem;
+  overflow: auto;
+  border: 1px solid var(--sea-line);
+  border-radius: 0.5rem;
+}
 
 .sea-knowledge-workbench .knowledge-editor-fields {
   margin: 0;
