@@ -41,9 +41,11 @@ const newRow = (sourceId: string): FactRow => ({
 export function WikiFactSetWorkbench({
   moduleId,
   revisions,
+  nextRevisionsCursor,
 }: {
   moduleId: string;
   revisions: Revision[];
+  nextRevisionsCursor?: string;
 }) {
   const [targetId, setTargetId] = useState("");
   const [preview, setPreview] = useState<FactSetScopePreview | null>(null);
@@ -107,6 +109,10 @@ export function WikiFactSetWorkbench({
         revision: (revisionId) => knowledgeRead.revision(moduleId, revisionId),
         compile: (compileId) => knowledgeRead.compile(moduleId, compileId),
         knownRevisions: revisions,
+        olderRevisions: {
+          nextCursor: nextRevisionsCursor || "",
+          page: (cursor) => knowledgeRead.revisions(moduleId, cursor),
+        },
       });
       if (version !== generation.current) return;
       setPreview(fixed);

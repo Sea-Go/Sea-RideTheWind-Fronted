@@ -13,7 +13,13 @@ type Readers = {
   revision: (id: string) => Promise<Revision>;
   compile: (id: string) => Promise<Compile>;
   knownRevisions?: Revision[];
+  olderRevisions?: {
+    nextCursor: string;
+    page: (cursor: string) => Promise<{ items: Revision[]; next_cursor?: string }>;
+  };
 };
+
+const maxOlderRevisionPages = 32;
 
 /** Mirrors the approved RTW scope, while RTW remains the final validator. */
 export async function previewFactSetScope(
@@ -36,6 +42,46 @@ export async function previewFactSetScope(
   const known = new Map(
     readers.knownRevisions?.map((revision) => [revision.revision_id, revision]),
   );
+  let olderCursor = readers.olderRevisions?.nextCursor || "";
+  let olderPageCount = 0;
+  const seenOlderCursors = new Set<string>();
+  async function olderSourceMetadata(id: string): Promise<Revision | undefined> {
+    while (olderCursor) {
+      if (olderPageCount >= maxOlderRevisionPages)
+        throw new Error(
+          `来源 ${id} 的历史元数据超过 ${maxOlderRevisionPages} 页上限，不能声明目录。`,
+        );
+      if (seenOlderCursors.has(olderCursor))
+        throw new Error(`来源 ${id} 的历史分页游标重复，不能声明目录。`);
+      seenOlderCursors.add(olderCursor);
+      const page = await readers.olderRevisions!.page(olderCursor);
+      olderPageCount++;
+      if (
+        !page ||
+        !Array.isArray(page.items) ||
+        page.items.length > 20 ||
+        (page.next_cursor !== undefined && typeof page.next_cursor !== "string")
+      )
+        throw new Error(`来源 ${id} 的历史元数据分页不符合固定契约。`);
+      for (const item of page.items) {
+        if (
+          !item ||
+          typeof item.revision_id !== "string" ||
+          !item.revision_id ||
+          known.has(item.revision_id)
+        )
+          throw new Error(`来源 ${id} 的历史元数据包含重复或无效修订。`);
+        known.set(item.revision_id, item);
+      }
+      const next = page.next_cursor || "";
+      if (next && seenOlderCursors.has(next))
+        throw new Error(`来源 ${id} 的历史分页游标重复，不能声明目录。`);
+      olderCursor = next;
+      const found = known.get(id);
+      if (found) return found;
+    }
+    return undefined;
+  }
   const sourceIDs = new Set<string>();
   const currentRefs = new Set(target.source_refs.map((ref) => ref.revision_id));
   const seenWiki = new Set<string>();
@@ -73,6 +119,8 @@ export async function previewFactSetScope(
   for (const id of [...sourceIDs].sort()) {
     const metadata = known.get(id);
     if (metadata?.withdrawn) {
+      if (metadata.kind !== "source" || metadata.module_id !== moduleId)
+        throw new Error(`来源 ${id} 的撤回元数据身份不符。`);
       if (currentRefs.has(id) || originCompileId)
         throw new Error(
           `当前 Wiki 或 AI 编制引用的原文 ${id} 已撤回，不能创建新目录；可按目录修订 ID 查看历史。`,
@@ -83,8 +131,23 @@ export async function previewFactSetScope(
     try {
       source = await readers.revision(id);
     } catch {
+      // Only an old manual ancestor may be retired from a new scope. The
+      // fixed Source body is still unavailable; scan bounded admin metadata.
+      if (!metadata && !currentRefs.has(id) && !originCompileId) {
+        const old = await olderSourceMetadata(id);
+        if (old) {
+          if (
+            old.revision_id !== id ||
+            old.kind !== "source" ||
+            old.module_id !== moduleId ||
+            old.withdrawn !== true
+          )
+            throw new Error(`来源 ${id} 的历史撤回元数据身份或状态不符，不能省略。`);
+          continue;
+        }
+      }
       throw new Error(
-        `来源修订 ${id} 的正文不可取；不能省略后继续声明。请加载历史来源元数据，或按目录修订 ID 查看旧目录。`,
+        `来源修订 ${id} 的正文不可取且未确认正式撤回；不能省略后继续声明。可按目录修订 ID 查看旧目录。`,
       );
     }
     if (source.kind !== "source" || source.module_id !== moduleId)
