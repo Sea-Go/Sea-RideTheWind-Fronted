@@ -90,3 +90,21 @@ standalone构建63页、BUILD_ID=`TOCJIX1hk2_ExXTPf9-Wf`、buildSHA=`b57df47f268
 720px，前述27项真实管理BFF及实际浏览器POST仍明确固定于独立Web
 `03afb7e`/`32ad232`历史构建与RTW `d10d1d3`。独立测试PG
 stop/status3、原红/绿报告和原Release不变证据继续保留；开发新HEAD产品联验、真人目录质量、自动发布及生产部署另签。
+
+## 前端开发头最终管理员HTTP复验
+
+继独立工作台七笔与跨页撤回元数据两笔精确合入后，开发代码`f1b2441be8e6fdbb528e92d14bea183c520dbd17`已推远端/树洁，RTW知识开发已推进`5daca1b3d6959ccd8e1f39be7eeca70fe02e1974`而管理DSL仍同固定合同。从**两个开发固定HEAD**用Web最终Next
+BUILD_ID=`TOCJIX1hk2_ExXTPf9-Wf`另外起隔离PG17/真RTW Admin+Worker HTTP/Next
+standalone
+BFF，`SEA_WEB_WIKI_FACT_SET_ACCEPTANCE=1 node scripts/knowledge-acceptance.cjs <RTW开发checkout>`顶层退出0、报告完整**27项HTTP断言PASS**：管理员401/403/200、双Cookie管理POST幂等重放、仅User
+Cookie历史GET401、目录current
+Scope与明确ID旧Revision、同scope二次CAS及stale409、required
+FactID/原Source字节跨度、withdrawn
+Source原文410且旧目录ID可查、冻目录前后Wiki编辑head与人工Release不移动。`result.json`
+SHA256=`c6d7f9aae06189ce71ddcdf0953e38496e6ad3faf9ecde761b67391c52a4a2e2`、父脚本日志SHA256=`304b5a1c60dbe2e82a86282f747ad56e0fa8321676a4563f04b7593c4df5ccb8`、PG
+`setup.log`SHA256=`0809860b2e374ea691aa7776aaa201ef10c83f6665b33af0309c66073e34a79b`且`pg_ctl status=3`，`api.log`SHA=`0378c6f4e25bdd6c7d3c7dbef95ccbd2ff7b0b23ba825d06af066850df8666ea`、`next.log`SHA=`83729db5877d5fd6c1de181d235c37fe366d4a1baa43f55eb84afb203aab6cb6`；两个本机服务listener后验已关闭。证据`sea-web-knowledge-acceptance-D3Babl`。
+
+这使FactSet管理BFF/真实RTW目录历史与CAS的**前端开发固定HEAD受控本机L3接口链**获签；先前独立`03afb7e`真HTTP/浏览器展示、独立`32ad232`
+720px单栏与最终开发Node122/Next63构建仍分别按各自字节留证。按需补读不在首屏分页的**已正式撤回人工祖先**已有纯Node有界32页负例，但本次27项真HTTP没有重造旧元数据落更早页的管理员操作，也未在开发`f1b2441`重复IAB
+POST/720px截图；该具体产品交互另验。Admin `actor_id`仅JWT名单字面非UserCenter
+UID，目录`facts_complete`是声明非真人无漏事实，不自动发布Release/D07，真实用户会话和生产未验。
