@@ -358,11 +358,16 @@ let resultWritten = false;
 
     const sessionPath = `/knowledge/answer-sessions/${encodeURIComponent(ready.session_id)}`;
     const entryPage = await httpPage(
-      "authenticated-search-page",
+      "answer-session-page-shell",
       `${webBase}${sessionPath}?module_id=${encodeURIComponent(ready.module_id)}`,
       ownerToken,
     );
-    assert.match(entryPage, /向知识库提问|SEARCH THE LIBRARY/);
+    // Authentication and the search form are hydrated from the browser's local
+    // session. A raw HTTP fetch can prove the production page route and assets,
+    // while the following BFF requests prove the authenticated product chain.
+    assert.match(entryPage, /问答历史/);
+    assert.match(entryPage, /请先登录/);
+    report.checks.push("Next production server served the answer-session page shell");
 
     const requestBody = {
       module_id: ready.module_id,
@@ -464,11 +469,11 @@ let resultWritten = false;
     assert.equal(available.payload.data.citations.length, 1);
     assert.equal(available.payload.data.citations[0].state, "available");
     const answerPage = await httpPage(
-      "authenticated-answer-page",
+      "answer-detail-page-shell",
       `${webBase}${sessionPath}/${encodeURIComponent(product.answer_id)}`,
       ownerToken,
     );
-    assert.match(answerPage, /已接纳|答案|ANSWER/);
+    assert.match(answerPage, /问答历史|历史答案/);
     report.checks.push("Web BFF read the RTW durable answer and available fixed citation");
     privateTouch(files.historyAvailableRelease);
 
