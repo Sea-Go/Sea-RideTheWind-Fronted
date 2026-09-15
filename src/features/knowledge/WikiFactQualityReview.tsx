@@ -5,7 +5,9 @@ import { Notice } from "@/features/sea/components/primitives";
 
 import {
   type JudgeWikiFactReq,
+  knowledge,
   knowledgeQuality,
+  type ReleaseState,
   type Revision,
   type WikiFactJudgmentRecord,
   type WikiPageHeadSnapshot,
@@ -26,6 +28,7 @@ export function WikiFactQualityReview({
 }) {
   const [evidence, setEvidence] = useState<WikiReviewEvidence | null>(null);
   const [editingHead, setEditingHead] = useState<WikiPageHeadSnapshot | null>(null);
+  const [currentRelease, setCurrentRelease] = useState<ReleaseState | null>(null);
   const [items, setItems] = useState<WikiFactJudgmentRecord[]>([]);
   const [cursor, setCursor] = useState("");
   const [error, setError] = useState("");
@@ -51,10 +54,12 @@ export function WikiFactQualityReview({
         "",
         controller.signal,
       ),
+      knowledge.current(moduleId, controller.signal),
     ])
-      .then(([head, page]) => {
+      .then(([head, page, release]) => {
         if (controller.signal.aborted || generation !== reading.current) return;
         setEditingHead(head);
+        setCurrentRelease(release);
         setItems(page.items || []);
         setCursor(page.next_cursor || "");
         setError("");
@@ -74,6 +79,7 @@ export function WikiFactQualityReview({
     reading.current++;
     setEvidence(next);
     setEditingHead(null);
+    setCurrentRelease(null);
     setItems([]);
     setCursor("");
     setError("");
@@ -86,6 +92,7 @@ export function WikiFactQualityReview({
     reading.current++;
     setEvidence(null);
     setEditingHead(null);
+    setCurrentRelease(null);
     setItems([]);
     setCursor("");
     setError("");
@@ -210,7 +217,12 @@ export function WikiFactQualityReview({
               : " · 所选为历史修订"}
           </p>
           <p>
-            已发布 Release <span className="knowledge-id">{publishedReleaseId || "尚未发布"}</span>
+            已发布 Release{" "}
+            <span className="knowledge-id">
+              {currentRelease
+                ? currentRelease.active_release_id || "尚未发布"
+                : publishedReleaseId || "尚未发布"}
+            </span>
           </p>
         </div>
       )}
