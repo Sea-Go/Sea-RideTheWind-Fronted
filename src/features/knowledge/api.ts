@@ -1,3 +1,4 @@
+import { getAdminAuthToken } from "@/services/admin";
 import { getAuthToken } from "@/services/auth";
 import { request, withBearerAuthorization } from "@/services/request";
 
@@ -31,6 +32,21 @@ export function knowledgeRequest<T>(
   init: RequestInit & { strictJSON?: boolean } = {},
 ) {
   const token = getAuthToken();
+  return request<T>(`/api/sea/knowledge/${path}`, {
+    ...init,
+    cache: "no-store",
+    responseMode: "wrapped",
+    headers: token ? withBearerAuthorization(token, init.headers) : init.headers,
+  });
+}
+/** Human Wiki review uses the administrator session even when a browser also
+ * holds an ordinary User Center token. RTW remains the authority on the role.
+ */
+export function knowledgeAdminRequest<T>(
+  path: string,
+  init: RequestInit & { strictJSON?: boolean } = {},
+) {
+  const token = getAdminAuthToken();
   return request<T>(`/api/sea/knowledge/${path}`, {
     ...init,
     cache: "no-store",
