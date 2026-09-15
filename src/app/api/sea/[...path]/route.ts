@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import {
+  hasAllowedHistoryQuery,
+  isKnowledgeHistoryRead,
+  knowledgeHistoryVersion,
+} from "@/server/knowledge-history-version";
 import { isKnowledgeRoute } from "@/server/knowledge-routes";
 // Knowledge paths are generated from RTW. Other product interfaces remain separate. No fixtures.
 const allowed =
@@ -13,6 +18,32 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pat
       : allowed.test(pathname))
   )
     return NextResponse.json({ code: 404, msg: "未知产品契约路径", data: null }, { status: 404 });
+  const version = knowledgeHistoryVersion(pathname, request.method);
+  if (version === "invalid")
+    return NextResponse.json(
+      { code: 503, msg: "SEA_KNOWLEDGE_HISTORY_READ_VERSION 仅支持 v1 或 v2", data: null },
+      { status: 503 },
+    );
+  if (
+    isKnowledgeHistoryRead(pathname, request.method) &&
+    !hasAllowedHistoryQuery(pathname, request.nextUrl.searchParams)
+  )
+    return NextResponse.json(
+      { code: 400, msg: "知识历史只接受分页参数", data: null },
+      { status: 400 },
+    );
+  const token =
+    request.headers.get("authorization") ||
+    (request.cookies.get("user_center_token")?.value &&
+      `Bearer ${request.cookies.get("user_center_token")?.value}`) ||
+    (!pathname.startsWith("knowledge/answer-sessions/") &&
+      request.cookies.get("admin_center_token")?.value &&
+      `Bearer ${request.cookies.get("admin_center_token")?.value}`);
+  if (version === "v2" && (!token || !/^Bearer\s+\S+$/i.test(token)))
+    return NextResponse.json(
+      { code: 401, msg: "知识历史 v2 需要 User JWT", data: null },
+      { status: 401 },
+    );
   const base = process.env.SEA_PRODUCT_API_SERVER_URL;
   if (!base)
     return NextResponse.json(
@@ -23,13 +54,6 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pat
       },
       { status: 503 },
     );
-  const token =
-    request.headers.get("authorization") ||
-    (request.cookies.get("user_center_token")?.value &&
-      `Bearer ${request.cookies.get("user_center_token")?.value}`) ||
-    (!pathname.startsWith("knowledge/answer-sessions/") &&
-      request.cookies.get("admin_center_token")?.value &&
-      `Bearer ${request.cookies.get("admin_center_token")?.value}`);
   const headers = new Headers({
     Accept: request.headers.get("accept") || "application/json",
     "Content-Type": request.headers.get("content-type") || "application/json",
@@ -37,7 +61,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pat
   if (token) headers.set("Authorization", token);
   try {
     const upstream = await fetch(
-      `${base.replace(/\/$/, "")}/v1/${pathname}${request.nextUrl.search}`,
+      `${base.replace(/\/$/, "")}/${version}/${pathname}${request.nextUrl.search}`,
       {
         method: request.method,
         headers,
