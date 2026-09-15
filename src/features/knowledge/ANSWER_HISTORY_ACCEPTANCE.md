@@ -115,8 +115,24 @@ AST 提取五个历史 v2 DTO 及依赖，未手写生成字段；旧
 本候选的 L1/L2 包括生成重跑零差异、旧 v1 三份生成文件原字节不变、88 项 Node 定向/回归测试通过、`pnpm typecheck`、`pnpm lint`
 与 `pnpm build`
 退出 0；全仓 lint 的既有 66 条 warning 不在改动文件。测试运行于 Node
-26.3.1，仓库声明 Node 22.22.0。本机一次隔离 PostgreSQL、真实 User Center、RTW
-HTTP、两套 Next BFF 的交接中，第二轮业务断言和 RTW
-Go 测试通过，但 Web 协调进程因旧定时器最终退出 143，不能记整轮 L3
-PASS；第三轮在 User RPC
-race 链接时遇 ENOSPC，未启动 HTTP，也不能记通过。真实 v2 浏览器、当前四仓集成头同轮验收、生产旧行 preflight 与部署均未完成，正式用户尚未切 v2。
+26.3.1，仓库声明 Node 22.22.0。早期本机隔离 PostgreSQL、真实 User Center、RTW
+HTTP、两套 Next BFF 的第二轮业务断言和 RTW
+Go 测试虽通过，Web 协调进程却因旧定时器最终退出 143，不能记整轮 L3
+PASS；第三轮在 User RPC race 链接时遇 ENOSPC，未启动 HTTP，也不能记通过。
+
+最终从 Web 当前开发集成代码 `caca51f41692cf0b6a3b8cc936a1723b1372fa84`
+和 RTW 知识集成 `730d16198b871ad8f26984f2f33361f5ca13f0c6`
+执行[可重跑脚本](../../../scripts/knowledge-v2-history-live-acceptance.cjs)，脚本字节 SHA256 为
+`36532056bc6518ecbf9d7ffdc0a09081d0e2636cea95d32ef243a951fc05453d`；本轮按测试默认路径重新编译 User
+RPC/API race 与当前 Knowledge HTTP，再启动两个生产 Next
+BFF，一个维持 v1、一个服务端显式 v2。顶层退出 **0**，报告
+`/var/folders/f_/l5hv3b1d6sx8zwr_cc8fkjkm0000gn/T/sea-web-v2-history-live-6GmmcD/report.json`
+SHA256
+`395551b92ca12522f9e9d5f719f14bb29cb9dd7e474082686524a2207de2e752`；本人两版列表/固定详情均200，新版外层仅 issuer+UID、内层旧v1
+turn逐字同旧版；第二 UID 自己有一条答案，但按主人固定AnswerID在v2隔离404，缺 User
+JWT
+v2为401。本人引用先 available，RTW 撤回后同一固定答案详情原 v1响应字节不变、v2
+turn不变，v2引用改为unavailable。RTW真 User Center Go 测试 PASS；隔离 PG
+`pg_ctl status`退出3、两个 Next 测试端口无监听，Owned进程均停。本次是**两仓真实User
+Center/PG→生产Next BFF
+HTTP 的L3子链**，还未在真实浏览器DOM/桌宠窗口操作v2、未验证四仓搜索/Tools的同轮v2业务写流，生产旧行preflight、默认用户切v2和部署均未完成。
