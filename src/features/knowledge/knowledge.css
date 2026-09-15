@@ -47,6 +47,33 @@
   border: 1px solid var(--sea-line);
   border-radius: 0.5rem;
 }
+.wiki-quality-review {
+  margin: 1rem 0;
+}
+.wiki-quality-pointers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 2rem;
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--sea-line);
+  border-radius: 0.75rem;
+}
+.wiki-quality-pointers p {
+  margin: 0;
+}
+.wiki-review-form {
+  min-width: 0;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  border: 1px solid var(--sea-line);
+  border-radius: 0.75rem;
+}
+.wiki-quality-history {
+  margin-top: 1.5rem;
+}
+.wiki-quality-history .sea-source-link {
+  margin: 0.5rem 0;
+}
 
 .sea-knowledge-workbench .knowledge-editor-fields {
   margin: 0;

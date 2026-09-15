@@ -83,10 +83,12 @@ test("release input requires three independent, complete representation profiles
   }));
   assert.deepEqual(parseProfiles(JSON.stringify(profiles)), profiles);
   for (const aggregation of ["sum_maxsim", "mean_maxsim"]) {
-    const explicit = profiles.map((p) => p.lane === "multivector" ? { ...p, aggregation } : p);
+    const explicit = profiles.map((p) => (p.lane === "multivector" ? { ...p, aggregation } : p));
     assert.deepEqual(parseProfiles(JSON.stringify(explicit)), explicit);
   }
-  const unknown = profiles.map((p) => p.lane === "multivector" ? { ...p, aggregation: "unknown" } : p);
+  const unknown = profiles.map((p) =>
+    p.lane === "multivector" ? { ...p, aggregation: "unknown" } : p,
+  );
   assert.throws(() => parseProfiles(JSON.stringify(unknown)));
 
   assert.throws(() => parseProfiles("[]"));
@@ -182,6 +184,7 @@ function renderWorkbench(snapshot) {
     "./state": require("../src/features/knowledge/state.ts"),
     "./knowledge.css": {},
     "./RevisionCompare": { RevisionCompare: "RevisionCompare" },
+    "./WikiFactQualityReview": { WikiFactQualityReview: "WikiFactQualityReview" },
   };
   const module = { exports: {} };
   new Function("require", "module", "exports", compiled)(
@@ -245,6 +248,21 @@ for (const state of ["NOT_BUILT", "BUILDING", "FAILED", "CANCELLED", "SUPERSEDED
     } else assert.equal(button, undefined);
   });
 }
+test("human Wiki fact review receives fixed revisions and the separate published Release pointer", () => {
+  const fixed = { revision_id: "wiki-r1", entity_id: "page-a", kind: "wiki" };
+  const page = renderWorkbench({
+    state: { active_release_id: "published-r1", build_state: "READY" },
+    revisions: [fixed],
+    releases: [],
+    builds: [],
+    compiles: [],
+  });
+  page.find((node) => node.type === "button" && page.nodeText(node) === "事实核验").props.onClick();
+  const review = page.find((node) => node.type === "WikiFactQualityReview");
+  assert.equal(review.props.moduleId, "m1");
+  assert.deepEqual(review.props.revisions, [fixed]);
+  assert.equal(review.props.publishedReleaseId, "published-r1");
+});
 test("editing metadata fetches a fixed body and preserves existing input on failure", async (t) => {
   const page = renderWorkbench({
     state: { build_state: "NOT_BUILT" },

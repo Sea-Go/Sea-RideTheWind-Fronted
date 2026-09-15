@@ -15,6 +15,7 @@ import {
 } from "./api";
 import { RevisionCompare } from "./RevisionCompare";
 import { CommandKeys, isPending, parseProfiles, statusName } from "./state";
+import { WikiFactQualityReview } from "./WikiFactQualityReview";
 
 import "./knowledge.css";
 
@@ -511,7 +512,7 @@ export function KnowledgeWorkbench({ moduleId }: { moduleId: string }) {
           </div>
           <div className="sea-toolbar">
             <div className="sea-tabs">
-              {["资料与修订", "编制任务", "修订比较", "候选与发布"].map((t) => (
+              {["资料与修订", "编制任务", "修订比较", "事实核验", "候选与发布"].map((t) => (
                 <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
                   {t}
                 </button>
@@ -840,6 +841,24 @@ export function KnowledgeWorkbench({ moduleId }: { moduleId: string }) {
                   加载更早修订
                 </button>
               )}
+            </>
+          )}
+          {tab === "事实核验" && (
+            <>
+              {snapshot.next.revisions && (
+                <button
+                  className="sea-button"
+                  disabled={loading}
+                  onClick={() => void more("revisions")}
+                >
+                  加载更早修订
+                </button>
+              )}
+              <WikiFactQualityReview
+                moduleId={moduleId}
+                revisions={snapshot.revisions}
+                publishedReleaseId={state?.active_release_id || ""}
+              />
             </>
           )}
           {tab === "候选与发布" && (
