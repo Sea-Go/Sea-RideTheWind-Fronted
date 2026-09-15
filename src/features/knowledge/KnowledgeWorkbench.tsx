@@ -875,7 +875,11 @@ export function KnowledgeWorkbench({ moduleId }: { moduleId: string }) {
                   加载更早修订
                 </button>
               )}
-              <WikiFactSetWorkbench moduleId={moduleId} revisions={snapshot.revisions} />
+              <WikiFactSetWorkbench
+                moduleId={moduleId}
+                revisions={snapshot.revisions}
+                nextRevisionsCursor={snapshot.next.revisions}
+              />
             </>
           )}
           {tab === "候选与发布" && (
