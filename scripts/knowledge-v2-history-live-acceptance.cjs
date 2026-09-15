@@ -65,13 +65,15 @@ fs.chmodSync(evidence, 0o700);
 if (browserMode) process.stdout.write(`Browser handoff directory: ${evidence}\n`);
 const files = Object.fromEntries(
   [
-    "availableReady", "availableRelease", "withdrawnReady", "withdrawnRelease",
-    "browserAvailableReady", "browserAvailableObserved",
-    "browserWithdrawnReady", "browserWithdrawnObserved",
-  ].map((name) => [
-    name,
-    path.join(evidence, `${name}.json`),
-  ]),
+    "availableReady",
+    "availableRelease",
+    "withdrawnReady",
+    "withdrawnRelease",
+    "browserAvailableReady",
+    "browserAvailableObserved",
+    "browserWithdrawnReady",
+    "browserWithdrawnObserved",
+  ].map((name) => [name, path.join(evidence, `${name}.json`)]),
 );
 const processes = [];
 const report = {
@@ -82,11 +84,18 @@ const report = {
   rtw_integration_head: head(provider),
   v2_contract_source_head: source.provider_commit,
   v2_api_sha256: source.api_sha256,
-  ...(browserMode ? {
-    script_sha256: crypto.createHash("sha256").update(fs.readFileSync(__filename)).digest("hex"),
-    script_dirty_at_start: cp.spawnSync("git", ["diff", "--quiet", "--", path.relative(web, __filename)],
-      { cwd: web }).status !== 0,
-  } : {}),
+  ...(browserMode
+    ? {
+        script_sha256: crypto
+          .createHash("sha256")
+          .update(fs.readFileSync(__filename))
+          .digest("hex"),
+        script_dirty_at_start:
+          cp.spawnSync("git", ["diff", "--quiet", "--", path.relative(web, __filename)], {
+            cwd: web,
+          }).status !== 0,
+      }
+    : {}),
   environment: browserMode
     ? "local isolated PostgreSQL, real User Center RPC/API, RTW HTTP, Next production BFF, local Chrome UI"
     : "local isolated PostgreSQL, real User Center RPC/API, RTW HTTP, Next production BFF",
@@ -127,7 +136,10 @@ const fixtureLoginServer = (ready) =>
     const stats = { matching_login_http_200: 0 };
     const server = http.createServer((request, response) => {
       const respond = (status, payload) => {
-        response.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        response.writeHead(status, {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        });
         response.end(JSON.stringify(payload));
       };
       if (request.method !== "POST" || request.url !== "/usercenter/v1/user/login") {
@@ -147,8 +159,10 @@ const fixtureLoginServer = (ready) =>
           respond(400, { code: 400, msg: "invalid test fixture credentials", data: null });
           return;
         }
-        if (credentials?.username !== "knowledge-history-owner" ||
-            credentials?.password !== "test-only-password-123") {
+        if (
+          credentials?.username !== "knowledge-history-owner" ||
+          credentials?.password !== "test-only-password-123"
+        ) {
           respond(401, { code: 401, msg: "test fixture login rejected", data: null });
           return;
         }
@@ -209,15 +223,20 @@ const readBrowserAX = (stage, page, url) => {
   assert.ok(stat.size > 0 && stat.size < 256 * 1024, "invalid browser AX observation size");
   const ax = fs.readFileSync(file, "utf8");
   const actualURL = new URL(url);
-  assert.ok(ax.includes(`${actualURL.host}${actualURL.pathname}`), `${page} AX URL did not match the fixed history path`);
+  assert.ok(
+    ax.includes(`${actualURL.host}${actualURL.pathname}`),
+    `${page} AX URL did not match the fixed history path`,
+  );
   return {
     ax,
     sha256: crypto.createHash("sha256").update(ax).digest("hex"),
   };
 };
 const browserHandoff = async (stage, base, sessionId, answerId, expected, child) => {
-  const readyFile = files[stage === "available" ? "browserAvailableReady" : "browserWithdrawnReady"];
-  const observedFile = files[stage === "available" ? "browserAvailableObserved" : "browserWithdrawnObserved"];
+  const readyFile =
+    files[stage === "available" ? "browserAvailableReady" : "browserWithdrawnReady"];
+  const observedFile =
+    files[stage === "available" ? "browserAvailableObserved" : "browserWithdrawnObserved"];
   const historyURL = `${base}/knowledge/answer-sessions/${encodeURIComponent(sessionId)}`;
   const detailURL = `${historyURL}/${encodeURIComponent(answerId)}`;
   const historyPath = new URL(historyURL).pathname;
@@ -237,9 +256,16 @@ const browserHandoff = async (stage, base, sessionId, answerId, expected, child)
   const observation = await waitFile(observedFile, child, 6 * 60_000);
   assert.equal(observation.schema_version, "sea.web.v2-history-browser-observation.v1");
   assert.equal(observation.stage, stage);
-  const required = stage === "available"
-    ? ["own_history_visible", "fixed_answer_visible", "citation_available", "quote_visible", "revision_link_visible"]
-    : ["fixed_answer_visible", "citation_unavailable", "quote_hidden", "revision_link_hidden"];
+  const required =
+    stage === "available"
+      ? [
+          "own_history_visible",
+          "fixed_answer_visible",
+          "citation_available",
+          "quote_visible",
+          "revision_link_visible",
+        ]
+      : ["fixed_answer_visible", "citation_unavailable", "quote_hidden", "revision_link_hidden"];
   assert.deepEqual(Object.keys(observation.observed).sort(), required.sort());
   for (const check of required) assert.equal(observation.observed[check], true, check);
   const detail = readBrowserAX(stage, "detail", detailURL);
@@ -247,29 +273,52 @@ const browserHandoff = async (stage, base, sessionId, answerId, expected, child)
   const citedQuote = new RegExp(`接纳时摘录：\\s*${escapePattern(expected.quote)}(?:\\s|$)`);
   if (stage === "available") {
     const list = readBrowserAX(stage, "list", historyURL);
-    assert.ok(list.ax.includes("本会话的已接纳答案"), "own history title is absent from browser AX");
+    assert.ok(
+      list.ax.includes("本会话的已接纳答案"),
+      "own history title is absent from browser AX",
+    );
     for (const [index, id] of expected.answerIds.entries()) {
       const ordinal = index + 1;
-      const cardOrdinal = new RegExp(`文本 第\\s*\\n\\s*\\d+ 文本 ${ordinal}\\s*\\n\\s*\\d+ 文本\\s+条已接纳记录`);
-      assert.ok(cardOrdinal.test(list.ax) && list.ax.includes(`${new URL(historyURL).host}${new URL(historyURL).pathname}/${encodeURIComponent(id)}`),
-        `own history AX is missing fixed answer ${ordinal}`);
+      const cardOrdinal = new RegExp(
+        `文本 第\\s*\\n\\s*\\d+ 文本 ${ordinal}\\s*\\n\\s*\\d+ 文本\\s+条已接纳记录`,
+      );
+      assert.ok(
+        cardOrdinal.test(list.ax) &&
+          list.ax.includes(
+            `${new URL(historyURL).host}${new URL(historyURL).pathname}/${encodeURIComponent(id)}`,
+          ),
+        `own history AX is missing fixed answer ${ordinal}`,
+      );
     }
     for (const phrase of ["当前可用", "接纳时摘录", "打开固定修订"])
       assert.ok(detail.ax.includes(phrase), `available detail AX is missing ${phrase}`);
-    assert.ok(citedQuote.test(detail.ax),
-      "browser detail displayed the wrong cited quote");
-    assert.ok(detail.ax.includes(expected.href), "browser detail linked to the wrong fixed revision");
-    report.browser ??= { mode: "CUA-observed local browser", login: "disposable local JWT handoff", stages: {} };
-    report.browser.stages.available = { operator_observed: observation.observed,
-      list_ax_sha256: list.sha256, detail_ax_sha256: detail.sha256 };
+    assert.ok(citedQuote.test(detail.ax), "browser detail displayed the wrong cited quote");
+    assert.ok(
+      detail.ax.includes(expected.href),
+      "browser detail linked to the wrong fixed revision",
+    );
+    report.browser ??= {
+      mode: "CUA-observed local browser",
+      login: "disposable local JWT handoff",
+      stages: {},
+    };
+    report.browser.stages.available = {
+      operator_observed: observation.observed,
+      list_ax_sha256: list.sha256,
+      detail_ax_sha256: detail.sha256,
+    };
   } else {
     assert.ok(detail.ax.includes("已撤回或不可用"), "withdrawn citation is absent from browser AX");
     for (const phrase of ["接纳时摘录", "打开固定修订"])
       assert.ok(!detail.ax.includes(phrase), `withdrawn detail AX still exposes ${phrase}`);
-    assert.ok(!citedQuote.test(detail.ax) && !detail.ax.includes(expected.href),
-      "withdrawn browser detail retained the cited quote or fixed revision link");
-    report.browser.stages.withdrawn = { operator_observed: observation.observed,
-      detail_ax_sha256: detail.sha256 };
+    assert.ok(
+      !citedQuote.test(detail.ax) && !detail.ax.includes(expected.href),
+      "withdrawn browser detail retained the cited quote or fixed revision link",
+    );
+    report.browser.stages.withdrawn = {
+      operator_observed: observation.observed,
+      detail_ax_sha256: detail.sha256,
+    };
   }
 };
 const inspectSubject = (subject) => {
@@ -351,13 +400,23 @@ async function main() {
     const citationKey = evidence?.key;
     assert.equal(evidence?.quote, ready.expected_quote);
     assert.equal(citationKey?.revision_id, ready.expected_citation_states[0].revision_id);
-    assert.ok(snapshot?.module_id && snapshot?.release_id && ["source", "wiki"].includes(citationKey?.source_kind));
-    const fixedSourceHref = `/knowledge/${encodeURIComponent(snapshot.module_id)}/${citationKey.source_kind === "source" ? "sources" : "read"}?${new URLSearchParams({
-      release: snapshot.release_id,
-      revision: citationKey.revision_id,
-      ...(evidence.locator?.locator ? { locator: evidence.locator.locator } : {}),
-    })}`;
-    const browserExpected = { quote: ready.expected_quote, href: fixedSourceHref, answerIds: ready.answer_ids };
+    assert.ok(
+      snapshot?.module_id &&
+        snapshot?.release_id &&
+        ["source", "wiki"].includes(citationKey?.source_kind),
+    );
+    const fixedSourceHref = `/knowledge/${encodeURIComponent(snapshot.module_id)}/${citationKey.source_kind === "source" ? "sources" : "read"}?${new URLSearchParams(
+      {
+        release: snapshot.release_id,
+        revision: citationKey.revision_id,
+        ...(evidence.locator?.locator ? { locator: evidence.locator.locator } : {}),
+      },
+    )}`;
+    const browserExpected = {
+      quote: ready.expected_quote,
+      href: fixedSourceHref,
+      answerIds: ready.answer_ids,
+    };
     assert.equal((await read(v2Base, answerRoute, ready.other_token, 404)).data, null);
     await read(
       v2Base,
@@ -384,9 +443,18 @@ async function main() {
       citation: "available",
     };
     if (browserMode) {
-      await browserHandoff("available", v2Base, ready.session_id, ready.answer_ids[0], browserExpected, providerProcess);
-      assert.ok(browserLoginServer.stats.matching_login_http_200 >= 1,
-        "browser reused another local session instead of logging in through the fixture bridge");
+      await browserHandoff(
+        "available",
+        v2Base,
+        ready.session_id,
+        ready.answer_ids[0],
+        browserExpected,
+        providerProcess,
+      );
+      assert.ok(
+        browserLoginServer.stats.matching_login_http_200 >= 1,
+        "browser reused another local session instead of logging in through the fixture bridge",
+      );
       report.browser.fixture_login_http_200 = browserLoginServer.stats.matching_login_http_200;
     }
     release(files.availableRelease);
@@ -407,7 +475,15 @@ async function main() {
       "withdrawn citation became unavailable without changing old v1 detail bytes or v2 turn bytes",
     );
     report.statuses.withdrawn = { v1_detail: 200, v2_detail: 200, citation: "unavailable" };
-    if (browserMode) await browserHandoff("withdrawn", v2Base, ready.session_id, ready.answer_ids[0], browserExpected, providerProcess);
+    if (browserMode)
+      await browserHandoff(
+        "withdrawn",
+        v2Base,
+        ready.session_id,
+        ready.answer_ids[0],
+        browserExpected,
+        providerProcess,
+      );
     release(files.withdrawnRelease);
     const exited =
       providerProcess.exitCode !== null
