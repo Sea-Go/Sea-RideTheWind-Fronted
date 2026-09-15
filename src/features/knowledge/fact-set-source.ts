@@ -72,8 +72,21 @@ export async function previewFactSetScope(
   const sources: Revision[] = [];
   for (const id of [...sourceIDs].sort()) {
     const metadata = known.get(id);
-    if (metadata?.withdrawn && !currentRefs.has(id) && !originCompileId) continue;
-    const source = await readers.revision(id);
+    if (metadata?.withdrawn) {
+      if (currentRefs.has(id) || originCompileId)
+        throw new Error(
+          `当前 Wiki 或 AI 编制引用的原文 ${id} 已撤回，不能创建新目录；可按目录修订 ID 查看历史。`,
+        );
+      continue;
+    }
+    let source: Revision;
+    try {
+      source = await readers.revision(id);
+    } catch {
+      throw new Error(
+        `来源修订 ${id} 的正文不可取；不能省略后继续声明。请加载历史来源元数据，或按目录修订 ID 查看旧目录。`,
+      );
+    }
     if (source.kind !== "source" || source.module_id !== moduleId)
       throw new Error(`来源 ${id} 不属于当前模块。`);
     if (source.withdrawn) {
