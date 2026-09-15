@@ -14,7 +14,11 @@ import {
 } from "./api";
 import { sha256Utf8 } from "./quality-source";
 import { CommandKeys } from "./state";
-import { type WikiFactReviewDraft, WikiFactReviewForm } from "./WikiFactReviewForm";
+import {
+  assessmentNames,
+  type WikiFactReviewDraft,
+  WikiFactReviewForm,
+} from "./WikiFactReviewForm";
 import { type WikiReviewEvidence, WikiReviewEvidencePicker } from "./WikiReviewEvidence";
 
 export function WikiFactQualityReview({
@@ -26,6 +30,7 @@ export function WikiFactQualityReview({
   revisions: Revision[];
   publishedReleaseId: string;
 }) {
+  const [target, setTarget] = useState<Revision | null>(null);
   const [evidence, setEvidence] = useState<WikiReviewEvidence | null>(null);
   const [editingHead, setEditingHead] = useState<WikiPageHeadSnapshot | null>(null);
   const [currentRelease, setCurrentRelease] = useState<ReleaseState | null>(null);
@@ -42,15 +47,15 @@ export function WikiFactQualityReview({
   const posting = useRef(false);
 
   useEffect(() => {
-    if (!evidence) return;
+    if (!target) return;
     const controller = new AbortController();
     const generation = ++reading.current;
     Promise.all([
-      knowledgeQuality.editingHead(moduleId, evidence.wiki.entity_id, controller.signal),
+      knowledgeQuality.editingHead(moduleId, target.entity_id, controller.signal),
       knowledgeQuality.judgments(
         moduleId,
-        evidence.wiki.entity_id,
-        evidence.wiki.revision_id,
+        target.entity_id,
+        target.revision_id,
         "",
         controller.signal,
       ),
@@ -72,24 +77,12 @@ export function WikiFactQualityReview({
         if (!controller.signal.aborted && generation === reading.current) setLoading(false);
       });
     return () => controller.abort();
-  }, [moduleId, evidence, reload]);
+  }, [moduleId, target, reload]);
 
-  const selectEvidence = (next: WikiReviewEvidence) => {
+  const selectTarget = (next: Revision | null) => {
     if (posting.current) return;
     reading.current++;
-    setEvidence(next);
-    setEditingHead(null);
-    setCurrentRelease(null);
-    setItems([]);
-    setCursor("");
-    setError("");
-    setMessage("");
-    setLoading(true);
-    setFormVersion((value) => value + 1);
-  };
-  const editEvidence = () => {
-    if (posting.current || !evidence) return;
-    reading.current++;
+    setTarget(next);
     setEvidence(null);
     setEditingHead(null);
     setCurrentRelease(null);
@@ -97,19 +90,31 @@ export function WikiFactQualityReview({
     setCursor("");
     setError("");
     setMessage("");
-    setLoading(false);
+    setLoading(Boolean(next));
+    setFormVersion((value) => value + 1);
+  };
+  const selectEvidence = (next: WikiReviewEvidence) => {
+    if (posting.current) return;
+    if (!target || target.revision_id !== next.wiki.revision_id) selectTarget(next.wiki);
+    setEvidence(next);
+    setFormVersion((value) => value + 1);
+  };
+  const editEvidence = () => {
+    if (posting.current || !evidence) return;
+    setEvidence(null);
+    setMessage("");
   };
 
   async function more() {
-    if (!evidence || !cursor || loading) return;
-    const current = evidence;
+    if (!target || !cursor || loading) return;
+    const current = target;
     const generation = reading.current;
     setLoading(true);
     try {
       const page = await knowledgeQuality.judgments(
         moduleId,
-        current.wiki.entity_id,
-        current.wiki.revision_id,
+        current.entity_id,
+        current.revision_id,
         cursor,
       );
       if (generation !== reading.current) return;
@@ -197,7 +202,7 @@ export function WikiFactQualityReview({
         </div>
         <button
           className="sea-button"
-          disabled={!evidence || loading || busy}
+          disabled={!target || loading || busy}
           onClick={() => {
             setLoading(true);
             setReload((value) => value + 1);
@@ -208,11 +213,14 @@ export function WikiFactQualityReview({
       </div>
       {error && <Notice error>{error}</Notice>}
       {message && <Notice>{message}</Notice>}
-      {editingHead && evidence && (
+      {target?.withdrawn && (
+        <Notice>所选 Wiki 修订已撤回。此前记录的事实判断仍可查阅，原正文不再供重新取证。</Notice>
+      )}
+      {editingHead && target && (
         <div className="wiki-quality-pointers">
           <p>
             当前编辑头 <span className="knowledge-id">{editingHead.revision_id}</span>
-            {editingHead.revision_id === evidence.wiki.revision_id
+            {editingHead.revision_id === target.revision_id
               ? " · 正在核对此修订"
               : " · 所选为历史修订"}
           </p>
@@ -232,6 +240,7 @@ export function WikiFactQualityReview({
           revisions={revisions}
           busy={busy}
           onEdit={editEvidence}
+          onTarget={selectTarget}
           onSelect={selectEvidence}
         />
         <WikiFactReviewForm
@@ -241,7 +250,7 @@ export function WikiFactQualityReview({
           onSubmit={(draft) => void judge(draft)}
         />
       </div>
-      {evidence && (
+      {target && (
         <div className="wiki-quality-history">
           <h3>这个 Wiki 修订的已有事实判断</h3>
           {loading && <p role="status">正在读取当前编辑头与事实判断…</p>}
@@ -252,7 +261,7 @@ export function WikiFactQualityReview({
                 <strong>
                   {item.assessment === "undetermined"
                     ? "无法判定 · 不打数字分"
-                    : `${item.assessment} · ${item.grade ?? "?"} 分`}
+                    : `${assessmentNames[item.assessment] || item.assessment} · ${item.grade ?? "?"} 分`}
                 </strong>
                 <p>{item.reason}</p>
                 <small className="knowledge-id">

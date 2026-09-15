@@ -19,12 +19,14 @@ export function WikiReviewEvidencePicker({
   revisions,
   busy,
   onEdit,
+  onTarget,
   onSelect,
 }: {
   moduleId: string;
   revisions: Revision[];
   busy: boolean;
   onEdit: () => void;
+  onTarget: (revision: Revision | null) => void;
   onSelect: (evidence: WikiReviewEvidence) => void;
 }) {
   const [wikiId, setWikiId] = useState("");
@@ -46,6 +48,9 @@ export function WikiReviewEvidencePicker({
   for (const ref of wiki?.source_refs || []) {
     if (!knownSource.has(ref.revision_id)) knownSource.set(ref.revision_id, null);
   }
+  const selectedSourceWithdrawn = Boolean(
+    revisions.find((revision) => revision.revision_id === sourceId)?.withdrawn,
+  );
 
   useEffect(() => {
     if (!wikiId) return;
@@ -95,17 +100,22 @@ export function WikiReviewEvidencePicker({
         setSource(revision);
       })
       .catch((reason) => {
-        if (!controller.signal.aborted)
-          setError(reason instanceof Error ? reason.message : "固定原文读取失败。");
+        if (controller.signal.aborted) return;
+        if (selectedSourceWithdrawn) {
+          setSource(null);
+          setSourceQuote("");
+          setError("所选原文修订已撤回，正文不可读。此前事实判断仍可在下方查阅。");
+        } else setError(reason instanceof Error ? reason.message : "固定原文读取失败。");
       })
       .finally(() => {
         if (!controller.signal.aborted) setSourceReading(false);
       });
     return () => controller.abort();
-  }, [moduleId, wiki, sourceId]);
+  }, [moduleId, wiki, sourceId, selectedSourceWithdrawn]);
 
   const paragraph = source?.content ? originalSourceParagraph(source.content, locator) : null;
   const quoteValid = Boolean(
+    !selectedSourceWithdrawn &&
     paragraph &&
     sourceQuote.trim() &&
     new TextEncoder().encode(sourceQuote).length <= 4096 &&
@@ -141,6 +151,7 @@ export function WikiReviewEvidencePicker({
             setSourceQuote("");
             setWikiClaim("");
             setError("");
+            onTarget(wikiChoices.find((revision) => revision.revision_id === id) || null);
           }}
           aria-label="选择固定 Wiki 修订"
         >
