@@ -5,13 +5,10 @@ import type {
   AcceptedAnswersPage,
   ProductAnswerCitationStates,
 } from "./generated/knowledgeComponents";
+import type { AcceptedAnswersPageV2, AcceptedAnswerV2 } from "./generated/knowledgeComponentsV2";
 
-export type HistoricalAcceptedAnswer = Omit<AcceptedAnswer, "subject"> & {
-  subject: AcceptedAnswer["subject"] | { issuer: string; subject_id: string };
-};
-export type HistoricalAcceptedAnswersPage = Omit<AcceptedAnswersPage, "items"> & {
-  items: HistoricalAcceptedAnswer[];
-};
+export type HistoricalAcceptedAnswer = AcceptedAnswer | AcceptedAnswerV2;
+export type HistoricalAcceptedAnswersPage = AcceptedAnswersPage | AcceptedAnswersPageV2;
 
 type ObjectValue = Record<string, unknown>;
 const object = (value: unknown): ObjectValue | null =>
