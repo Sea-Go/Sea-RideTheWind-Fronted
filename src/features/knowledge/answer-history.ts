@@ -37,6 +37,27 @@ export interface HistoricalAnswer {
   citations: HistoricalCitation[];
 }
 
+// One older or malformed accepted turn cannot hide other independently valid
+// records in a session. Fixed AnswerID detail continues to decode strictly.
+export function readHistoricalPage(
+  items: AcceptedAnswer[],
+  sessionId: string,
+): {
+  answers: HistoricalAnswer[];
+  unreadableCount: number;
+} {
+  const answers: HistoricalAnswer[] = [];
+  let unreadableCount = 0;
+  for (const item of items) {
+    try {
+      answers.push(readHistoricalAnswer(item, sessionId));
+    } catch {
+      unreadableCount++;
+    }
+  }
+  return { answers, unreadableCount };
+}
+
 /** Decode only the validated product turn fields used by the reading surface. */
 export function readHistoricalAnswer(item: AcceptedAnswer, sessionId: string): HistoricalAnswer {
   if (item.session_id !== sessionId || !Number.isSafeInteger(item.accepted_ordinal))

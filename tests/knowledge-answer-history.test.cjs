@@ -32,6 +32,7 @@ const {
   appendAcceptedPage,
   readCurrentCitationStates,
   readHistoricalAnswer,
+  readHistoricalPage,
 } = require("../src/features/knowledge/answer-history.ts");
 const { isKnowledgeRoute } = require("../src/server/knowledge-routes.ts");
 const route = require("../src/app/api/sea/[...path]/route.ts");
@@ -215,6 +216,30 @@ test("accepted ordinal pages append in order without duplicating replayed record
   const first = answer();
   const second = { ...answer(), answer_id: "answer-2", accepted_ordinal: 2 };
   assert.deepEqual(appendAcceptedPage([second], { items: [first, second] }), [first, second]);
+});
+
+test("one unreadable historical turn does not hide a later valid answer", () => {
+  const older = answer();
+  older.answer_id = "legacy-answer";
+  older.accepted_ordinal = 1;
+  older.turn_json = JSON.stringify({ Request: { AnswerID: "legacy-answer" } });
+  const current = answer();
+  current.answer_id = "answer-2";
+  current.search_id = "search-2";
+  current.accepted_ordinal = 2;
+  const turn = JSON.parse(current.turn_json);
+  turn.request.AnswerID = current.answer_id;
+  turn.request.SearchID = current.search_id;
+  turn.result.answer_id = current.answer_id;
+  turn.result.search.evidence_pack.search_id = current.search_id;
+  current.turn_json = JSON.stringify(turn);
+  const page = readHistoricalPage([older, current], "session-1");
+  assert.equal(page.unreadableCount, 1);
+  assert.deepEqual(
+    page.answers.map((row) => row.answerId),
+    ["answer-2"],
+  );
+  assert.throws(() => readHistoricalAnswer(older, "session-1"));
 });
 
 test("BFF preserves user JWT and status while excluding admin cookie on product history", async (t) => {

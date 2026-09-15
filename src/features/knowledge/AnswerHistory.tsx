@@ -10,6 +10,7 @@ import {
   type HistoricalAnswer,
   readCurrentCitationStates,
   readHistoricalAnswer,
+  readHistoricalPage,
 } from "./answer-history";
 import {
   type AcceptedAnswer,
@@ -241,12 +242,12 @@ function AuthorizedAnswerHistory({
   }, [answerId, cursor, retry, sessionId]);
 
   let parsed: HistoricalAnswer[] = [];
+  let unreadableCount = 0;
   let presentationError = error;
   if (!presentationError) {
     try {
-      parsed = (answerId ? (single ? [single] : []) : items).map((item) =>
-        readHistoricalAnswer(item, sessionId),
-      );
+      if (answerId) parsed = single ? [readHistoricalAnswer(single, sessionId)] : [];
+      else ({ answers: parsed, unreadableCount } = readHistoricalPage(items, sessionId));
     } catch (cause) {
       presentationError = cause instanceof Error ? cause.message : "历史答案格式不正确。";
     }
@@ -300,6 +301,12 @@ function AuthorizedAnswerHistory({
           </button>
         </Notice>
       )}
+      {!answerId && !presentationError && unreadableCount > 0 && (
+        <Notice error>
+          有 {unreadableCount}{" "}
+          条历史记录暂不可读；已验证的记录仍可查看。请使用原固定链接核对异常记录。
+        </Notice>
+      )}
       {loading && <p role="status">正在读取已接纳的历史…</p>}
       {answerId && parsed[0]?.citations.length > 0 && !verifiedStates && !loading && (
         <Notice error>
@@ -317,10 +324,20 @@ function AuthorizedAnswerHistory({
         </Notice>
       )}
       {!loading && !presentationError && parsed.length === 0 && (
-        <EmptyState title={answerId ? "这条记录不可读" : "本会话暂无已接纳答案"}>
+        <EmptyState
+          title={
+            answerId
+              ? "这条记录不可读"
+              : unreadableCount
+                ? "本会话记录暂不可读"
+                : "本会话暂无已接纳答案"
+          }
+        >
           {answerId
             ? "请核对固定链接或返回本会话。"
-            : "只有通过答案与引用校验后正式接纳的记录才会出现在这里。"}
+            : unreadableCount
+              ? "现有记录尚未通过展示校验；请使用原固定链接核对。"
+              : "只有通过答案与引用校验后正式接纳的记录才会出现在这里。"}
         </EmptyState>
       )}
       {!presentationError &&
