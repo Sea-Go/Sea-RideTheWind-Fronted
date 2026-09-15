@@ -14,3 +14,10 @@ export function isKnowledgeRoute(path: string, method: string) {
     );
   });
 }
+
+/** These RTW product reads and writes use the administrator session. */
+export function isKnowledgeWikiReviewRoute(path: string) {
+  return /^knowledge\/modules\/[^/]+\/wiki-pages\/[^/]+\/(?:head|revisions\/[^/]+\/quality-judgments(?:\/[^/]+)?)$/.test(
+    path,
+  );
+}

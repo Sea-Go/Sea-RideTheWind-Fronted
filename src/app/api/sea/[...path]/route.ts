@@ -5,7 +5,7 @@ import {
   isKnowledgeHistoryRead,
   knowledgeHistoryVersion,
 } from "@/server/knowledge-history-version";
-import { isKnowledgeRoute } from "@/server/knowledge-routes";
+import { isKnowledgeRoute, isKnowledgeWikiReviewRoute } from "@/server/knowledge-routes";
 // Knowledge paths are generated from RTW. Other product interfaces remain separate. No fixtures.
 const allowed =
   /^(?:learning\/conversations(?:\/[^/]+\/messages)?|learning\/answers\/[^/]+(?:\/(?:cancel|citations\/[^/]+))?|intelligence\/(?:search|recommendations))$/;
@@ -33,13 +33,16 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pat
       { code: 400, msg: "知识历史只接受分页参数", data: null },
       { status: 400 },
     );
+  const adminCookie = request.cookies.get("admin_center_token")?.value;
+  const userCookie = request.cookies.get("user_center_token")?.value;
   const token =
     request.headers.get("authorization") ||
-    (request.cookies.get("user_center_token")?.value &&
-      `Bearer ${request.cookies.get("user_center_token")?.value}`) ||
-    (!pathname.startsWith("knowledge/answer-sessions/") &&
-      request.cookies.get("admin_center_token")?.value &&
-      `Bearer ${request.cookies.get("admin_center_token")?.value}`);
+    (isKnowledgeWikiReviewRoute(pathname)
+      ? adminCookie && `Bearer ${adminCookie}`
+      : (userCookie && `Bearer ${userCookie}`) ||
+        (!pathname.startsWith("knowledge/answer-sessions/") &&
+          adminCookie &&
+          `Bearer ${adminCookie}`));
   if (version === "v2" && (!token || !/^Bearer\s+\S+$/i.test(token)))
     return NextResponse.json(
       { code: 401, msg: "知识历史 v2 需要 User JWT", data: null },
