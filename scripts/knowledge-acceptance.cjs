@@ -14,7 +14,8 @@ const assert = require("node:assert/strict");
 const { setTimeout: delay } = require("node:timers/promises");
 const provider = path.resolve(process.argv[2] || "");
 if (!process.argv[2]) throw new Error("RTW checkout argument is required");
-const wikiQualityMode = process.env.SEA_WEB_WIKI_QUALITY_ACCEPTANCE === "1";
+const wikiFactSetMode = process.env.SEA_WEB_WIKI_FACT_SET_ACCEPTANCE === "1";
+const wikiQualityMode = process.env.SEA_WEB_WIKI_QUALITY_ACCEPTANCE === "1" || wikiFactSetMode;
 const web = path.resolve(__dirname, "..");
 const pg = process.env.KNOWLEDGE_PG_BIN || "/opt/homebrew/opt/postgresql@17/bin";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sea-web-knowledge-acceptance-"));
@@ -37,11 +38,15 @@ const report = {
     "Local content-addressed object backend",
     "H06 structural fixture only; no real AI compilation, Dense/Sparse/Multi-vector model or query quality",
     "No production deployment",
-    ...(wikiQualityMode
+    ...(wikiFactSetMode
       ? [
-          "Single human Wiki fact only; no complete FactSet, D07 quality threshold, or automatic Release",
+          "FactSet completeness is an isolated administrator declaration, not externally verified page quality or D07",
         ]
-      : []),
+      : wikiQualityMode
+        ? [
+            "Single human Wiki fact only; no complete FactSet, D07 quality threshold, or automatic Release",
+          ]
+        : []),
   ],
 };
 const check = (name, fn) => {
@@ -160,6 +165,7 @@ process.on("SIGTERM", () => {
     },
     Objects: { Backend: "local", LocalDirectory: objectDir },
     ...(wikiQualityMode ? { WikiQualityJudgments: { Enabled: true } } : {}),
+    ...(wikiFactSetMode ? { WikiFactSets: { Enabled: true } } : {}),
   };
   const configPath = path.join(dir, "api.json");
   fs.writeFileSync(configPath, JSON.stringify(config), { mode: 0o600 });
@@ -399,6 +405,78 @@ process.on("SIGTERM", () => {
       checks: ["HTTP401", "HTTP403", "HTTP200", "idempotency", "list/get/head", "CAS409"],
     };
   }
+  let catalog1;
+  if (wikiFactSetMode) {
+    const factPath = `modules/${module.id}/wiki-pages/climate/revisions/${wiki1.revision_id}/fact-sets`;
+    const quote = "坡向影响光照。";
+    const input = {
+      source_revisions: [{ revision_id: a.revision_id, content_sha256: a.content_hash }],
+      facts: [
+        {
+          source_revision_id: a.revision_id,
+          locator: "paragraph:2",
+          source_quote: quote,
+          source_quote_sha256: crypto.createHash("sha256").update(Buffer.from(quote)).digest("hex"),
+          required: true,
+        },
+      ],
+      facts_complete: true,
+      reason: "管理员声明：此固定来源范围预期覆盖这条光照事实",
+      idempotency_key: key(),
+    };
+    await call(factPath, "POST", input, 401, false, true);
+    const userRejected = await fetch(`${base}/api/sea/knowledge/${factPath}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${qualityUserToken}` },
+      body: JSON.stringify(input),
+    });
+    check("FactSet BFF keeps non-admin 403", () => assert.equal(userRejected.status, 403));
+    catalog1 = await call(factPath, "POST", input);
+    const scopePath = `modules/${module.id}/wiki-pages/climate/fact-sets/${catalog1.source_scope_revision}`;
+    const historyPath = `modules/${module.id}/wiki-pages/climate/fact-set-revisions/${catalog1.fact_set_revision_id}`;
+    const scoped = await call(scopePath);
+    const historical = await call(historyPath);
+    const replayed = await fetch(`${base}/api/sea/knowledge/${factPath}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: `user_center_token=${qualityUserToken}; admin_center_token=${token}`,
+      },
+      body: JSON.stringify(input),
+    });
+    const withoutAdmin = await fetch(`${base}/api/sea/knowledge/${historyPath}`, {
+      headers: { Cookie: `user_center_token=${qualityUserToken}` },
+    });
+    check("FactSet dual-cookie POST replays with admin and history GET refuses User-only", () => {
+      assert.equal(replayed.status, 200);
+      assert.equal(withoutAdmin.status, 401);
+    });
+    const editing = await call(`modules/${module.id}/wiki-pages/climate/head`);
+    const releasePointer = await call(`modules/${module.id}/releases/current`);
+    check(
+      "FactSet freezes immutable required Fact, same scope/history, without Wiki or Release writes",
+      () => {
+        assert.equal(catalog1.wiki_revision_id, wiki1.revision_id);
+        assert.equal(catalog1.source_revisions.length, 1);
+        assert.equal(catalog1.facts.length, 1);
+        assert.equal(catalog1.facts[0].required, true);
+        assert.equal(catalog1.facts[0].source_quote, quote);
+        assert.equal(
+          catalog1.facts[0].source_byte_start,
+          String(Buffer.from(a.content).indexOf(Buffer.from(quote))),
+        );
+        assert.equal(
+          catalog1.facts[0].source_byte_end,
+          String(Buffer.from(a.content).indexOf(Buffer.from(quote)) + Buffer.byteLength(quote)),
+        );
+        assert.equal(catalog1.actor_id, "web-fixture-admin");
+        assert.equal(scoped.fact_set_revision_id, catalog1.fact_set_revision_id);
+        assert.equal(historical.fact_set_jcs_sha256, catalog1.fact_set_jcs_sha256);
+        assert.equal(editing.revision_id, wiki1.revision_id);
+        assert.equal(releasePointer.active_release_id, "");
+      },
+    );
+  }
   const r1 = await release(module, [a], wiki1);
   const state0 = await call(`modules/${module.id}/releases/current`);
   check("frozen candidate is NOT_BUILT and never automatically published", () => {
@@ -434,6 +512,69 @@ process.on("SIGTERM", () => {
     [a],
     wiki1,
   );
+  if (wikiFactSetMode) {
+    const input = {
+      source_revisions: catalog1.source_revisions,
+      facts: catalog1.facts.map((fact) => ({
+        source_revision_id: fact.source_revision_id,
+        locator: fact.locator,
+        source_quote: fact.source_quote,
+        source_quote_sha256: fact.source_quote_sha256,
+        required: fact.required,
+      })),
+      facts_complete: true,
+      reason: "同一来源范围的新 Wiki 修订再次声明预期事实",
+      base_fact_set_revision_id: catalog1.fact_set_revision_id,
+      idempotency_key: key(),
+    };
+    const path = `modules/${module.id}/wiki-pages/climate/revisions/${wiki2.revision_id}/fact-sets`;
+    const catalog2 = await call(path, "POST", input);
+    const old = await call(
+      `modules/${module.id}/wiki-pages/climate/fact-set-revisions/${catalog1.fact_set_revision_id}`,
+    );
+    const currentCatalog = await call(
+      `modules/${module.id}/wiki-pages/climate/fact-sets/${catalog1.source_scope_revision}`,
+    );
+    const releasePointer = await call(`modules/${module.id}/releases/current`);
+    check("FactSet CAS moves only same-scope head, by-ID old Wiki remains pinned", () => {
+      assert.equal(catalog2.base_fact_set_revision_id, catalog1.fact_set_revision_id);
+      assert.equal(catalog2.source_scope_revision, catalog1.source_scope_revision);
+      assert.equal(catalog2.wiki_revision_id, wiki2.revision_id);
+      assert.equal(old.wiki_revision_id, wiki1.revision_id);
+      assert.equal(currentCatalog.fact_set_revision_id, catalog2.fact_set_revision_id);
+      assert.equal(releasePointer.active_release_id, r1.release_id);
+    });
+    await call(
+      path,
+      "POST",
+      {
+        ...input,
+        base_fact_set_revision_id: catalog1.fact_set_revision_id,
+        idempotency_key: key(),
+      },
+      409,
+    );
+    report.wiki_fact_set = {
+      source_scope_revision: catalog1.source_scope_revision,
+      first_revision_id: catalog1.fact_set_revision_id,
+      current_revision_id: catalog2.fact_set_revision_id,
+      historical_wiki_revision_id: old.wiki_revision_id,
+      current_wiki_revision_id: catalog2.wiki_revision_id,
+      required_fact_id: catalog1.facts[0].fact_id,
+      actor_id: catalog1.actor_id,
+      checks: [
+        "HTTP401",
+        "HTTP403",
+        "HTTP200",
+        "dual-cookie",
+        "scope",
+        "by-ID history",
+        "CAS409",
+        "byte-span",
+        "head/release separation",
+      ],
+    };
+  }
   const r2 = await release(module, [a], wiki2);
   const b2 = await ready(r2);
   const activation2 = {
