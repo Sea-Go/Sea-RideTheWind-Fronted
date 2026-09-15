@@ -115,13 +115,26 @@ const processLog = (state) => {
     return "";
   }
 };
+const withTimeout = async (promise, timeoutMillis) => {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((resolve) => {
+        timer = setTimeout(() => resolve(null), timeoutMillis);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
 const stop = async (name) => {
   const state = children.get(name);
   if (!state || state.exit !== null || state.signal !== null) return;
   try {
     process.kill(-state.child.pid, "SIGTERM");
   } catch {}
-  const result = await Promise.race([state.done, delay(15000).then(() => null)]);
+  const result = await withTimeout(state.done, 15000);
   if (result === null) {
     try {
       process.kill(-state.child.pid, "SIGKILL");
@@ -511,11 +524,11 @@ let resultWritten = false;
     );
     privateTouch(files.historyWithdrawnRelease);
 
-    const rtwExit = await Promise.race([rtwState.done, delay(8 * 60 * 1000).then(() => null)]);
+    const rtwExit = await withTimeout(rtwState.done, 8 * 60 * 1000);
     assert.ok(rtwExit, "RTW acceptance did not exit");
     assert.equal(rtwExit.code, 0, processLog(rtwState));
     releaseIfMissing(dcRelease);
-    const dcExit = await Promise.race([dcState.done, delay(5 * 60 * 1000).then(() => null)]);
+    const dcExit = await withTimeout(dcState.done, 5 * 60 * 1000);
     assert.ok(dcExit, "DataCenter acceptance did not exit");
     assert.equal(dcExit.code, 0, processLog(dcState));
 
