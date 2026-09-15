@@ -92,6 +92,39 @@ function answer(status = "succeeded") {
   };
 }
 
+function goUppercaseAnswer() {
+  const row = answer();
+  const { request, result } = JSON.parse(row.turn_json);
+  const turn = {
+    Request: {
+      ...request,
+      Search: {
+        ...request.Search,
+        Query: "What does this source say?",
+        Depth: "fast",
+        Intelligence: "low",
+        Snapshot: result.search.evidence_pack.snapshot,
+      },
+    },
+    result: {
+      ...result,
+      answer: "Evidence is cited.",
+      search: {
+        ...result.search,
+        evidence_pack: {
+          ...result.search.evidence_pack,
+          evidence: [{ ...result.search.evidence_pack.evidence[0], quote: "Evidence" }],
+        },
+      },
+    },
+  };
+  return {
+    ...row,
+    subject: { issuer: "rtw.identity", subject_id: "42" },
+    turn_json: JSON.stringify(turn),
+  };
+}
+
 test("generated product history routes are read-only and worker routes stay unavailable", () => {
   assert.deepEqual(v2Routes, [
     { method: "GET", path: "knowledge/answer-sessions/{session_id}/accepted-answers" },
@@ -191,6 +224,62 @@ test("accepted turn shows its fixed historic citation without inferring current 
     edit(raw);
     mismatched.turn_json = JSON.stringify(raw);
     assert.throws(() => readHistoricalAnswer(mismatched, "session-1"));
+  }
+});
+
+test("RTW Go uppercase Request turn remains readable through the v2 subject projection", () => {
+  const row = goUppercaseAnswer();
+  const view = readHistoricalAnswer(row, "session-1");
+  const v1 = { ...row, subject: answer().subject };
+  assert.deepEqual(readHistoricalAnswer(v1, "session-1"), view);
+  assert.equal(v1.turn_json, row.turn_json);
+  assert.equal(view.question, "What does this source say?");
+  assert.equal(view.answer, "Evidence is cited.");
+  assert.equal(view.citations[0].quote, "Evidence");
+  assert.equal(
+    view.citations[0].sourceHref,
+    "/knowledge/book-1/sources?release=release-1&revision=revision-1&locator=paragraph%3A2",
+  );
+  assert.deepEqual(readHistoricalPage([row], "session-1"), {
+    answers: [view],
+    unreadableCount: 0,
+  });
+  assert.throws(() =>
+    readHistoricalAnswer(
+      { ...row, subject: { issuer: "rtw.identity", subject_id: "43" } },
+      "session-1",
+    ),
+  );
+  const forgedTurn = JSON.parse(row.turn_json);
+  forgedTurn.result.citations = ["missing-evidence"];
+  assert.throws(() =>
+    readHistoricalAnswer({ ...row, turn_json: JSON.stringify(forgedTurn) }, "session-1"),
+  );
+});
+
+test("accepted turn rejects simultaneous or malformed request aliases", () => {
+  const row = goUppercaseAnswer();
+  const valid = JSON.parse(row.turn_json);
+  for (const turn of [
+    { ...valid, request: valid.Request },
+    {
+      ...valid,
+      request: { ...valid.Request, Subject: { issuer: "rtw.identity", subject_id: "43" } },
+    },
+    { ...valid, request: null },
+    { ...valid, request: [] },
+    { ...valid, Request: "invalid", request: valid.Request },
+    { ...valid, Request: null },
+    { ...valid, Request: [] },
+    { result: valid.result, request: null },
+    { result: valid.result, request: [] },
+    { result: valid.result, request: "invalid" },
+    { result: valid.result },
+  ]) {
+    assert.throws(
+      () => readHistoricalAnswer({ ...row, turn_json: JSON.stringify(turn) }, "session-1"),
+      /请求结构不明确/,
+    );
   }
 });
 
