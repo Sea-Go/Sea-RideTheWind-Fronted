@@ -52,6 +52,23 @@ export interface AcceptedAnswerEnvelope {
   data: AcceptedAnswer;
 }
 
+export interface AcceptedAnswerV2 {
+  answer_id: string;
+  search_id: string;
+  subject: AcceptedSubjectRefV2;
+  session_id: string;
+  status: string;
+  accepted_ordinal: number;
+  accepted_at: string;
+  turn_json: string;
+}
+
+export interface AcceptedAnswerV2Envelope {
+  code: number;
+  msg: string;
+  data: AcceptedAnswerV2;
+}
+
 export interface AcceptedAnswersPage {
   items: Array<AcceptedAnswer>;
   next_ordinal?: number;
@@ -63,9 +80,25 @@ export interface AcceptedAnswersPageEnvelope {
   data: AcceptedAnswersPage;
 }
 
+export interface AcceptedAnswersPageV2 {
+  items: Array<AcceptedAnswerV2>;
+  next_ordinal?: number;
+}
+
+export interface AcceptedAnswersPageV2Envelope {
+  code: number;
+  msg: string;
+  data: AcceptedAnswersPageV2;
+}
+
 export interface AcceptedSubjectRef {
   authority_id: string;
   tenant_id: string;
+  subject_id: string;
+}
+
+export interface AcceptedSubjectRefV2 {
+  issuer: string;
   subject_id: string;
 }
 
@@ -264,6 +297,56 @@ export interface GetAcceptedAnswerReqParams {
   session_id: string;
 }
 
+export interface GroundingReviewCasePath {}
+export interface GroundingReviewCasePathParams {}
+
+export interface GroundingReviewReceipt {
+  schema_version: string;
+  case_sha256: string;
+  case_json: string;
+  review_json: string;
+  review_sha256: string;
+  key_id: string;
+  reviewer_authority: string;
+  reviewer_id: string;
+  data_kind: string;
+  registry_revision_at_commit: number;
+  answer_id: string;
+  search_id: string;
+  accepted_answer_sha256: string;
+  turn_sha256: string;
+  citation_pack_ref: string;
+  citation_pack_sha256: string;
+  trace_authority_status: string;
+  reviewed_at: string;
+  event_id: string;
+  event_sha256: string;
+}
+
+export interface GroundingReviewReceiptEnvelope {
+  code: number;
+  msg: string;
+  data: GroundingReviewReceipt;
+}
+
+export interface JudgeWikiFactReq {
+  origin_compile_id?: string;
+  source_revision_id: string;
+  source_content_sha256: string;
+  locator: string;
+  source_quote: string;
+  source_quote_sha256: string;
+  wiki_claim_text?: string;
+  wiki_claim_sha256?: string;
+  assessment: string;
+  grade?: string;
+  rubric_version: string;
+  reason: string;
+  base_judge_revision_id?: string;
+  idempotency_key: string;
+}
+export interface JudgeWikiFactReqParams {}
+
 export interface ListAcceptedAnswersReq {}
 export interface ListAcceptedAnswersReqParams {
   authority_id: string;
@@ -333,6 +416,23 @@ export interface ListRevisionsRespEnvelope {
   code: number;
   msg: string;
   data: ListRevisionsResp;
+}
+
+export interface ListWikiFactJudgmentsEnvelope {
+  code: number;
+  msg: string;
+  data: ListWikiFactJudgmentsResp;
+}
+
+export interface ListWikiFactJudgmentsReq {}
+export interface ListWikiFactJudgmentsReqParams {
+  limit?: number;
+  cursor?: string;
+}
+
+export interface ListWikiFactJudgmentsResp {
+  items: Array<WikiFactJudgmentRecord>;
+  next_cursor?: string;
 }
 
 export interface Module {
@@ -470,6 +570,25 @@ export interface ReceiptEnvelope {
   data: Receipt;
 }
 
+export interface RecordSearchJudgmentReq {
+  search_id: string;
+  content_revision_id: string;
+  chunk_id: string;
+  grade: string;
+  rubric_version: string;
+  reason: string;
+  base_revision_id?: string;
+  idempotency_key: string;
+}
+export interface RecordSearchJudgmentReqParams {}
+
+export interface RegisterReviewerKeyReq {
+  key_id: string;
+  data_kind: string;
+  public_key_ed25519_hex: string;
+  idempotency_key: string;
+}
+
 export interface Release {
   release_id: string;
   module_id: string;
@@ -518,6 +637,30 @@ export interface RetrievalProfile {
   aggregation?: string;
 }
 
+export interface ReviewerKeyPath {}
+export interface ReviewerKeyPathParams {}
+
+export interface ReviewerKeyRecord {
+  schema_version: string;
+  key_id: string;
+  reviewer_authority: string;
+  reviewer_id: string;
+  data_kind: string;
+  public_key_ed25519_hex: string;
+  registered_at: string;
+  revoked_at: string;
+  status: string;
+  registry_revision: number;
+  registration_event_id: string;
+  revocation_event_id: string;
+}
+
+export interface ReviewerKeyRecordEnvelope {
+  code: number;
+  msg: string;
+  data: ReviewerKeyRecord;
+}
+
 export interface Revision {
   revision_id: string;
   module_id: string;
@@ -544,6 +687,12 @@ export interface RevisionEnvelope {
 
 export interface RevisionPath {}
 export interface RevisionPathParams {}
+
+export interface RevokeReviewerKeyReq {
+  reason: string;
+  idempotency_key: string;
+}
+export interface RevokeReviewerKeyReqParams {}
 
 export interface SearchCitationPath {}
 export interface SearchCitationPathParams {}
@@ -589,6 +738,37 @@ export interface SearchCitationReference {
   state: string;
 }
 
+export interface SearchJudgmentEventPath {}
+export interface SearchJudgmentEventPathParams {}
+
+export interface SearchJudgmentEventReceipt {
+  event_id: string;
+  event_json: string;
+  event_sha256: string;
+}
+
+export interface SearchJudgmentEventReceiptEnvelope {
+  code: number;
+  msg: string;
+  data: SearchJudgmentEventReceipt;
+}
+
+export interface SearchJudgmentReceipt {
+  judgment_id: string;
+  revision_id: string;
+  search_id: string;
+  chunk_id: string;
+  state: string;
+  event_id: string;
+  event_sha256: string;
+}
+
+export interface SearchJudgmentReceiptEnvelope {
+  code: number;
+  msg: string;
+  data: SearchJudgmentReceipt;
+}
+
 export interface SearchSnapshot {
   module_id: string;
   release_id: string;
@@ -609,6 +789,204 @@ export interface SourceRef {
   locator: string;
 }
 
+export interface SubmitGroundingReviewReq {
+  case_json: string;
+  review_json: string;
+  key_id: string;
+  idempotency_key: string;
+}
+
+export interface ToolBudget {
+  search_calls: number;
+  read_calls: number;
+  quote_runes: number;
+  max_reads_per_search: number;
+  max_quote_runes_per_search: number;
+}
+
+export interface ToolEvidence {
+  evidence_id: string;
+  revision_id: string;
+  locator: string;
+  quote: string;
+  quote_hash: string;
+  source_kind: string;
+}
+
+export interface ToolParentEnvelope {
+  code: number;
+  msg: string;
+  data: ToolParentResult;
+}
+
+export interface ToolParentPath {}
+export interface ToolParentPathParams {}
+
+export interface ToolParentReq {
+  module_id: string;
+  idempotency_key: string;
+}
+export interface ToolParentReqParams {}
+
+export interface ToolParentResult {
+  operation_id: string;
+  scope_ref: string;
+  snapshot_ref: string;
+  budget_ref: string;
+  module_id: string;
+  deadline_at_ms: number;
+  allow_lower_intelligence: boolean;
+  budget: ToolBudget;
+}
+
+export interface ToolReadEnvelope {
+  code: number;
+  msg: string;
+  data: ToolReadResult;
+}
+
+export interface ToolReadReq {
+  search_id: string;
+  evidence_id: string;
+  idempotency_key: string;
+}
+export interface ToolReadReqParams {}
+
+export interface ToolReadResult {
+  search_id: string;
+  snapshot_ref: string;
+  evidence: ToolEvidence;
+  citation_receipt: ToolReceipt;
+}
+
+export interface ToolReceipt {
+  search_id: string;
+  pack_hash: string;
+  durable_ref: string;
+}
+
+export interface ToolSearchEnvelope {
+  code: number;
+  msg: string;
+  data: ToolSearchResult;
+}
+
+export interface ToolSearchPath {}
+export interface ToolSearchPathParams {}
+
+export interface ToolSearchReq {
+  query: string;
+  depth: string;
+  intelligence: string;
+  continue_search_id?: string;
+  read_calls: number;
+  quote_runes: number;
+  idempotency_key: string;
+}
+export interface ToolSearchReqParams {}
+
+export interface ToolSearchResult {
+  search_id: string;
+  status: string;
+  stop_reason: string;
+  snapshot_ref: string;
+  requested_intelligence: string;
+  effective_intelligence: string;
+  evidence: Array<ToolEvidence>;
+  gaps: Array<string>;
+  conflicts: Array<string>;
+  pack_hash?: string;
+  citation_receipt?: ToolReceipt;
+  usage: ToolUsage;
+}
+
+export interface ToolUsage {
+  read_calls: number;
+  quote_runes: number;
+}
+
+export interface WikiFactJudgmentEnvelope {
+  code: number;
+  msg: string;
+  data: WikiFactJudgmentRecord;
+}
+
+export interface WikiFactJudgmentPath {}
+export interface WikiFactJudgmentPathParams {}
+
+export interface WikiFactJudgmentRecord {
+  schema_version: string;
+  judgment_id: string;
+  fact_id: string;
+  judge_revision_id: string;
+  judge_revision: string;
+  base_judge_revision_id: string;
+  module_id: string;
+  page_id: string;
+  wiki_revision_id: string;
+  base_wiki_revision_id: string;
+  wiki_origin_kind: string;
+  origin_compile_id?: string;
+  wiki_content_sha256: string;
+  source_revision_id: string;
+  source_content_sha256: string;
+  locator: string;
+  source_byte_start: string;
+  source_byte_end: string;
+  source_quote: string;
+  source_quote_sha256: string;
+  wiki_claim_text?: string;
+  wiki_claim_sha256?: string;
+  citation_present: boolean;
+  assessment: string;
+  grade?: string;
+  rubric_version: string;
+  reason: string;
+  actor_id: string;
+  judged_at: string;
+  source_withdrawn: boolean;
+  wiki_withdrawn: boolean;
+  event_id?: string;
+  event_raw_sha256?: string;
+  event_jcs_sha256?: string;
+}
+
+export interface WikiPageHeadEnvelope {
+  code: number;
+  msg: string;
+  data: WikiPageHeadSnapshot;
+}
+
+export interface WikiPageHeadPath {}
+export interface WikiPageHeadPathParams {}
+
+export interface WikiPageHeadSnapshot {
+  module_id: string;
+  page_id: string;
+  revision_id: string;
+  base_revision_id: string;
+  content_sha256: string;
+  title: string;
+  created_by: string;
+  withdrawn: boolean;
+}
+
+export interface WikiQualityEventEnvelope {
+  code: number;
+  msg: string;
+  data: WikiQualityEventReceipt;
+}
+
+export interface WikiQualityEventPath {}
+export interface WikiQualityEventPathParams {}
+
+export interface WikiQualityEventReceipt {
+  event_id: string;
+  event_json: string;
+  event_raw_sha256: string;
+  event_jcs_sha256: string;
+}
+
 export interface WithdrawReq {
   target_kind: string;
   target_id: string;
@@ -616,3 +994,12 @@ export interface WithdrawReq {
   idempotency_key: string;
 }
 export interface WithdrawReqParams {}
+
+export interface WithdrawSearchJudgmentReq {
+  search_id: string;
+  chunk_id: string;
+  base_revision_id: string;
+  reason: string;
+  idempotency_key: string;
+}
+export interface WithdrawSearchJudgmentReqParams {}
