@@ -25,7 +25,12 @@ require.extensions[".ts"] = (module, filename) =>
     }).outputText,
     filename,
   );
-const { knowledgeAdminRequest, knowledgeRequest } = require("../src/features/knowledge/api.ts");
+const {
+  knowledge,
+  knowledgeAdminRequest,
+  knowledgeAnswerHistory,
+  knowledgeRead,
+} = require("../src/features/knowledge/api.ts");
 const { isKnowledgeWikiReviewRoute } = require("../src/server/knowledge-routes.ts");
 const bff = require("../src/app/api/sea/[...path]/route.ts");
 const { NextRequest } = require("next/server");
@@ -54,9 +59,18 @@ test("dual browser sessions send administrator JWT only for human Wiki review", 
     auth.push(new Headers(init.headers).get("Authorization"));
     return Response.json({ code: 200, msg: "ok", data: { revision_id: "fixed" } });
   });
-  await knowledgeRequest("modules/m1/revisions/r1");
+  await knowledge.module("m1");
+  await knowledgeRead.module("m1");
+  await knowledgeRead.revision("m1", "r1");
+  await knowledgeAnswerHistory.list("ordinary-session");
   await knowledgeAdminRequest("modules/m1/wiki-pages/p1/head");
-  assert.deepEqual(auth, ["Bearer user-fixture", "Bearer admin-fixture"]);
+  assert.deepEqual(auth, [
+    "Bearer user-fixture",
+    "Bearer admin-fixture",
+    "Bearer admin-fixture",
+    "Bearer user-fixture",
+    "Bearer admin-fixture",
+  ]);
 });
 
 test("missing administrator session does not silently substitute a User JWT", async (t) => {
