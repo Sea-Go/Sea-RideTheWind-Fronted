@@ -327,6 +327,7 @@ let resultWritten = false;
         SEA_DC_BGE_RUNTIME: runtime,
         SEA_BTW_PRODUCT_SEARCH_ROOT: btw,
         SEA_BTW_SEARCH_API_SOCKET_ROOT: btw,
+        ...(browserMode ? { SEA_RTW_PRODUCT_SERVER_PARENT_TIMEOUT: "15m" } : {}),
       },
     );
     await waitFor(
