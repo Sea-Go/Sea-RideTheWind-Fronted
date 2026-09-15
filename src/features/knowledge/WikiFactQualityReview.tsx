@@ -32,6 +32,7 @@ export function WikiFactQualityReview({
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [formVersion, setFormVersion] = useState(0);
   const [reload, setReload] = useState(0);
   const keys = useRef(new CommandKeys());
   const reading = useRef(0);
@@ -78,6 +79,7 @@ export function WikiFactQualityReview({
     setError("");
     setMessage("");
     setLoading(true);
+    setFormVersion((value) => value + 1);
   };
   const editEvidence = () => {
     if (posting.current || !evidence) return;
@@ -166,6 +168,7 @@ export function WikiFactQualityReview({
       keys.current.complete(scope, intent);
       setItems((prior) => [result, ...prior.filter((item) => item.fact_id !== result.fact_id)]);
       setMessage(`已记录这一条事实的人工判断 · 评阅修订 ${result.judge_revision_id}。`);
+      setFormVersion((value) => value + 1);
       setLoading(true);
       setReload((value) => value + 1);
     } catch (reason) {
@@ -220,6 +223,7 @@ export function WikiFactQualityReview({
           onSelect={selectEvidence}
         />
         <WikiFactReviewForm
+          key={formVersion}
           evidence={evidence}
           busy={busy || loading}
           onSubmit={(draft) => void judge(draft)}
