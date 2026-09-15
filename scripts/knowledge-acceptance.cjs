@@ -605,10 +605,104 @@ process.on("SIGTERM", () => {
   const bookB = await source(module, "书 B 原文", "迎风坡受到地形抬升降水的影响。");
   const wiki3 = await createWiki(
     "山地与气候 v3",
-    "## 第三版\n\n加入书 B，比较迎风与背风差异。",
+    "## 第三版\n\n海拔影响温度。迎风坡受到地形抬升降水的影响。编辑补充迎风与背风差异。",
     [a, bookB],
     wiki2,
   );
+  let multiSourceCatalog = null;
+  let multiSourceJudgments = [];
+  if (wikiFactSetMode) {
+    const expectedFacts = [
+      { source: a, quote: "海拔影响温度。" },
+      { source: bookB, quote: "迎风坡受到地形抬升降水的影响。" },
+    ];
+    const sourceRevisions = expectedFacts
+      .map(({ source: item }) => ({
+        revision_id: item.revision_id,
+        content_sha256: item.content_hash,
+      }))
+      .sort((left, right) =>
+        left.revision_id < right.revision_id ? -1 : left.revision_id > right.revision_id ? 1 : 0,
+      );
+    const catalogPath = `modules/${module.id}/wiki-pages/climate/revisions/${wiki3.revision_id}/fact-sets`;
+    const beforeCatalog = await call(`modules/${module.id}/releases/current`);
+    multiSourceCatalog = await call(catalogPath, "POST", {
+      source_revisions: sourceRevisions,
+      facts: expectedFacts.map(({ source: item, quote }) => ({
+        source_revision_id: item.revision_id,
+        locator: "paragraph:1",
+        source_quote: quote,
+        source_quote_sha256: crypto.createHash("sha256").update(Buffer.from(quote)).digest("hex"),
+        required: true,
+      })),
+      facts_complete: true,
+      reason: "隔离管理员声明：人工第三版须同时覆盖书A与书B的两条固定事实",
+      idempotency_key: key(),
+    });
+    const judgmentPath = `modules/${module.id}/wiki-pages/climate/revisions/${wiki3.revision_id}/quality-judgments`;
+    for (const { source: item, quote } of expectedFacts) {
+      multiSourceJudgments.push(
+        await call(judgmentPath, "POST", {
+          source_revision_id: item.revision_id,
+          source_content_sha256: item.content_hash,
+          locator: "paragraph:1",
+          source_quote: quote,
+          source_quote_sha256: crypto.createHash("sha256").update(Buffer.from(quote)).digest("hex"),
+          assessment: "covered",
+          grade: "3",
+          rubric_version: "sea.wiki.fact-coverage.v1",
+          reason: "隔离管理员主张：此版正文逐字包含本资料事实，真人质量另验",
+          idempotency_key: key(),
+        }),
+      );
+    }
+    const editing = await call(`modules/${module.id}/wiki-pages/climate/head`);
+    const stillUnpublished = await call(`modules/${module.id}/releases/current`);
+    const fixedCatalog = await call(
+      `modules/${module.id}/wiki-pages/climate/fact-set-revisions/${multiSourceCatalog.fact_set_revision_id}`,
+    );
+    const originals = await Promise.all(
+      expectedFacts.map(({ source: item }) =>
+        call(`modules/${module.id}/revisions/${item.revision_id}`),
+      ),
+    );
+    check(
+      "manual two-source Wiki freezes two original facts and separate labels without publishing",
+      () => {
+        assert.equal(multiSourceCatalog.wiki_revision_id, wiki3.revision_id);
+        assert.equal(multiSourceCatalog.source_revisions.length, 2);
+        assert.equal(multiSourceCatalog.facts.length, 2);
+        assert.equal(multiSourceJudgments.length, 2);
+        assert.equal(new Set(multiSourceJudgments.map((item) => item.fact_id)).size, 2);
+        assert.equal(fixedCatalog.fact_set_jcs_sha256, multiSourceCatalog.fact_set_jcs_sha256);
+        assert.equal(editing.revision_id, wiki3.revision_id);
+        assert.equal(stillUnpublished.active_release_id, beforeCatalog.active_release_id);
+        expectedFacts.forEach(({ source: item, quote }, index) => {
+          const original = Buffer.from(originals[index].content);
+          const fact = multiSourceCatalog.facts.find(
+            (candidate) => candidate.source_revision_id === item.revision_id,
+          );
+          const label = multiSourceJudgments.find(
+            (candidate) => candidate.source_revision_id === item.revision_id,
+          );
+          assert.equal(
+            crypto.createHash("sha256").update(original).digest("hex"),
+            item.content_hash,
+          );
+          assert.equal(fact.source_quote, quote);
+          assert.equal(fact.source_byte_start, String(original.indexOf(Buffer.from(quote))));
+          assert.equal(
+            fact.source_byte_end,
+            String(original.indexOf(Buffer.from(quote)) + Buffer.byteLength(quote)),
+          );
+          assert.equal(label.fact_id, fact.fact_id);
+          assert.equal(label.wiki_revision_id, wiki3.revision_id);
+          assert.equal(label.assessment, "covered");
+          assert.equal(label.grade, "3");
+        });
+      },
+    );
+  }
   const r3 = await release(module, [a, bookB], wiki3);
   const b3 = await ready(r3);
   pointer = await call(`modules/${module.id}/activation`, "PUT", {
@@ -618,6 +712,46 @@ process.on("SIGTERM", () => {
     reason: "结构 fixture 加入书 B",
     idempotency_key: key(),
   });
+  if (wikiFactSetMode) {
+    const fixedPublicWiki = await call(
+      `modules/${module.id}/releases/${r3.release_id}/revisions/${wiki3.revision_id}`,
+      "GET",
+      undefined,
+      200,
+      false,
+      true,
+    );
+    const fixedPublicSources = await Promise.all(
+      [a, bookB].map((item) =>
+        call(
+          `modules/${module.id}/releases/${r3.release_id}/revisions/${item.revision_id}`,
+          "GET",
+          undefined,
+          200,
+          false,
+          true,
+        ),
+      ),
+    );
+    check(
+      "manual release publishes the same two-source Wiki and keeps its original facts pinned",
+      () => {
+        assert.equal(pointer.active_release_id, r3.release_id);
+        assert.equal(fixedPublicWiki.content, wiki3.content);
+        assert.ok(fixedPublicWiki.content.includes("海拔影响温度。"));
+        assert.ok(fixedPublicWiki.content.includes("迎风坡受到地形抬升降水的影响。"));
+        assert.equal(fixedPublicSources[0].content, "海拔影响温度。\n\n坡向影响光照。");
+        assert.equal(fixedPublicSources[1].content, "迎风坡受到地形抬升降水的影响。");
+      },
+    );
+    report.wiki_fact_set.multi_source_revision_id = multiSourceCatalog.fact_set_revision_id;
+    report.wiki_fact_set.multi_source_fact_ids = multiSourceCatalog.facts.map(
+      (item) => item.fact_id,
+    );
+    report.wiki_fact_set.multi_source_label_event_ids = multiSourceJudgments.map(
+      (item) => item.event_id,
+    );
+  }
   check("book A, revised interpretation, and book B create three immutable releases", () =>
     assert.equal(pointer.pointer_revision, 3),
   );
