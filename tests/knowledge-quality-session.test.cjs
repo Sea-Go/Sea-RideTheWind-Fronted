@@ -29,6 +29,7 @@ const {
   knowledge,
   knowledgeAdminRequest,
   knowledgeAnswerHistory,
+  knowledgeQuality,
   knowledgeRead,
 } = require("../src/features/knowledge/api.ts");
 const { isKnowledgeWikiReviewRoute } = require("../src/server/knowledge-routes.ts");
@@ -169,4 +170,60 @@ test("real Next BFF uses admin cookie for Wiki review and keeps ordinary route i
       "Bearer user-fixture",
     ],
   );
+});
+
+test("fixed RTW quality client binds one Wiki revision, admin identity and judge CAS", async (t) => {
+  const originalWindow = global.window;
+  const originalDocument = global.document;
+  global.window = {
+    localStorage: {
+      getItem: (key) =>
+        key === "admin_center_token"
+          ? "admin-fixture"
+          : key === "user_center_token"
+            ? "user-fixture"
+            : null,
+    },
+  };
+  global.document = { cookie: "admin_center_token=admin-fixture; user_center_token=user-fixture" };
+  t.after(() => {
+    global.window = originalWindow;
+    global.document = originalDocument;
+  });
+  const calls = [];
+  t.mock.method(global, "fetch", async (url, init) => {
+    calls.push({ url, init });
+    return Response.json({ code: 200, msg: "ok", data: { items: [], next_cursor: "" } });
+  });
+  await knowledgeQuality.editingHead("module/a", "page/b");
+  await knowledgeQuality.judgments("module/a", "page/b", "revision/c", "fact/next");
+  await knowledgeQuality.judge("module/a", "page/b", "revision/c", {
+    source_revision_id: "source-r1",
+    source_content_sha256: "s".repeat(64),
+    locator: "paragraph:2",
+    source_quote: "原文字串",
+    source_quote_sha256: "q".repeat(64),
+    assessment: "undetermined",
+    rubric_version: "sea.wiki.fact-coverage.v1",
+    reason: "待另一份原文核对",
+    base_judge_revision_id: "judge-r1",
+    idempotency_key: "one-fixed-intent",
+  });
+  assert.deepEqual(
+    calls.map((call) => call.url),
+    [
+      "/api/sea/knowledge/modules/module%2Fa/wiki-pages/page%2Fb/head",
+      "/api/sea/knowledge/modules/module%2Fa/wiki-pages/page%2Fb/revisions/revision%2Fc/quality-judgments?limit=20&cursor=fact%2Fnext",
+      "/api/sea/knowledge/modules/module%2Fa/wiki-pages/page%2Fb/revisions/revision%2Fc/quality-judgments",
+    ],
+  );
+  assert.ok(
+    calls.every(
+      (call) => new Headers(call.init.headers).get("Authorization") === "Bearer admin-fixture",
+    ),
+  );
+  const post = JSON.parse(calls[2].init.body);
+  assert.equal(post.base_judge_revision_id, "judge-r1");
+  assert.equal(post.grade, undefined);
+  assert.equal(post.tenant_id, undefined);
 });
