@@ -11,7 +11,7 @@ export type WikiFactReviewDraft = {
   reason: string;
 };
 
-const assessmentNames: Record<FactAssessment, string> = {
+export const assessmentNames: Record<string, string> = {
   covered: "已覆盖",
   missing: "缺失",
   conflict: "冲突",
