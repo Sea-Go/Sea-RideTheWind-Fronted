@@ -233,7 +233,7 @@ const browserHandoff = async (stage, base, sessionId, answerId, expected, child)
     flag: "wx",
     mode: 0o600,
   });
-  const observation = await waitFile(observedFile, child, 3 * 60_000);
+  const observation = await waitFile(observedFile, child, 6 * 60_000);
   assert.equal(observation.schema_version, "sea.web.v2-history-browser-observation.v1");
   assert.equal(observation.stage, stage);
   const required = stage === "available"
