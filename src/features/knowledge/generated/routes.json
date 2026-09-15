@@ -1,5 +1,9 @@
 [
   {
+    "method": "POST",
+    "path": "knowledge/answer-grounding/reviews"
+  },
+  {
     "method": "GET",
     "path": "knowledge/answer-sessions/{session_id}/accepted-answers"
   },
@@ -18,6 +22,26 @@
   {
     "method": "GET",
     "path": "knowledge/answer-sessions/{session_id}/searches/{search_id}"
+  },
+  {
+    "method": "POST",
+    "path": "knowledge/answer-sessions/{session_id}/tool-runs"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/answer-sessions/{session_id}/tool-runs/{operation_id}"
+  },
+  {
+    "method": "POST",
+    "path": "knowledge/answer-sessions/{session_id}/tool-runs/{operation_id}/evidence-reads"
+  },
+  {
+    "method": "POST",
+    "path": "knowledge/answer-sessions/{session_id}/tool-runs/{operation_id}/searches"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/answer-sessions/{session_id}/tool-runs/{operation_id}/searches/{search_id}"
   },
   {
     "method": "POST",
@@ -105,11 +129,35 @@
   },
   {
     "method": "POST",
+    "path": "knowledge/modules/{module_id}/search-judgments"
+  },
+  {
+    "method": "POST",
+    "path": "knowledge/modules/{module_id}/search-judgments/withdrawals"
+  },
+  {
+    "method": "POST",
     "path": "knowledge/modules/{module_id}/sources"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/modules/{module_id}/wiki-pages/{page_id}/head"
   },
   {
     "method": "POST",
     "path": "knowledge/modules/{module_id}/wiki-pages/{page_id}/revisions"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/modules/{module_id}/wiki-pages/{page_id}/revisions/{wiki_revision_id}/quality-judgments"
+  },
+  {
+    "method": "POST",
+    "path": "knowledge/modules/{module_id}/wiki-pages/{page_id}/revisions/{wiki_revision_id}/quality-judgments"
+  },
+  {
+    "method": "GET",
+    "path": "knowledge/modules/{module_id}/wiki-pages/{page_id}/revisions/{wiki_revision_id}/quality-judgments/{fact_id}"
   },
   {
     "method": "POST",
@@ -118,6 +166,14 @@
   {
     "method": "POST",
     "path": "knowledge/releases/{release_id}/index-builds"
+  },
+  {
+    "method": "POST",
+    "path": "knowledge/reviewer-keys"
+  },
+  {
+    "method": "POST",
+    "path": "knowledge/reviewer-keys/{key_id}/revoke"
   },
   {
     "method": "GET",
