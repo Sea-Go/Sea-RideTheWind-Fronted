@@ -27,3 +27,14 @@ API与Next两个测试listener后验已关闭；证据`sea-web-knowledge-accepta
 v3→两事实目录/各自管理员判定→结构READY→显式人工Release→公开固定原文**的本机产品/版本状态L3；未验真实三路索引READY、LLM编制质量、真人资料事实全集或D07。合成管理员的`grade=3`只是当轮测试主张，不是独立真人标签；RTW
 Admin `actor_id`也不是UserCenter
 UID。网页最终开发HEAD的这一新剧本、IAB实际操作、WhaleHall本人会话、检索真实引用与生产部署还须分别复验。
+
+## 网页开发头上的同码复验
+
+四笔叶子提交已按原序精确合入网页内容开发分支为`c7d71cb/7cd404e/4997d50/7a37c45`。在**当前RTW知识开发`a07cd671b19c8af2c022042cf97cecc3c5932505`**（含新私有SourceVersion候选，但本网页脚本没有调用它）和Web开发`7a37c45a441ee06f7395123aee11414247d27e68`上，`SEA_WEB_WIKI_FACT_SET_ACCEPTANCE=1 node scripts/knowledge-acceptance.cjs <RTW知识开发树>`新建独立PG17，构建真实go-zero知识API并启动生产Next
+BFF，全部29项HTTP管理/公开断言退出0。Next
+BUILD_ID=`TOCJIX1hk2_ExXTPf9-Wf`；双来源目录的FactID是两条，逐Fact质量EventID也为两条。留下`result.json`原字节SHA=`7b5fa85ef491f0868d09988253454c763fa1d09bc064997a80b5df56f7423b34`、setup/API/Next日志SHA依次`ae9fa1bcc70fdbd26598335dbc07c3a5d15fdcb0d4211a8220986a4765b7c08e`/`6e4d45dd727f60abeeea78abdef555a5fd29af62d2f06664a0925b9283975ce8`/`d3d22fc1232aa1af6b3db2a55c1af177d2f8b0f0e82e2e0ac2b5b13ea6653c65`；证据目录`sea-web-knowledge-acceptance-6LqnEr`。独立检查PG
+`pg_ctl status=3/no server`，API/Next/session三个端口均连接拒绝；`node --check`与Git
+diff check退出0。
+
+这签的是**网页开发代码×当前RTW开发代码**的双来源人工维护和固定原文读取L3，而不是三路真实索引、人工事实全集、D07、WhaleHall本人登录或生产。脚本的H06
+READY仍为结构fixture；后续Native物理搜索父桥需要另验实际三路持久Build/Load/Search和原Source可读，不能借用这里的READY。
