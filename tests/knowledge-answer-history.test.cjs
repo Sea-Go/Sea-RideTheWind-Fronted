@@ -28,6 +28,7 @@ require.extensions[".ts"] = (module, filename) =>
   );
 
 const { knowledgeAnswerHistory } = require("../src/features/knowledge/api.ts");
+const { parseStrictJSON } = require("../src/services/strict-json.ts");
 const {
   appendAcceptedPage,
   readCurrentCitationStates,
@@ -172,6 +173,68 @@ test("accepted turn shows its fixed historic citation without inferring current 
     mismatched.turn_json = JSON.stringify(raw);
     assert.throws(() => readHistoricalAnswer(mismatched, "session-1"));
   }
+});
+
+test("mixed v1 and v2 accepted subjects keep the same verified RTW UID and immutable turn", () => {
+  const v1 = answer();
+  const v2 = { issuer: "rtw.identity", subject_id: "42" };
+  const turn = JSON.parse(v1.turn_json);
+  turn.request.Subject = v2;
+  assert.deepEqual(readHistoricalAnswer({ ...v1, subject: v2, turn_json: JSON.stringify(turn) }, "session-1"), readHistoricalAnswer(v1, "session-1"));
+  assert.deepEqual(readHistoricalAnswer({ ...v1, subject: v2 }, "session-1"), readHistoricalAnswer(v1, "session-1"));
+  assert.deepEqual(readHistoricalAnswer({ ...v1, turn_json: JSON.stringify(turn) }, "session-1"), readHistoricalAnswer(v1, "session-1"));
+  const highUID = "9223372036854775807";
+  assert.equal(readHistoricalAnswer({ ...v1, subject: { ...v2, subject_id: highUID }, turn_json: v1.turn_json.replace('"subject_id":"42"', `"subject_id":"${highUID}"`) }, "session-1").answerId, "answer-1");
+  assert.equal(v1.turn_json, answer().turn_json);
+});
+
+test("a v1/v2 mixed page retains valid answers and isolates a conflicting row", () => {
+  const first = answer();
+  const second = { ...answer(), answer_id: "answer-2", search_id: "search-2", accepted_ordinal: 2, subject: { issuer: "rtw.identity", subject_id: "42" } };
+  const turn = JSON.parse(second.turn_json);
+  turn.request.AnswerID = second.answer_id;
+  turn.request.SearchID = second.search_id;
+  turn.result.answer_id = second.answer_id;
+  turn.result.search.evidence_pack.search_id = second.search_id;
+  second.turn_json = JSON.stringify(turn); // RTW v2 projection over an unchanged v1 turn.
+  const conflicting = { ...second, answer_id: "answer-3", accepted_ordinal: 3, subject: { issuer: "rtw.identity", subject_id: "43" } };
+  conflicting.turn_json = second.turn_json.replace('"AnswerID":"answer-2"', '"AnswerID":"answer-3"').replace('"answer_id":"answer-2"', '"answer_id":"answer-3"');
+  const items = appendAcceptedPage([], { items: [first, second, conflicting] });
+  const page = readHistoricalPage(items, "session-1");
+  assert.deepEqual(page.answers.map((row) => row.answerId), ["answer-1", "answer-2"]);
+  assert.equal(page.unreadableCount, 1);
+  assert.throws(() => readHistoricalAnswer(conflicting, "session-1"));
+});
+
+test("history rejects unknown or injected subject fields and never joins another UID", () => {
+  for (const bad of [
+    { authority_id: "wrong", tenant_id: "platform", subject_id: "42" },
+    { authority_id: "rtw.identity", tenant_id: "another", subject_id: "42" },
+    { issuer: "wrong", subject_id: "42" },
+    { issuer: "rtw.identity", tenant_id: "platform", subject_id: "42" },
+    { issuer: "rtw.identity", authority_id: "rtw.identity", subject_id: "42" },
+    ...["", "0", "-1", "01", "1.0", "other", "9223372036854775808"].map((subject_id) => ({ issuer: "rtw.identity", subject_id })),
+  ]) {
+    assert.throws(() => readHistoricalAnswer({ ...answer(), subject: bad }, "session-1"));
+  }
+  assert.throws(() => readHistoricalAnswer({ ...answer(), subject: { issuer: "rtw.identity", subject_id: "43" } }, "session-1"));
+  const row = answer();
+  const turn = JSON.parse(row.turn_json);
+  turn.request.Subject = { issuer: "rtw.identity", subject_id: "43" };
+  assert.throws(() => readHistoricalAnswer({ ...row, turn_json: JSON.stringify(turn) }, "session-1"));
+});
+
+test("accepted response and immutable turn reject duplicate object keys before normalization", async (t) => {
+  assert.throws(() => parseStrictJSON('{"subject":{"issuer":"rtw.identity","\\u0069ssuer":"wrong","subject_id":"42"}}'));
+  assert.throws(() => parseStrictJSON('{"items":[{"subject":{"subject_id":"42","subject_id":"43"}}]}'));
+  assert.deepEqual(parseStrictJSON('{"items":[{"subject":{"issuer":"rtw.identity","subject_id":"42"}}]}'), { items: [{ subject: { issuer: "rtw.identity", subject_id: "42" } }] });
+  const row = answer();
+  row.turn_json = row.turn_json.replace('"subject_id":"42"', '"subject_id":"42","subject_id":"43"');
+  assert.throws(() => readHistoricalAnswer(row, "session-1"));
+
+  t.mock.method(global, "fetch", async () => new Response('{"code":200,"msg":"ok","data":{"items":[],"items":[]}}', { status: 200 }));
+  await assert.rejects(() => knowledgeAnswerHistory.list("session-1"), /重复字段/);
+  await assert.rejects(() => knowledgeAnswerHistory.answer("session-1", "answer-1"), /重复字段/);
 });
 
 test("current product citation projection decides availability without trusting old quote", () => {

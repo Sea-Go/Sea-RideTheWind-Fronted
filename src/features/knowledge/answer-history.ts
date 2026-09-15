@@ -1,8 +1,17 @@
+import { parseStrictJSON } from "@/services/strict-json";
+
 import type {
   AcceptedAnswer,
   AcceptedAnswersPage,
   ProductAnswerCitationStates,
 } from "./generated/knowledgeComponents";
+
+export type HistoricalAcceptedAnswer = Omit<AcceptedAnswer, "subject"> & {
+  subject: AcceptedAnswer["subject"] | { issuer: string; subject_id: string };
+};
+export type HistoricalAcceptedAnswersPage = Omit<AcceptedAnswersPage, "items"> & {
+  items: HistoricalAcceptedAnswer[];
+};
 
 type ObjectValue = Record<string, unknown>;
 const object = (value: unknown): ObjectValue | null =>
@@ -10,6 +19,25 @@ const object = (value: unknown): ObjectValue | null =>
     ? (value as ObjectValue)
     : null;
 const string = (value: unknown) => (typeof value === "string" ? value : "");
+const MAX_UID = BigInt("9223372036854775807");
+const canonicalSubject = (value: unknown): string => {
+  const ref = object(value);
+  const fields = ref ? Object.keys(ref).sort() : [];
+  const v1 = fields.join(",") === "authority_id,subject_id,tenant_id";
+  const v2 = fields.join(",") === "issuer,subject_id";
+  const uid = ref?.subject_id;
+  if (
+    (!v1 && !v2) ||
+    (v1 && (ref?.authority_id !== "rtw.identity" || ref?.tenant_id !== "platform")) ||
+    (v2 && ref?.issuer !== "rtw.identity") ||
+    typeof uid !== "string" ||
+    !/^[1-9][0-9]*$/.test(uid) ||
+    uid.length > 19 ||
+    BigInt(uid) > MAX_UID
+  )
+    throw new Error("服务返回的历史主体不是规范 RTW UID。");
+  return uid;
+};
 
 export interface HistoricalCitation {
   id: string;
@@ -40,7 +68,7 @@ export interface HistoricalAnswer {
 // One older or malformed accepted turn cannot hide other independently valid
 // records in a session. Fixed AnswerID detail continues to decode strictly.
 export function readHistoricalPage(
-  items: AcceptedAnswer[],
+  items: HistoricalAcceptedAnswer[],
   sessionId: string,
 ): {
   answers: HistoricalAnswer[];
@@ -59,20 +87,23 @@ export function readHistoricalPage(
 }
 
 /** Decode only the validated product turn fields used by the reading surface. */
-export function readHistoricalAnswer(item: AcceptedAnswer, sessionId: string): HistoricalAnswer {
+export function readHistoricalAnswer(
+  item: HistoricalAcceptedAnswer,
+  sessionId: string,
+): HistoricalAnswer {
   if (item.session_id !== sessionId || !Number.isSafeInteger(item.accepted_ordinal))
     throw new Error("服务返回的历史记录与当前会话不一致。");
   let raw: unknown;
   try {
-    raw = JSON.parse(item.turn_json);
+    raw = parseStrictJSON(item.turn_json);
   } catch {
     throw new Error("服务返回的历史答案无法解析。");
   }
   const turn = object(raw);
   const request = object(turn?.request);
   const result = object(turn?.result);
-  const subject = object(request?.Subject);
-  const acceptedSubject = object(item.subject);
+  const subjectUID = canonicalSubject(request?.Subject);
+  const acceptedUID = canonicalSubject(item.subject);
   const searchRequest = object(request?.Search);
   const search = object(result?.search);
   const pack = object(search?.evidence_pack);
@@ -85,12 +116,7 @@ export function readHistoricalAnswer(item: AcceptedAnswer, sessionId: string): H
     string(request.SessionID) !== sessionId ||
     string(request.AnswerID) !== item.answer_id ||
     string(request.SearchID) !== item.search_id ||
-    !string(acceptedSubject?.authority_id) ||
-    !string(acceptedSubject?.tenant_id) ||
-    !string(acceptedSubject?.subject_id) ||
-    string(subject?.authority_id) !== string(acceptedSubject?.authority_id) ||
-    string(subject?.tenant_id) !== string(acceptedSubject?.tenant_id) ||
-    string(subject?.subject_id) !== string(acceptedSubject?.subject_id) ||
+    subjectUID !== acceptedUID ||
     string(result.answer_id) !== item.answer_id ||
     string(pack?.search_id) !== item.search_id ||
     status !== item.status ||
@@ -212,9 +238,9 @@ export function readCurrentCitationStates(
 }
 
 export function appendAcceptedPage(
-  previous: AcceptedAnswer[],
-  page: AcceptedAnswersPage,
-): AcceptedAnswer[] {
+  previous: HistoricalAcceptedAnswer[],
+  page: HistoricalAcceptedAnswersPage,
+): HistoricalAcceptedAnswer[] {
   const byID = new Map(previous.map((item) => [item.answer_id, item]));
   for (const item of page.items) byID.set(item.answer_id, item);
   return [...byID.values()].sort((a, b) => a.accepted_ordinal - b.accepted_ordinal);

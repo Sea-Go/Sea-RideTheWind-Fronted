@@ -1,9 +1,8 @@
 import { getAuthToken } from "@/services/auth";
 import { request, withBearerAuthorization } from "@/services/request";
 
+import type { HistoricalAcceptedAnswer, HistoricalAcceptedAnswersPage } from "./answer-history";
 import type {
-  AcceptedAnswer,
-  AcceptedAnswersPage,
   ActivateReq,
   Build,
   CancelBuildReq,
@@ -27,7 +26,10 @@ import type {
 export type * from "./generated/knowledgeComponents";
 const part = encodeURIComponent;
 const modulePath = (id: string) => `modules/${part(id)}`;
-export function knowledgeRequest<T>(path: string, init: RequestInit = {}) {
+export function knowledgeRequest<T>(
+  path: string,
+  init: RequestInit & { strictJSON?: boolean } = {},
+) {
   const token = getAuthToken();
   return request<T>(`/api/sea/knowledge/${path}`, {
     ...init,
@@ -36,7 +38,8 @@ export function knowledgeRequest<T>(path: string, init: RequestInit = {}) {
     headers: token ? withBearerAuthorization(token, init.headers) : init.headers,
   });
 }
-const get = <T>(path: string, signal?: AbortSignal) => knowledgeRequest<T>(path, { signal });
+const get = <T>(path: string, signal?: AbortSignal, strictJSON = false) =>
+  knowledgeRequest<T>(path, { signal, strictJSON });
 const post = <T>(path: string, data: unknown) =>
   knowledgeRequest<T>(path, { method: "POST", body: JSON.stringify(data) });
 export const knowledge = {
@@ -110,14 +113,16 @@ export const knowledgeRead = {
 // The browser supplies only a logical session ID, pagination, and an answer ID.
 export const knowledgeAnswerHistory = {
   list: (sessionId: string, afterOrdinal = 0, signal?: AbortSignal) =>
-    get<AcceptedAnswersPage>(
+    get<HistoricalAcceptedAnswersPage>(
       `answer-sessions/${part(sessionId)}/accepted-answers?limit=20${afterOrdinal ? `&after_ordinal=${afterOrdinal}` : ""}`,
       signal,
+      true,
     ),
   answer: (sessionId: string, answerId: string, signal?: AbortSignal) =>
-    get<AcceptedAnswer>(
+    get<HistoricalAcceptedAnswer>(
       `answer-sessions/${part(sessionId)}/accepted-answers/${part(answerId)}`,
       signal,
+      true,
     ),
   citationStates: (sessionId: string, answerId: string, signal?: AbortSignal) =>
     get<ProductAnswerCitationStates>(

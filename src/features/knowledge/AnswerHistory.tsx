@@ -7,16 +7,13 @@ import { getAuthToken } from "@/services/auth";
 
 import {
   appendAcceptedPage,
+  type HistoricalAcceptedAnswer,
   type HistoricalAnswer,
   readCurrentCitationStates,
   readHistoricalAnswer,
   readHistoricalPage,
 } from "./answer-history";
-import {
-  type AcceptedAnswer,
-  knowledgeAnswerHistory,
-  type ProductAnswerCitationStates,
-} from "./api";
+import { knowledgeAnswerHistory, type ProductAnswerCitationStates } from "./api";
 import { ProductSearchForm } from "./ProductSearchForm";
 
 import "./knowledge.css";
@@ -193,8 +190,8 @@ function AuthorizedAnswerHistory({
   token: string;
   moduleId: string;
 }) {
-  const [items, setItems] = useState<AcceptedAnswer[]>([]);
-  const [single, setSingle] = useState<AcceptedAnswer | null>(null);
+  const [items, setItems] = useState<HistoricalAcceptedAnswer[]>([]);
+  const [single, setSingle] = useState<HistoricalAcceptedAnswer | null>(null);
   const [citationStates, setCitationStates] = useState<ProductAnswerCitationStates | null>(null);
   const [citationError, setCitationError] = useState("");
   const [next, setNext] = useState(0);

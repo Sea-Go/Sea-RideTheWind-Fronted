@@ -1,3 +1,5 @@
+import { parseStrictJSON } from "./strict-json";
+
 export interface ApiResponse<T> {
   code: number;
   msg: string;
@@ -6,6 +8,7 @@ export interface ApiResponse<T> {
 
 interface RequestOptions extends RequestInit {
   responseMode?: "auto" | "wrapped" | "raw";
+  strictJSON?: boolean;
 }
 
 const DEFAULT_ERROR_MESSAGE = "请求失败，请稍后重试";
@@ -46,11 +49,13 @@ const isWrappedPayload = <T>(value: unknown): value is ApiResponse<T> => {
   );
 };
 
-const parseResponsePayload = async (response: Response): Promise<unknown> => {
+const parseResponsePayload = async (response: Response, strictJSON = false): Promise<unknown> => {
   const rawText = await response.text();
   if (!rawText) {
     return null;
   }
+
+  if (strictJSON) return parseStrictJSON(rawText);
 
   try {
     return JSON.parse(rawText) as unknown;
@@ -93,13 +98,13 @@ const extractPayloadMessage = (payload: unknown): string | null => {
 };
 
 export async function request<T>(path: string, init?: RequestOptions): Promise<T> {
-  const responseMode = init?.responseMode ?? "auto";
+  const { strictJSON = false, responseMode = "auto", ...requestInit } = init ?? {};
   const response = await fetch(buildRequestUrl(path), {
-    ...init,
+    ...requestInit,
     headers: buildHeaders(init?.headers),
   });
 
-  const payload = await parseResponsePayload(response);
+  const payload = await parseResponsePayload(response, strictJSON);
   const wrappedPayload = isWrappedPayload<T>(payload) ? payload : null;
   const payloadMessage = extractPayloadMessage(payload);
 
