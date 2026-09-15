@@ -5,7 +5,7 @@ HTTP 跨仓链 INTEGRATED（2026-09-15）**。前端与 RTW H02 产品合同、N
 BFF 转发和现有已接纳答案读面完成本地合同验收；真实 User
 Center、Next 生产服务、RTW、BTW 正式
 `cmd/api`、DataCenter 固定 BGE-M3 三路表示及 RTW
-PostgreSQL 已在同一次 HTTP 联验中通过。真实浏览器 DOM/视觉、线上模型和规模效果仍未验收，H02 整体仍为
+PostgreSQL 已在同一次 HTTP 联验中通过；当前开发集成头又完成了真实浏览器登录、水合、搜索与引用撤回展示的同次验收。线上模型和规模效果仍未验收，H02 整体仍为
 **PARTIAL**。
 
 ## 产品流程和边界
@@ -17,9 +17,10 @@ PostgreSQL 已在同一次 HTTP 联验中通过。真实浏览器 DOM/视觉、�
 `POST /v1/knowledge/answer-sessions/:session_id/searches`
 发送这五个字段。SubjectRef、SearchSnapshot、SearchID、AnswerID 都由服务端确定，浏览器不从客户端身份或页面版本推断。
 
-SubjectRef 的产品身份语义只有 **RTW User Center（`rtw-user-center`）权威来源 +
-User Center 全局 UID**。后端现有三段编码 `rtw.identity/platform/<UID>`
-中，`platform` 是固定 realm 常量，不是租户；网页不新增、保存或发送
+SubjectRef 的稳定权威值为 `rtw.identity`，用户身份来自 RTW User
+Center 的全局 UID。后端现有 v1 路径 `rtw.identity/platform/<UID>` 中，`platform`
+仅是固定兼容槽，不是租户；最终 v2 对外形状只含
+`{issuer,subject_id}`。网页不新增、保存或发送
 `tenant_id`，也不根据域名、模块或会话推断租户。
 
 RTW 返回 202 时，网页每 3 秒 GET 固定 `search_id`；503 或 GET 的
@@ -33,7 +34,7 @@ RTW 返回 202 时，网页每 3 秒 GET 固定 `search_id`；503 或 GET 的
 
 答案详情的当前引用状态由 RTW 用户态 `/:answer_id/citations`
 投影决定。`unavailable`
-时既有详情读面隐藏旧摘录和原文链接，仍保留“当时已接纳”的历史记录；状态请求失败或身份/引用不一致时标示“当前可用性未核实”。这部分读面在此前前端合同测试中覆盖，**本次搜索入口测试没有用真实撤回来源跑浏览器到 RTW 数据库的联验**。
+时既有详情读面隐藏旧摘录和原文链接，仍保留“当时已接纳”的历史记录；状态请求失败或身份/引用不一致时标示“当前可用性未核实”。此前仅有合同测试，现已用真实浏览器与隔离 RTW 数据库同次核验撤回前后的实际展示，见下文。
 
 浏览器调用 `/api/sea/knowledge/...`，BFF 的路由来自 RTW `api/knowledge.api`
 生成物。BFF 保留上游 200/202/503、正文、User
@@ -71,3 +72,13 @@ Dense/Sparse/Multi-vector 表示与三路本地精确检索。最终报告
 
 这次只把生产 Next 页面路由壳作为 HTTP 证据；登录态页面内容和 `sessionStorage`
 依赖客户端水合，没有把原始 HTML 误写成浏览器验收。未运行真实浏览器 DOM/视觉；固定模型和两块隔离语料也不验证模型答案质量、检索相关性、规模效果、客户端 SSE/Tools 或生产部署。
+
+2026-09-15 追加真实浏览器验收。独立 Web、RTW、BTW 测试分支先修浏览器生成幂等键的后端权威重放，以及测试子进程在人工页面观察期间的父期限；第二轮页面业务虽然可见，但早期子进程120秒超时使父测试退出1，**不计整体通过**。修正后集成头 Web=`e6a4b15399de007dde6db744584bfd9d3e917247`、RTW=`8db77843b579d33cd1eafb0c339bd7a6b14f0134`、BTW=`794938848f2c3abd57fd50e3e2dd09bb0195b33e`、DC=`99580a3b61030995431ba524fb19194206ea120f`
+同次运行`SEA_WEB_REAL_BROWSER=1 node scripts/knowledge-live-search-acceptance.cjs <RTW> <BTW> <DC>`退出0。报告`/private/tmp/sea-web-browser-integration-e6a4b15/report.json`
+SHA-256=`85d2b471171577e121af0bd95ac8743e94731fe30a3976acde7a5bb291d842ab`，直接绑定两位真实User
+Center用户、浏览器页面、Next BFF、正式BTW搜索、DC固定BGE三路与RTW
+PG；其他UID按固定SearchID/AnswerID拒读。
+
+Codex内置浏览器实际输入快搜/低层与`Evidence`后到达RTW固定AnswerID，详情显示答案正文、`当前可用`、原文摘录与固定修订链接；RTW撤回同一来源后刷新**同一**URL，答案正文保留、引用变`已撤回或不可用`，摘录及来源链接消失。回到会话列表时，3条较早的结构不匹配记录明确标为暂不可读，但第4条新答案仍可见。该列表缺口由逐条解析隔离修正，固定AnswerID详情仍严格拒绝主体/引用不匹配；定向测试80项、类型检查、lint(0
+error/66既有warning)、Next
+63页生产构建与两仓受影响包race/vet通过。报告只证明本机真实浏览器与隔离服务；固定摘要夹具/两块语料不证明模型质量、检索相关性或规模，SSE/Tools、跨浏览器和生产部署仍未验。

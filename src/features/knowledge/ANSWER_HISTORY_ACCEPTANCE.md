@@ -10,6 +10,7 @@ SHA256 见 `generated/source.json`。
 - 书架提供“已接纳问答”入口。`/knowledge/answer-sessions`
   接受已有逻辑会话 ID；会话页按 `accepted_ordinal`
   正序分页，答案页按 AnswerID 回查。同一用户换账号后页面按 JWT 重新装配，不沿用旧账号的组件状态。成功和证据不足分别显示，空会话、未登录、加载、网络/身份错误都有显式状态。
+- 列表逐条校验已接纳历史。较早的结构不匹配记录单独标为暂不可读，不遮蔽同会话其他已验证答案；如果全页都不匹配，不显示“暂无答案”的误导提示。固定 AnswerID 详情仍严格拒绝不匹配的主体、会话和引用，不把被跳过记录的正文或旧摘录展示出来。
 - 仅调用 RTW User JWT 产品 GET
   `/v1/knowledge/answer-sessions/:session_id/accepted-answers`、`/:answer_id` 与
   `/:answer_id/citations`。浏览器只提交会话 ID、AnswerID、`limit` 和
@@ -63,3 +64,5 @@ JWT 产品 GET；67 项 Node 定向/回归测试通过，覆盖 BFF 不借用管
 22.22.0；Next 生产构建通过并产生 63 个预渲染静态页面。使用 CUA 在本机 Codex 内置浏览器打开独立 Next 开发服务器，入口表单和提示排版可见；提交模拟会话 ID 后，既有登录代理正确转至
 `/login?next=...`。RTW 自身有独立真实 go-zero HTTP、User RPC、隔离 PostgreSQL
 16 的产品读及撤回反例测试；本分支尚未与那些进程做同一次浏览器到数据库联验，也未验真实登录账户/部署。因此不把本次页面或合同测试记为 H02 整体验收。
+
+2026-09-15 当前Web开发集成头增加逐条隔离测试：早期不匹配record加新有效answer时，列表只显示新答案并报告旧记录数量；固定详情对不匹配record仍拒绝。该测试与真实浏览器同次链均通过，浏览器在来源撤回后回到`search-facade-session`列表，看到3条暂不可读提示和第4条可查看的`Evidence`答案卡；随后固定详情仍显示`已撤回或不可用`且隐藏旧摘录/链接。完整同次报告及SHA见[搜索入口验收](PRODUCT_SEARCH_ACCEPTANCE.md#验收记录)。这证明本机产品读面不会被一条旧结构记录整页阻断；旧记录本身尚未完成格式迁移，也没有上线或跨浏览器验收。
