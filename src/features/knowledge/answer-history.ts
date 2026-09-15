@@ -97,7 +97,10 @@ export function readHistoricalAnswer(
     throw new Error("服务返回的历史答案无法解析。");
   }
   const turn = object(raw);
-  const request = object(turn?.request);
+  if (!turn || Object.hasOwn(turn, "request") === Object.hasOwn(turn, "Request"))
+    throw new Error("服务返回的历史答案请求结构不明确。");
+  const request = object(Object.hasOwn(turn, "Request") ? turn.Request : turn.request);
+  if (!request) throw new Error("服务返回的历史答案请求结构不明确。");
   const result = object(turn?.result);
   const subjectUID = canonicalSubject(request?.Subject);
   const acceptedUID = canonicalSubject(item.subject);
