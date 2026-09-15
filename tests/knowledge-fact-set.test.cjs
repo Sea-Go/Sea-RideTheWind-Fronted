@@ -76,6 +76,12 @@ test("accepted AI scope includes every frozen Compile Source, even an uncited on
         source_revision_ids: ["source-a", "source-b"],
       };
     },
+    olderRevisions: {
+      nextCursor: "unused",
+      page: async () => {
+        throw new Error("ordinary accepted AI preview must not paginate metadata");
+      },
+    },
   });
   assert.deepEqual(
     preview.sources.map((source) => source.revision_id),
@@ -144,6 +150,147 @@ test("manual descendant retains active AI ancestor sources and excludes only for
       }),
     /已撤回/,
   );
+});
+
+test("missing withdrawn manual ancestor is confirmed from bounded older admin pages only on failed fixed GET", async () => {
+  const current = revision("source-current", "source", "当前事实");
+  const retired = revision("source-retired", "source", "旧事实", { withdrawn: true });
+  const ancestor = revision("wiki-ancestor", "wiki", "旧 Wiki", {
+    source_refs: [{ revision_id: retired.revision_id, locator: "paragraph:1" }],
+    withdrawn: true,
+  });
+  const manual = revision("wiki-manual", "wiki", "当前 Wiki", {
+    base_revision_id: ancestor.revision_id,
+    source_refs: [{ revision_id: current.revision_id, locator: "paragraph:1" }],
+  });
+  const calls = [];
+  const preview = await previewFactSetScope("module-a", "page-a", manual.revision_id, {
+    revision: async (id) => {
+      calls.push(`GET:${id}`);
+      if (id === retired.revision_id) throw new Error("retired body: 410");
+      return id === manual.revision_id ? manual : current;
+    },
+    compile: async () => {
+      throw new Error("no AI Compile");
+    },
+    knownRevisions: [manual, ancestor, current],
+    olderRevisions: {
+      nextCursor: "older-1",
+      page: async (cursor) => {
+        calls.push(`PAGE:${cursor}`);
+        if (cursor === "older-1")
+          return { items: [revision("unrelated", "source", "别的来源")], next_cursor: "older-2" };
+        assert.equal(cursor, "older-2");
+        return { items: [retired] };
+      },
+    },
+  });
+  assert.deepEqual(
+    preview.sources.map((source) => source.revision_id),
+    [current.revision_id],
+  );
+  assert.deepEqual(calls, [
+    "GET:wiki-manual",
+    "GET:source-current",
+    "GET:source-retired",
+    "PAGE:older-1",
+    "PAGE:older-2",
+  ]);
+});
+
+test("unknown, bad, or looping old Source metadata never becomes an omitted FactSet Source", async () => {
+  const current = revision("source-current", "source", "当前事实");
+  const retiredId = "source-retired";
+  const ancestor = revision("wiki-ancestor", "wiki", "旧 Wiki", {
+    source_refs: [{ revision_id: retiredId, locator: "paragraph:1" }],
+    withdrawn: true,
+  });
+  const manual = revision("wiki-manual", "wiki", "当前 Wiki", {
+    base_revision_id: ancestor.revision_id,
+    source_refs: [{ revision_id: current.revision_id, locator: "paragraph:1" }],
+  });
+  const base = {
+    revision: async (id) => {
+      if (id === retiredId) throw new Error("retired body unavailable");
+      return id === manual.revision_id ? manual : current;
+    },
+    compile: async () => {
+      throw new Error("no AI Compile");
+    },
+    knownRevisions: [manual, ancestor, current],
+  };
+  const preview = (page) =>
+    previewFactSetScope("module-a", "page-a", manual.revision_id, {
+      ...base,
+      olderRevisions: { nextCursor: "older-1", page },
+    });
+  await assert.rejects(
+    () => preview(async () => ({ items: [], next_cursor: "" })),
+    /未确认正式撤回/,
+  );
+  await assert.rejects(
+    () =>
+      preview(async () => ({
+        items: [revision(retiredId, "source", "旧事实", { withdrawn: true, module_id: "other" })],
+      })),
+    /身份或状态不符/,
+  );
+  await assert.rejects(
+    () => preview(async () => ({ items: [], next_cursor: "older-1" })),
+    /游标重复/,
+  );
+  let pages = 0;
+  await assert.rejects(
+    () =>
+      preview(async () => ({
+        items: [],
+        next_cursor: `older-${++pages + 1}`,
+      })),
+    /超过 32 页上限/,
+  );
+  assert.equal(pages, 32);
+});
+
+test("current or AI fixed Source cannot be retired by older metadata pagination", async () => {
+  const retiredId = "source-retired";
+  const old = revision(retiredId, "source", "旧事实", { withdrawn: true });
+  const manual = revision("wiki-current", "wiki", "当前 Wiki", {
+    source_refs: [{ revision_id: retiredId, locator: "paragraph:1" }],
+  });
+  const ai = revision("wiki-ai", "wiki", "AI Wiki", {
+    created_by: "btw.compile/compile-a",
+    source_refs: [{ revision_id: retiredId, locator: "paragraph:1" }],
+  });
+  let pageCalls = 0;
+  const readers = {
+    revision: async (id) => {
+      if (id === retiredId) throw new Error("retired body: 410");
+      return id === manual.revision_id ? manual : ai;
+    },
+    compile: async () => ({
+      state: "ACCEPTED",
+      module_id: "module-a",
+      page_id: "page-a",
+      revision_id: ai.revision_id,
+      source_revision_ids: [retiredId],
+    }),
+    olderRevisions: {
+      nextCursor: "older-1",
+      page: async () => {
+        pageCalls++;
+        return { items: [old] };
+      },
+    },
+  };
+  await assert.rejects(
+    () => previewFactSetScope("module-a", "page-a", manual.revision_id, readers),
+    /正文不可取/,
+  );
+  await assert.rejects(
+    () => previewFactSetScope("module-a", "page-a", ai.revision_id, readers),
+    /正文不可取/,
+  );
+  assert.equal(pageCalls, 0);
 });
 
 test("Fact quote preview uses RTW original UTF-8 byte span and FactID input", async () => {
