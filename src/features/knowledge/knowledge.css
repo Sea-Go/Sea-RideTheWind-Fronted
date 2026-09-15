@@ -71,8 +71,96 @@
 .wiki-quality-history {
   margin-top: 1.5rem;
 }
-.wiki-quality-history .sea-source-link {
-  margin: 0.5rem 0;
+.wiki-fact-history-entry {
+  min-width: 0;
+  margin: 0.75rem 0;
+  padding: 1rem 1.25rem;
+  background: var(--sea-panel);
+  border: 1px solid var(--sea-line);
+  border-radius: 0.75rem;
+}
+.wiki-fact-history-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+}
+.wiki-fact-history-head h4 {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+.wiki-fact-history-head span,
+.wiki-fact-history-source {
+  color: var(--sea-muted);
+  font-size: 0.88rem;
+}
+.wiki-fact-history-reason {
+  margin: 0.65rem 0;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.wiki-fact-history-source {
+  margin: 0;
+}
+.wiki-fact-history-evidence {
+  min-width: 0;
+  margin-top: 0.8rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--sea-line);
+}
+.wiki-fact-history-evidence summary {
+  width: fit-content;
+  cursor: pointer;
+}
+.wiki-fact-history-evidence summary:focus-visible {
+  outline: 2px solid var(--sea-orange);
+  outline-offset: 3px;
+}
+.wiki-fact-history-evidence-body {
+  min-width: 0;
+  padding: 0.6rem 0 0.2rem;
+}
+.wiki-fact-history-evidence-body h5 {
+  margin: 0.8rem 0 0.35rem;
+  font-size: 0.88rem;
+}
+.wiki-fact-history-evidence-body blockquote {
+  margin: 0;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.wiki-fact-history-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1.25rem;
+  margin: 1rem 0 0;
+}
+.wiki-fact-history-fields > div {
+  min-width: 0;
+}
+.wiki-fact-history-fields dt {
+  color: var(--sea-muted);
+  font-size: 0.78rem;
+}
+.wiki-fact-history-fields dd {
+  margin: 0.2rem 0 0;
+  line-height: 1.5;
+}
+.wiki-fact-history-fields code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.8rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+@media (width <= 48rem) {
+  .wiki-fact-history-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .sea-knowledge-workbench .knowledge-editor-fields {
