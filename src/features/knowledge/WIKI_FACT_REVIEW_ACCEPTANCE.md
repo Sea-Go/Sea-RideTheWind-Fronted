@@ -25,10 +25,12 @@ SHA-256
 
 ## 本机证据
 
-- 70 项受影响 Node 合同/组件测试通过，test.log SHA-256
-  `12682af1b893c7bec043e0406c4e819a8cd8e8427711438038b201615a0767a6`；TypeScript 类型检查、scoped
-  ESLint/Stylelint 和 Next
-  16.1.3 生产构建通过；构建生成 63 个静态页面。全库 pre-push
+- 固定 Web 源提交 `4eea79ff3ee9fe7da70e536ad327868eac0c5bfe`
+  的 70 项受影响 Node 合同/组件测试通过，test.log SHA-256
+  `c6eca80a9be69b1e5860b366663ab3106e7e6aff5f9737a4cb8f324d4be75b22`；TypeScript 类型检查、scoped
+  ESLint/Stylelint 和 Next 16.1.3 生产构建通过，build.log SHA-256
+  `4395d9f08e2d618948009e55ca06e50a5bc5f9a20674e82f478cf29eae84e9f1`、BUILD_ID
+  `TcHnEnQdLvwjOfh7hzIxR`，构建生成 63 个静态页面。全库 pre-push
   ESLint 有 64 个范围外既有 warning、0 error；Stylelint 与 typecheck 退出 0。
 - Opt-in `SEA_WEB_WIKI_QUALITY_ACCEPTANCE=1` 用一次性 PG17、真 RTW Go 服务、Next
   standalone
