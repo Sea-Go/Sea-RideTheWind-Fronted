@@ -453,6 +453,8 @@ process.on("SIGTERM", () => {
     });
     const editing = await call(`modules/${module.id}/wiki-pages/climate/head`);
     const releasePointer = await call(`modules/${module.id}/releases/current`);
+    const fixedSource = await call(`modules/${module.id}/revisions/${a.revision_id}`);
+    const original = Buffer.from(fixedSource.content);
     check(
       "FactSet freezes immutable required Fact, same scope/history, without Wiki or Release writes",
       () => {
@@ -461,13 +463,14 @@ process.on("SIGTERM", () => {
         assert.equal(catalog1.facts.length, 1);
         assert.equal(catalog1.facts[0].required, true);
         assert.equal(catalog1.facts[0].source_quote, quote);
+        assert.equal(crypto.createHash("sha256").update(original).digest("hex"), a.content_hash);
         assert.equal(
           catalog1.facts[0].source_byte_start,
-          String(Buffer.from(a.content).indexOf(Buffer.from(quote))),
+          String(original.indexOf(Buffer.from(quote))),
         );
         assert.equal(
           catalog1.facts[0].source_byte_end,
-          String(Buffer.from(a.content).indexOf(Buffer.from(quote)) + Buffer.byteLength(quote)),
+          String(original.indexOf(Buffer.from(quote)) + Buffer.byteLength(quote)),
         );
         assert.equal(catalog1.actor_id, "web-fixture-admin");
         assert.equal(scoped.fact_set_revision_id, catalog1.fact_set_revision_id);
@@ -776,6 +779,7 @@ process.on("SIGTERM", () => {
   );
   let withdrawnFactPath = "";
   let withdrawnFact = null;
+  let withdrawnCatalog = null;
   if (wikiQualityMode) {
     const quote = "该资料仅用于撤回规则验收。";
     withdrawnFactPath = `modules/${withdrawnModule.id}/wiki-pages/withdrawn/revisions/${withdrawnWiki.revision_id}/quality-judgments`;
@@ -791,6 +795,36 @@ process.on("SIGTERM", () => {
       reason: "撤回前记录固定原文事实在这一版 Wiki 中缺失",
       idempotency_key: key(),
     });
+  }
+  if (wikiFactSetMode) {
+    const quote = "该资料仅用于撤回规则验收。";
+    withdrawnCatalog = await call(
+      `modules/${withdrawnModule.id}/wiki-pages/withdrawn/revisions/${withdrawnWiki.revision_id}/fact-sets`,
+      "POST",
+      {
+        source_revisions: [
+          {
+            revision_id: withdrawnSource.revision_id,
+            content_sha256: withdrawnSource.content_hash,
+          },
+        ],
+        facts: [
+          {
+            source_revision_id: withdrawnSource.revision_id,
+            locator: "paragraph:1",
+            source_quote: quote,
+            source_quote_sha256: crypto
+              .createHash("sha256")
+              .update(Buffer.from(quote))
+              .digest("hex"),
+            required: true,
+          },
+        ],
+        facts_complete: true,
+        reason: "撤回前的固定来源预期事实，仅供目录历史回读",
+        idempotency_key: key(),
+      },
+    );
   }
   const withdrawnRelease = await release(withdrawnModule, [withdrawnSource], withdrawnWiki);
   const withdrawnBuild = await ready(withdrawnRelease);
@@ -825,6 +859,20 @@ process.on("SIGTERM", () => {
     );
     report.wiki_quality.withdrawn_fact_id = withdrawnFact.fact_id;
     report.wiki_quality.withdrawn_module_id = withdrawnModule.id;
+  }
+  if (wikiFactSetMode) {
+    const retainedCatalog = await call(
+      `modules/${withdrawnModule.id}/wiki-pages/withdrawn/fact-set-revisions/${withdrawnCatalog.fact_set_revision_id}`,
+    );
+    check(
+      "withdrawn original Source GET remains 410 while its immutable FactSet history is readable",
+      () => {
+        assert.equal(retainedCatalog.fact_set_revision_id, withdrawnCatalog.fact_set_revision_id);
+        assert.equal(retainedCatalog.facts[0].source_quote, "该资料仅用于撤回规则验收。");
+        assert.equal(retainedCatalog.facts[0].source_revision_id, withdrawnSource.revision_id);
+      },
+    );
+    report.wiki_fact_set.withdrawn_catalog_revision_id = withdrawnCatalog.fact_set_revision_id;
   }
   await call(
     `modules/${withdrawnModule.id}/releases/${withdrawnRelease.release_id}/revisions/${withdrawnWiki.revision_id}`,
