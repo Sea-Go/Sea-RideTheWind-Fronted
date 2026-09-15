@@ -46,11 +46,13 @@ export function WikiFactReviewForm({
     ),
   );
   const claim = evidence?.wikiClaim || "";
+  const withdrawn = Boolean(evidence?.wiki.withdrawn || evidence?.source.withdrawn);
   const consistent =
-    (assessment === "covered" && Boolean(claim) && ["1", "2", "3"].includes(grade)) ||
-    (assessment === "conflict" && Boolean(claim) && grade === "0") ||
-    (assessment === "missing" && !claim && grade === "0") ||
-    (assessment === "undetermined" && grade === "");
+    (!withdrawn || assessment === "undetermined") &&
+    ((assessment === "covered" && Boolean(claim) && ["1", "2", "3"].includes(grade)) ||
+      (assessment === "conflict" && Boolean(claim) && grade === "0") ||
+      (assessment === "missing" && !claim && grade === "0") ||
+      (assessment === "undetermined" && grade === ""));
   const citedForStrongGrade = !["2", "3"].includes(grade) || citationPresent;
   const ready = Boolean(
     evidence &&
@@ -80,6 +82,7 @@ export function WikiFactReviewForm({
           </p>
           <blockquote className="knowledge-body">{evidence.sourceQuote}</blockquote>
           {claim && <blockquote className="knowledge-body">Wiki：{claim}</blockquote>}
+          {withdrawn && <p>原文或 Wiki 修订已撤回，新的复核只能记录“无法判定”。</p>}
           <label className="sea-field">
             判断
             <select

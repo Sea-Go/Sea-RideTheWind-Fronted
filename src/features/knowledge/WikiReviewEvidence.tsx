@@ -17,10 +17,14 @@ export type WikiReviewEvidence = {
 export function WikiReviewEvidencePicker({
   moduleId,
   revisions,
+  busy,
+  onEdit,
   onSelect,
 }: {
   moduleId: string;
   revisions: Revision[];
+  busy: boolean;
+  onEdit: () => void;
   onSelect: (evidence: WikiReviewEvidence) => void;
 }) {
   const [wikiId, setWikiId] = useState("");
@@ -124,7 +128,9 @@ export function WikiReviewEvidencePicker({
         Wiki 修订
         <select
           value={wikiId}
+          disabled={busy}
           onChange={(event) => {
+            onEdit();
             const id = event.target.value;
             setWikiReading(Boolean(id));
             setSourceReading(false);
@@ -158,7 +164,12 @@ export function WikiReviewEvidencePicker({
             <textarea
               rows={3}
               value={wikiClaim}
-              onChange={(event) => setWikiClaim(event.target.value)}
+              disabled={busy}
+              onChange={(event) => {
+                onEdit();
+                setWikiClaim(event.target.value);
+              }}
+              maxLength={4096}
               aria-invalid={!claimValid}
               placeholder="仅从上方固定 Wiki 正文逐字复制"
             />
@@ -168,7 +179,9 @@ export function WikiReviewEvidencePicker({
             原文修订
             <select
               value={sourceId}
+              disabled={busy}
               onChange={(event) => {
+                onEdit();
                 const id = event.target.value;
                 setSourceReading(Boolean(id));
                 setSourceId(id);
@@ -198,7 +211,9 @@ export function WikiReviewEvidencePicker({
                 原文段落定位
                 <input
                   value={locator}
+                  disabled={busy}
                   onChange={(event) => {
+                    onEdit();
                     setLocator(event.target.value);
                     setSourceQuote("");
                   }}
@@ -211,8 +226,11 @@ export function WikiReviewEvidencePicker({
                   <button
                     type="button"
                     className="sea-button"
-                    disabled={new TextEncoder().encode(paragraph).length > 4096}
-                    onClick={() => setSourceQuote(paragraph)}
+                    disabled={busy || new TextEncoder().encode(paragraph).length > 4096}
+                    onClick={() => {
+                      onEdit();
+                      setSourceQuote(paragraph);
+                    }}
                   >
                     使用整段原文
                   </button>
@@ -221,7 +239,11 @@ export function WikiReviewEvidencePicker({
                     <textarea
                       rows={3}
                       value={sourceQuote}
-                      onChange={(event) => setSourceQuote(event.target.value)}
+                      disabled={busy}
+                      onChange={(event) => {
+                        onEdit();
+                        setSourceQuote(event.target.value);
+                      }}
                       maxLength={4096}
                       aria-invalid={Boolean(sourceQuote) && !quoteValid}
                       placeholder="仅从上方原文段落逐字复制；保留原始空格与换行"
@@ -238,7 +260,7 @@ export function WikiReviewEvidencePicker({
             <button
               type="button"
               className="sea-button"
-              disabled={!source || !quoteValid || !claimValid || reading}
+              disabled={busy || !source || !quoteValid || !claimValid || reading}
               onClick={() => {
                 if (source && quoteValid && claimValid)
                   onSelect({ wiki, source, locator, sourceQuote, wikiClaim });
