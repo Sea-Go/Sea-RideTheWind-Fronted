@@ -128,5 +128,6 @@ export const knowledgeAnswerHistory = {
     get<ProductAnswerCitationStates>(
       `answer-sessions/${part(sessionId)}/accepted-answers/${part(answerId)}/citations`,
       signal,
+      true,
     ),
 };

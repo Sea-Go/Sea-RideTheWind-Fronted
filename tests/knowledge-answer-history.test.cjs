@@ -315,6 +315,30 @@ test("accepted response and immutable turn reject duplicate object keys before n
   await assert.rejects(() => knowledgeAnswerHistory.answer("session-1", "answer-1"), /重复字段/);
 });
 
+test("current citation response rejects a duplicate state before availability is displayed", async (t) => {
+  let body = JSON.stringify({
+    code: 200,
+    msg: "ok",
+    data: {
+      answer_id: "answer-1",
+      search_id: "search-1",
+      status: "succeeded",
+      module_id: "book-1",
+      release_id: "release-1",
+      publication_revision: "3",
+      citations: [{ evidence_id: "evidence-1", state: "unavailable" }],
+    },
+  });
+  t.mock.method(global, "fetch", async () => new Response(body, { status: 200 }));
+  const valid = await knowledgeAnswerHistory.citationStates("session-1", "answer-1");
+  assert.equal(valid.citations[0].state, "unavailable");
+  body = body.replace('"state":"unavailable"', '"state":"unavailable","state":"available"');
+  await assert.rejects(
+    () => knowledgeAnswerHistory.citationStates("session-1", "answer-1"),
+    /重复字段/,
+  );
+});
+
 test("current product citation projection decides availability without trusting old quote", () => {
   const historical = readHistoricalAnswer(answer(), "session-1");
   const current = {
@@ -418,15 +442,20 @@ test("BFF preserves user JWT and status while excluding admin cookie on product 
     seen[1].url,
     "http://127.0.0.1:1/v1/knowledge/answer-sessions/session-1/accepted-answers",
   );
-  const clientVersion = await route.GET(
+  const legacySubjectQuery = "?authority_id=forged&tenant_id=forged&subject_id=43";
+  const legacyQuery = await route.GET(
     new NextRequest(
-      "http://localhost/api/sea/knowledge/answer-sessions/session-1/accepted-answers?version=v2",
+      `http://localhost/api/sea/knowledge/answer-sessions/session-1/accepted-answers${legacySubjectQuery}`,
       { headers: { authorization: "Bearer user-jwt" } },
     ),
     { params: Promise.resolve({ path }) },
   );
-  assert.equal(clientVersion.status, 400);
-  assert.equal(seen.length, 2);
+  assert.equal(legacyQuery.status, 401);
+  assert.equal(
+    seen[2].url,
+    `http://127.0.0.1:1/v1/knowledge/answer-sessions/session-1/accepted-answers${legacySubjectQuery}`,
+  );
+  assert.equal(seen[2].authorization, "Bearer user-jwt");
 });
 
 test("v2 history switch is server controlled, GET only, and forwards only User JWT", async (t) => {
@@ -480,6 +509,7 @@ test("v2 history switch is server controlled, GET only, and forwards only User J
     },
   ]);
   assert.equal((await withUser(`${base}?subject_id=43`, list)).status, 400);
+  assert.equal((await withUser(`${base}?version=v1`, list)).status, 400);
   assert.equal((await withUser(`${base}?limit=20&limit=30`, list)).status, 400);
   assert.equal((await withUser(`${base}/missing-answer?after_ordinal=4`, detail)).status, 400);
   assert.equal(
