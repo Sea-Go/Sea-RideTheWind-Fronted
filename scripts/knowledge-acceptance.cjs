@@ -715,6 +715,7 @@ process.on("SIGTERM", () => {
     idempotency_key: key(),
   });
   if (wikiFactSetMode) {
+    const wiki3Original = await call(`modules/${module.id}/revisions/${wiki3.revision_id}`);
     const fixedPublicWiki = await call(
       `modules/${module.id}/releases/${r3.release_id}/revisions/${wiki3.revision_id}`,
       "GET",
@@ -739,7 +740,11 @@ process.on("SIGTERM", () => {
       "manual release publishes the same two-source Wiki and keeps its original facts pinned",
       () => {
         assert.equal(pointer.active_release_id, r3.release_id);
-        assert.equal(fixedPublicWiki.content, wiki3.content);
+        assert.equal(fixedPublicWiki.content, wiki3Original.content);
+        assert.equal(
+          crypto.createHash("sha256").update(Buffer.from(wiki3Original.content)).digest("hex"),
+          wiki3.content_hash,
+        );
         assert.ok(fixedPublicWiki.content.includes("海拔影响温度。"));
         assert.ok(fixedPublicWiki.content.includes("迎风坡受到地形抬升降水的影响。"));
         assert.equal(fixedPublicSources[0].content, "海拔影响温度。\n\n坡向影响光照。");
