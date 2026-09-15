@@ -633,6 +633,24 @@ process.on("SIGTERM", () => {
       idempotency_key: key(),
     },
   );
+  let withdrawnFactPath = "";
+  let withdrawnFact = null;
+  if (wikiQualityMode) {
+    const quote = "该资料仅用于撤回规则验收。";
+    withdrawnFactPath = `modules/${withdrawnModule.id}/wiki-pages/withdrawn/revisions/${withdrawnWiki.revision_id}/quality-judgments`;
+    withdrawnFact = await call(withdrawnFactPath, "POST", {
+      source_revision_id: withdrawnSource.revision_id,
+      source_content_sha256: withdrawnSource.content_hash,
+      locator: "paragraph:1",
+      source_quote: quote,
+      source_quote_sha256: crypto.createHash("sha256").update(Buffer.from(quote)).digest("hex"),
+      assessment: "missing",
+      grade: "0",
+      rubric_version: "sea.wiki.fact-coverage.v1",
+      reason: "撤回前记录固定原文事实在这一版 Wiki 中缺失",
+      idempotency_key: key(),
+    });
+  }
   const withdrawnRelease = await release(withdrawnModule, [withdrawnSource], withdrawnWiki);
   const withdrawnBuild = await ready(withdrawnRelease);
   await call(`modules/${withdrawnModule.id}/activation`, "PUT", {
@@ -648,6 +666,25 @@ process.on("SIGTERM", () => {
     reason: "验证正式内容撤回",
     idempotency_key: key(),
   });
+  if (wikiQualityMode) {
+    await call(
+      `modules/${withdrawnModule.id}/revisions/${withdrawnSource.revision_id}`,
+      "GET",
+      undefined,
+      410,
+    );
+    const retained = await call(`${withdrawnFactPath}?limit=20`);
+    check(
+      "withdrawn Source body is unavailable while its earlier fixed fact label remains listed",
+      () => {
+        assert.equal(retained.items.length, 1);
+        assert.equal(retained.items[0].fact_id, withdrawnFact.fact_id);
+        assert.equal(retained.items[0].source_revision_id, withdrawnSource.revision_id);
+      },
+    );
+    report.wiki_quality.withdrawn_fact_id = withdrawnFact.fact_id;
+    report.wiki_quality.withdrawn_module_id = withdrawnModule.id;
+  }
   await call(
     `modules/${withdrawnModule.id}/releases/${withdrawnRelease.release_id}/revisions/${withdrawnWiki.revision_id}`,
     "GET",
