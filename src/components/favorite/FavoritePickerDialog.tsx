@@ -24,10 +24,10 @@ import {
 import {
   createArticleFavoriteInFolder,
   createOrFindFavoriteFolder,
-  listFavoriteFolders,
   type FavoriteFolder,
   type FavoriteItem,
   type FavoriteTargetSnapshot,
+  listFavoriteFolders,
 } from "@/services/favorite";
 
 interface FavoritePickerDialogProps {
@@ -182,7 +182,9 @@ export const FavoritePickerDialog = ({
         <AlertDialogHeader>
           <AlertDialogTitle>选择收藏夹</AlertDialogTitle>
           <AlertDialogDescription>
-            {target?.title ? `将《${target.title}》收藏到你选择的收藏夹。` : "选择一个收藏夹来保存这篇文章。"}
+            {target?.title
+              ? `将《${target.title}》收藏到你选择的收藏夹。`
+              : "选择一个收藏夹来保存这篇文章。"}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -195,7 +197,9 @@ export const FavoritePickerDialog = ({
               disabled={isLoadingFolders || isSaving || folders.length === 0}
             >
               <SelectTrigger id="favorite-folder-select" className="w-full">
-                <SelectValue placeholder={isLoadingFolders ? "正在加载收藏夹..." : "请选择收藏夹"} />
+                <SelectValue
+                  placeholder={isLoadingFolders ? "正在加载收藏夹..." : "请选择收藏夹"}
+                />
               </SelectTrigger>
               <SelectContent>
                 {folders.map((folder) => (

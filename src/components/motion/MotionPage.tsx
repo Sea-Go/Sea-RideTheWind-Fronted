@@ -2,8 +2,8 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo } from "react";
 import type { ReactNode } from "react";
+import { useEffect, useMemo } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -35,7 +35,11 @@ export const MotionPage = ({
     markNavigationTiming("nav:path-change", { pathname });
     const frame = window.requestAnimationFrame(() => {
       markNavigationTiming("nav:content-ready", { pathname });
-      if (pageKey === "dashboard" || shouldReduceMotion || !FRONTEND_MOTION_CONFIG.features.pageTransition) {
+      if (
+        pageKey === "dashboard" ||
+        shouldReduceMotion ||
+        !FRONTEND_MOTION_CONFIG.features.pageTransition
+      ) {
         markNavigationTiming("nav:motion-settled", { pathname });
       }
     });
