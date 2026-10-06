@@ -96,7 +96,7 @@ export default function ChatPage() {
                 placeholder="输入学习问题……（Enter 发送，Shift+Enter 换行）"
                 rows={2}
                 disabled={busy}
-                className="focus-visible:ring-ring min-h-[3.25rem] flex-1 resize-none rounded-xl px-3.5 py-2.5 text-sm outline-none focus-visible:ring-2"
+                className="focus-visible:ring-ring min-h-[3.25rem] flex-1 resize-none rounded-xl border border-[var(--sea-line)] px-3.5 py-2.5 text-sm outline-none focus-visible:border-[var(--sea-orange)] focus-visible:ring-2 motion-safe:transition-colors motion-safe:duration-200"
               />
               {busy ? (
                 <Button type="button" variant="outline" onClick={stop} aria-label="停止生成">
@@ -108,7 +108,7 @@ export default function ChatPage() {
                   type="submit"
                   disabled={!question.trim()}
                   aria-label="发送问题"
-                  className="rounded-xl"
+                  className="rounded-[8px]"
                 >
                   <SendIcon aria-hidden />
                   发送

@@ -44,8 +44,8 @@ function CandidateRow({
         <span className="evidence-row-score" title="RRF 融合分">
           {candidate.rrf_score.toFixed(4)}
         </span>
-        <span className="evidence-row-caret" aria-hidden="true">
-          {expanded ? "▴" : "▾"}
+        <span className={`evidence-row-caret ${expanded ? "open" : ""}`} aria-hidden="true">
+          ▾
         </span>
       </button>
       {/* 折叠时保持 200ms 高度过渡，同时以 inert 移除隐藏卡片的焦点与可达性。 */}
