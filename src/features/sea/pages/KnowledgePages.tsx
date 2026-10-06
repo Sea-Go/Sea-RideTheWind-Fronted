@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 
+import type { DocStructureTreeUI } from "@/features/knowledge/generated/structureComponents";
 import { KnowledgeWorkbench as LiveKnowledgeWorkbench } from "@/features/knowledge/KnowledgeWorkbench";
 import { PublishedModule, PublishedReader } from "@/features/knowledge/PublishedKnowledge";
+import { StructureTreeViewer } from "@/features/knowledge/StructureTreeViewer";
 import { WorkbenchModules } from "@/features/knowledge/WorkbenchModules";
 
 import {
@@ -296,16 +298,19 @@ export function KnowledgeReader({
   releaseId = "",
   revisionId = "",
   locator = "",
+  structure,
 }: {
   source?: boolean;
   id?: string;
   releaseId?: string;
   revisionId?: string;
   locator?: string;
+  /** 文档结构树：当前由页面传 mock JSON，待后端端点（后端未就绪）。 */
+  structure?: DocStructureTreeUI;
 }) {
   const { demo } = useSea();
   return demo ? (
-    <DemoKnowledgeReader source={source} id={id} />
+    <DemoKnowledgeReader source={source} id={id} structure={structure} />
   ) : (
     <PublishedReader
       key={`${id}:${releaseId}:${revisionId}:${locator}:${source}`}
@@ -314,15 +319,18 @@ export function KnowledgeReader({
       releaseId={releaseId}
       revisionId={revisionId}
       locator={locator}
+      structure={structure}
     />
   );
 }
 function DemoKnowledgeReader({
   source = false,
   id = "mountain",
+  structure,
 }: {
   source?: boolean;
   id?: string;
+  structure?: DocStructureTreeUI;
 }) {
   const { demo } = useSea();
   const [saved, setSaved] = useState(false);
@@ -358,6 +366,13 @@ function DemoKnowledgeReader({
               </a>
             ),
           )}
+          {structure ? (
+            <StructureTreeViewer
+              tree={structure}
+              activeAnchor="section-1"
+              note="演示结构 JSON · 待后端端点（后端未就绪）"
+            />
+          ) : null}
           <div className="sea-reader-meta">
             <span className="sea-pill">v3 正式版本 · 演示</span>
             <p>

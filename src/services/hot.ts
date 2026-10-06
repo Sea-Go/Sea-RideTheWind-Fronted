@@ -30,9 +30,7 @@ export interface GetHotArticlesParams {
   page_size?: number;
 }
 
-export const getHotArticles = (
-  params?: GetHotArticlesParams,
-): Promise<HotArticlesResponse> =>
+export const getHotArticles = (params?: GetHotArticlesParams): Promise<HotArticlesResponse> =>
   request<HotArticlesResponse>(HOT_API_PATHS.list(params?.page ?? 1, params?.page_size ?? 20), {
     method: "GET",
   });

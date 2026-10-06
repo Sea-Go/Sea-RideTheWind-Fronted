@@ -117,7 +117,12 @@ export default function SecondaryTagsInput({
       )}
 
       <div className="flex items-center gap-3">
-        <Button type="button" variant="outline" onClick={commitDraft} disabled={disabled || !draft.trim()}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={commitDraft}
+          disabled={disabled || !draft.trim()}
+        >
           添加标签
         </Button>
         <p className="text-muted-foreground text-xs">

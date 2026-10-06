@@ -9,12 +9,7 @@ interface MotionListProps extends ComponentPropsWithoutRef<"div"> {
   enabled?: boolean;
 }
 
-export const MotionList = ({
-  children,
-  className,
-  enabled = true,
-  ...props
-}: MotionListProps) => (
+export const MotionList = ({ children, className, enabled = true, ...props }: MotionListProps) => (
   <div className={cn(enabled && "sea-motion-list", className)} {...props}>
     {children}
   </div>
