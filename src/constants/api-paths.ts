@@ -218,3 +218,8 @@ export const ADMIN_RECO_API_PATHS = {
   invokeSkill: `${RECO_V2_ADMIN_PREFIX}/skill/invoke`,
   enableSkill: (name: string) => `${RECO_V2_ADMIN_PREFIX}/skill/${encodeURIComponent(name)}/enable`,
 } as const;
+
+// ─── 学习问答（通过 BFF: /api/chat，SSE 流式透传 A1 /api/v1/chat）─────────
+export const CHAT_API_PATHS = {
+  chat: "/api/chat",
+} as const;

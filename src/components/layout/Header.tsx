@@ -3,6 +3,7 @@
 import {
   BookmarkIcon,
   FileTextIcon,
+  GraduationCapIcon,
   HomeIcon,
   InfoIcon,
   LogInIcon,
@@ -51,6 +52,7 @@ const HeaderAboutDialog = dynamic(
 
 const baseNavItems = [
   { href: USER_HOME_PATH, label: "首页", icon: HomeIcon },
+  { href: "/chat", label: "学习问答", icon: GraduationCapIcon },
   { href: "/dashboard/travel-agent", label: "旅行 Agent", icon: MapIcon },
   { href: "/post", label: "发布", icon: PenBoxIcon },
   { href: "/profile/articles", label: "文章管理", icon: FileTextIcon },
