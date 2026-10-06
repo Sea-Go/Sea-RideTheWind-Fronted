@@ -127,22 +127,17 @@ export const ChatStream = ({
                   识海 · 学习问答
                 </span>
                 <div className="chat-stream-answer text-foreground">
-                  {message.parts.map((part, index) => {
-                    const isTail =
-                      message.id === lastAssistantId &&
-                      index === message.parts.length - 1 &&
-                      streaming;
-                    return (
-                      <span key={index} className="chat-stream-block">
-                        {renderTextWithCitations(
-                          part.text,
-                          `${message.id}-${index}`,
-                          onViewCitation,
-                        )}
-                        {isTail ? <span className="chat-stream-caret" aria-hidden /> : null}
-                      </span>
-                    );
-                  })}
+                  {/* SSE 分片边界可能拆开 [n]，引用按拼接后的完整文本识别。 */}
+                  <span className="chat-stream-block">
+                    {renderTextWithCitations(
+                      message.parts.map((part) => part.text).join(""),
+                      message.id,
+                      onViewCitation,
+                    )}
+                    {message.id === lastAssistantId && streaming ? (
+                      <span className="chat-stream-caret" aria-hidden />
+                    ) : null}
+                  </span>
                   {message.id === lastAssistantId && message.parts.length === 0 && streaming ? (
                     <span className="chat-stream-caret" aria-hidden />
                   ) : null}

@@ -54,13 +54,13 @@ BFF 已完成本地构建与契约验收；真实 A1 `/api/v1/chat`
 ## 边界与已知遗留
 
 - A1 `/api/v1/chat`
-  未实现：BFF 对上游 404/501 原样透传，ChatStream 以 error 横幅呈现并允许显式重试；不伪造流式内容。
+  未实现：BFF 对上游 404/501 原样透传，ChatStream 以 error 横幅呈现并允许显式重试；重试沿用既有回合（不重复追加用户问题、保留去重集合与
+  `after` 游标）；不伪造流式内容。
 - 引用侧栏为占位（CitationCard / EvidencePanel 未在本任务范围）；
   `collectCitationNumbers` 只收集正文中出现的 `[n]`
   编号，不与EvidencePack 候选对应——待引用下发接口接入后替换。
 - 断线重连：客户端按 `(message id, seq)` 幂等去重并携带 `after` 游标重发；`seq`
-  缺失时退化为按 `(id, 文本)`
-  去重。上游重放语义（是否支持 after 续传）待 A1 契约冻结后复核。
+  缺失的增量不去重、按到达顺序直接追加（无文本兜底去重）。EOF 未收到 done 事件同样按中断走有界重连。上游重放语义（是否支持 after 续传）待 A1 契约冻结后复核。
 - tier 文案唯一来源为 `generated/structureComponents.ts` 的
   `CHAT_TIER_DEFS`（规范 §2.4 条款 6）；默认档 D12 冻结值下发后改页面常量
   `DEFAULT_CHAT_TIER` 一处即可。

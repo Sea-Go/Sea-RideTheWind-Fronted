@@ -71,7 +71,9 @@ test("collectCitationNumbers 收集去重并升序的角标编号", () => {
       role: "assistant",
       parts: [
         { type: "text", text: "结构树按修订冻结 [2]，Locator 指向段落 [1]。" },
-        { type: "text", text: "更多见 [10] 与重复的 [2]。" },
+        // SSE 分片边界拆开 [10]：按拼接后的完整文本仍应命中。
+        { type: "text", text: "更多见 [" },
+        { type: "text", text: "10] 与重复的 [2]。" },
       ],
     },
     {
@@ -80,7 +82,7 @@ test("collectCitationNumbers 收集去重并升序的角标编号", () => {
       parts: [{ type: "text", text: "用户输入里的 [99] 不采集？采集规则按正文统一处理" }],
     },
   ]);
-  assert.deepEqual(numbers, [1, 2, 10, 99]);
+  assert.deepEqual(numbers, [1, 2, 10]);
 });
 
 test("契约常量与 Go 侧 evidence/types.go 对齐", () => {

@@ -358,22 +358,21 @@ function DemoKnowledgeReader({
             山地的语言
           </SeaLink>
           <span className="sea-eyebrow">本模块目录</span>
+          {["山地如何塑造气候与生命", "迎风坡与雨影效应", "垂直自然带", "冰川与时间"].map(
+            (t, i) => (
+              <a key={t} href={`#section-${i + 1}`} className={i === 0 ? "active" : ""}>
+                <span>0{i + 1}</span>
+                {t}
+              </a>
+            ),
+          )}
           {structure ? (
             <StructureTreeViewer
               tree={structure}
               activeAnchor="section-1"
               note="演示结构 JSON · 待后端端点（后端未就绪）"
             />
-          ) : (
-            ["山地如何塑造气候与生命", "迎风坡与雨影效应", "垂直自然带", "冰川与时间"].map(
-              (t, i) => (
-                <a key={t} href={`#section-${i + 1}`} className={i === 0 ? "active" : ""}>
-                  <span>0{i + 1}</span>
-                  {t}
-                </a>
-              ),
-            )
-          )}
+          ) : null}
           <div className="sea-reader-meta">
             <span className="sea-pill">v3 正式版本 · 演示</span>
             <p>

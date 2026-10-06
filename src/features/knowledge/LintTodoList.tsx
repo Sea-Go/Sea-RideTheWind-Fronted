@@ -52,7 +52,7 @@ export function LintTodoList({ items }: { items: KnowledgeLintTodo[] }) {
                   检出时间 {item.detected_at} · 待办 {item.id}
                 </small>
                 <SeaLink
-                  href={`/knowledge/${encodeURIComponent(item.page_key)}/read`}
+                  href={`/knowledge/${encodeURIComponent(item.module_id ?? item.page_key)}/read`}
                   className="sea-text-link"
                 >
                   涉及页：{item.page_title} →

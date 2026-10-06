@@ -224,8 +224,13 @@ export interface KnowledgeLintTodo {
   id: string;
   kind: KnowledgeLintKind;
   summary: string;
-  /** 涉及页 doc key，链接到 /knowledge/{page_key}/read。 */
+  /** 涉及页 doc key。 */
   page_key: string;
+  /**
+   * 拥有该页的模块 ID：/knowledge/[id]/read 以模块为路由身份，doc key 不能
+   * 直接充当路由参数；字段待 C-15 后端契约冻结，缺省时回退 page_key。
+   */
+  module_id?: string;
   page_title: string;
   /** RFC3339 检出时间。 */
   detected_at: string;

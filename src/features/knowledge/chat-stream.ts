@@ -59,15 +59,20 @@ interface StreamCursor {
 const RECONNECT_BASE_DELAY_MS = 600;
 const RECONNECT_MAX_ATTEMPTS = 3;
 
-/** 消息内已应用的最大引用角标编号（升序去重），供侧栏占位消费。 */
+/** SSE 帧边界：LF（\n\n）或 CRLF（\r\n\r\n）分隔，二者混用亦可。 */
+const FRAME_BOUNDARY = /\r\n\r\n|\n\n/;
+
+/** 消息内已应用的最大引用角标编号（升序去重），供侧栏占位消费。
+ *  仅扫描 assistant 消息；SSE 分片边界可能拆开 `[n]`，因此按拼接后的
+ *  完整文本匹配，而不是逐 part 扫描。 */
 export const collectCitationNumbers = (messages: ChatStreamMessage[]): number[] => {
   const seen = new Set<number>();
   for (const message of messages) {
-    for (const part of message.parts) {
-      for (const match of part.text.matchAll(/\[(\d+)\]/g)) {
-        const n = Number.parseInt(match[1] as string, 10);
-        if (Number.isFinite(n) && n > 0) seen.add(n);
-      }
+    if (message.role !== "assistant") continue;
+    const text = message.parts.map((part) => part.text).join("");
+    for (const match of text.matchAll(/\[(\d+)\]/g)) {
+      const n = Number.parseInt(match[1] as string, 10);
+      if (Number.isFinite(n) && n > 0) seen.add(n);
     }
   }
   return [...seen].sort((a, b) => a - b);
@@ -156,21 +161,22 @@ export const useChatStream = (options: { onFatal?: (message: string) => void } =
   }, []);
 
   const readStream = useCallback(
-    async (response: Response): Promise<"done" | "network"> => {
-      if (!response.body) return "network";
+    async (response: Response): Promise<"done" | "interrupted"> => {
+      if (!response.body) return "interrupted";
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
       try {
         for (;;) {
           const { value, done } = await reader.read();
-          if (done) return "done";
+          // 干净 EOF 但未收到 SSE done 事件：视为中断，交由有界重连兜底。
+          if (done) return "interrupted";
           buffer += decoder.decode(value, { stream: true });
-          let boundary = buffer.indexOf("\n\n");
-          while (boundary >= 0) {
-            const frame = buffer.slice(0, boundary);
-            buffer = buffer.slice(boundary + 2);
-            boundary = buffer.indexOf("\n\n");
+          let boundary = FRAME_BOUNDARY.exec(buffer);
+          while (boundary !== null) {
+            const frame = buffer.slice(0, boundary.index);
+            buffer = buffer.slice(boundary.index + boundary[0].length);
+            boundary = FRAME_BOUNDARY.exec(buffer);
             const parsed = parseSSEFrame(frame);
             if (!parsed) continue;
             if (parsed.event === "message") {
@@ -191,10 +197,11 @@ export const useChatStream = (options: { onFatal?: (message: string) => void } =
   );
 
   const requestStream = useCallback(
-    async (payload: ChatSendPayload, signal: AbortSignal): Promise<"done" | "network"> => {
+    async (payload: ChatSendPayload, signal: AbortSignal): Promise<"done" | "interrupted"> => {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       const token = getAuthToken();
       if (token) headers.Authorization = `Bearer ${token}`;
+      const cursor = cursorRef.current;
       const response = await fetch(CHAT_API_PATHS.chat, {
         method: "POST",
         headers,
@@ -202,7 +209,8 @@ export const useChatStream = (options: { onFatal?: (message: string) => void } =
           tier: payload.tier,
           question: payload.question,
           session_id: sessionIdRef.current,
-          after: cursorRef.current,
+          // 请求契约的 wire 键为 message_id（camelCase 的游标需映射）。
+          after: cursor ? { message_id: cursor.messageId, seq: cursor.seq } : undefined,
         }),
         signal,
         cache: "no-store",
@@ -223,19 +231,23 @@ export const useChatStream = (options: { onFatal?: (message: string) => void } =
   );
 
   const send = useCallback(
-    async (payload: ChatSendPayload) => {
+    async (payload: ChatSendPayload, sendOptions: { retry?: boolean } = {}) => {
       const question = payload.question.trim();
       if (!question || !isChatTier(payload.tier)) return;
       if (status === "streaming" || status === "reconnecting") return;
       setError(null);
       setStreamTier(payload.tier);
-      seenRef.current = new Set();
-      cursorRef.current = null;
-      appendMessage({
-        id: makeId("user"),
-        role: "user",
-        parts: [{ type: "text", text: question }],
-      });
+      // 重试沿用既有回合：保留去重集合与 after 游标、不重复追加用户问题，
+      // 服务端重放的片段由 (message id, seq) 去重吸收；仅新问题才初始化。
+      if (!sendOptions.retry) {
+        seenRef.current = new Set();
+        cursorRef.current = null;
+        appendMessage({
+          id: makeId("user"),
+          role: "user",
+          parts: [{ type: "text", text: question }],
+        });
+      }
       const controller = new AbortController();
       controllerRef.current = controller;
       setStatus("streaming");
@@ -244,6 +256,10 @@ export const useChatStream = (options: { onFatal?: (message: string) => void } =
         try {
           const outcome = await requestStream(payload, controller.signal);
           if (!mountedRef.current) return;
+          if (outcome !== "done") {
+            // 无 body 或 EOF 未收到 done 事件：按中断处理，走有界重连。
+            throw new TypeError("stream interrupted before done event");
+          }
           setStatus("idle");
           return;
         } catch (e) {
