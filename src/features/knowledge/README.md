@@ -78,3 +78,17 @@ KNOWLEDGE_PG_BIN=/path/to/postgresql/bin node scripts/knowledge-acceptance.cjs /
 可留给人工 UI 验收；结束发送 SIGINT/SIGTERM 会停止该脚本创建的服务。日志和随机测试凭据只在临时目录，不提交远端。
 
 聚合契约补充：发布配置可明确指定sum_maxsim或mean_maxsim，页面按原值提交，不在两者之间换算。maxsim仅保留早期结构fixture的兼容输入，真实多向量模型需使用固定数学聚合与对应表示契约；BGE-M3为mean_maxsim。
+
+## 2026-10-06 引用-定位轨（feat/citation-ui-20261006）
+
+新增引用 UI 组件族与 v2 骨架，视觉全部走 `--sea-*` 主题令牌（详见
+[CITATION_LOCATOR_ACCEPTANCE.md](CITATION_LOCATOR_ACCEPTANCE.md)）：
+
+- `CitationCard.tsx` / `EvidencePanel.tsx` / `StructureTreeViewer.tsx` /
+  `LintTodoList.tsx`；类型唯一来源 `generated/structureComponents.ts`（与 F1
+  chat 轨各自独立建同内容文件，合并时二取其一）。
+- `/knowledge/[id]/read` 加结构树侧栏（mock
+  JSON，`demo-fixtures.ts`）；`/knowledge/lint`
+  新建待办页骨架（四类徽章 + 涉及页链接 + 处置占位）。
+- `src/constants/api-paths.ts` 登记
+  `KNOWLEDGE_V2_PATHS`（structure/lint，**后端未就绪**，仅占位，组件不得硬编码 URL）。

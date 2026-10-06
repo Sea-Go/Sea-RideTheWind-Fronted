@@ -223,3 +223,16 @@ export const ADMIN_RECO_API_PATHS = {
 export const CHAT_API_PATHS = {
   chat: "/api/chat",
 } as const;
+
+// ─── 知识 v2（结构树 / Lint）── 后端未就绪，仅前端占位登记 ────────────────
+// 组件不得另行硬编码 URL；待 RTW 评审并下发 structure/lint 端点后，
+// 由 scripts/sync-knowledge-contract.cjs 同步 generated/ 契约并统一替换此处常量。
+const KNOWLEDGE_V2_PREFIX = "/api/sea/knowledge/v2";
+
+export const KNOWLEDGE_V2_PATHS = {
+  /** 后端未就绪：文档结构树（DocStructureTree），阅读页结构树侧栏消费。 */
+  docStructure: (docKey: string) =>
+    `${KNOWLEDGE_V2_PREFIX}/docs/${encodeURIComponent(docKey)}/structure`,
+  /** 后端未就绪：知识 Lint 待办清单（矛盾/孤页/缺引用/过时，C-15 消费）。 */
+  lintTodos: `${KNOWLEDGE_V2_PREFIX}/lint/todos`,
+} as const;

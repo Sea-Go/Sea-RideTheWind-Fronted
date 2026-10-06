@@ -5,7 +5,9 @@ import { MarkdownArticle } from "@/components/article/MarkdownArticle";
 import { EmptyState, Notice, SeaLink } from "@/features/sea/components/primitives";
 
 import { knowledge, knowledgeRead, type Module, type Release, type Revision } from "./api";
+import type { DocStructureTreeUI } from "./generated/structureComponents";
 import { revisionHref, sourceParagraph } from "./state";
+import { StructureTreeViewer } from "./StructureTreeViewer";
 
 import "./knowledge.css";
 
@@ -136,12 +138,15 @@ export function PublishedReader({
   revisionId = "",
   locator = "",
   source = false,
+  structure,
 }: {
   moduleId: string;
   releaseId?: string;
   revisionId?: string;
   locator?: string;
   source?: boolean;
+  /** 文档结构树：当前为页面传入的 mock JSON，待后端端点（后端未就绪）。 */
+  structure?: DocStructureTreeUI;
 }) {
   const [release, setRelease] = useState<Release | null>(null);
   const [revision, setRevision] = useState<Revision | null>(null);
@@ -201,6 +206,9 @@ export function PublishedReader({
           <p className="knowledge-id">发布：{release.release_id}</p>
           <p className="knowledge-id">修订：{revision.revision_id}</p>
           <p>{revision.provenance}</p>
+          {structure && (
+            <StructureTreeViewer tree={structure} note="演示结构 JSON · 待后端端点（后端未就绪）" />
+          )}
           <SeaLink href={revisionHref(moduleId, release.release_id, revision)}>
             此修订固定链接 →
           </SeaLink>
