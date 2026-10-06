@@ -1,0 +1,25 @@
+name: web
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        # errors-only gate: 19 pre-existing @next/next/no-img-element warnings
+        # remain on main (img -> next/image migration tracked as tech debt).
+        # Restore `pnpm lint:ci` (zero warnings) after that migration.
+        run: pnpm lint
+      - name: Build
+        run: pnpm build

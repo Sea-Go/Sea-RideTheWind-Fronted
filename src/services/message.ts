@@ -185,7 +185,11 @@ export const sendAdminNotification = (
   token: string,
   payload: AdminSendNotificationPayload,
 ): Promise<AdminSendNotificationResult> =>
-  postWithToken<AdminSendNotificationResult>(token, MESSAGE_API_PATHS.sendAdminNotification, payload);
+  postWithToken<AdminSendNotificationResult>(
+    token,
+    MESSAGE_API_PATHS.sendAdminNotification,
+    payload,
+  );
 
 export const listAdminConversations = (
   token: string,

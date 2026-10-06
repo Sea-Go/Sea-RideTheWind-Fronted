@@ -384,11 +384,7 @@ export interface TemporalProfileSnapshot {
 // ─── 搜索（search）类型 ────────────────────────────────────────────────────
 
 /** 搜索意图类型 */
-export type SearchIntentType =
-  | "informational"
-  | "navigational"
-  | "transactional"
-  | "comparative";
+export type SearchIntentType = "informational" | "navigational" | "transactional" | "comparative";
 
 /** 搜索意图（SearchAgent.understand 输出） */
 export interface SearchIntent {
@@ -898,13 +894,7 @@ export interface UserProfile {
 // ─── 评估（eval）类型 ──────────────────────────────────────────────────────
 
 /** 评估指标类型 */
-export type EvalMetricType =
-  | "recall_at_k"
-  | "ndcg_at_k"
-  | "ctr"
-  | "cvr"
-  | "llm_judge"
-  | "rubric";
+export type EvalMetricType = "recall_at_k" | "ndcg_at_k" | "ctr" | "cvr" | "llm_judge" | "rubric";
 
 /** Rubric 维度 */
 export interface RubricCriterion {
@@ -1392,9 +1382,7 @@ export const getMyProfile = (includeTemporal = false): Promise<UserProfile> =>
  * 直接使用 fetch 返回 Response，调用方通过 response.body 读取 ReadableStream，
  * 不走 request helper（后者会缓冲整个响应体，不适用于流式）。
  */
-export const recommendArticlesStream = (
-  payload: RecommendArticlesPayload,
-): Promise<Response> =>
+export const recommendArticlesStream = (payload: RecommendArticlesPayload): Promise<Response> =>
   fetch(RECO_API_PATHS.recommendStream, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
