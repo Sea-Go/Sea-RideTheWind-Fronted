@@ -162,12 +162,9 @@ export const ADMIN_RECO_API_PATHS = {
   // 频道管理
   listChannelsAdmin: `${RECO_V2_ADMIN_PREFIX}/channels`,
   createChannel: `${RECO_V2_ADMIN_PREFIX}/channels`,
-  getChannel: (name: string) =>
-    `${RECO_V2_ADMIN_PREFIX}/channels/${encodeURIComponent(name)}`,
-  updateChannel: (name: string) =>
-    `${RECO_V2_ADMIN_PREFIX}/channels/${encodeURIComponent(name)}`,
-  deleteChannel: (name: string) =>
-    `${RECO_V2_ADMIN_PREFIX}/channels/${encodeURIComponent(name)}`,
+  getChannel: (name: string) => `${RECO_V2_ADMIN_PREFIX}/channels/${encodeURIComponent(name)}`,
+  updateChannel: (name: string) => `${RECO_V2_ADMIN_PREFIX}/channels/${encodeURIComponent(name)}`,
+  deleteChannel: (name: string) => `${RECO_V2_ADMIN_PREFIX}/channels/${encodeURIComponent(name)}`,
   // 质量管理
   evaluateQuality: `${RECO_V2_ADMIN_PREFIX}/quality/evaluate`,
   batchEvaluateQuality: `${RECO_V2_ADMIN_PREFIX}/quality/evaluate/batch`,
@@ -215,12 +212,14 @@ export const ADMIN_RECO_API_PATHS = {
   getGraphSchema: `${RECO_V2_ADMIN_PREFIX}/graph/schema`,
   // Skill 管理
   listSkills: `${RECO_V2_ADMIN_PREFIX}/skill/list`,
-  getSkill: (name: string) =>
-    `${RECO_V2_ADMIN_PREFIX}/skill/${encodeURIComponent(name)}`,
+  getSkill: (name: string) => `${RECO_V2_ADMIN_PREFIX}/skill/${encodeURIComponent(name)}`,
   registerSkill: `${RECO_V2_ADMIN_PREFIX}/skill/register`,
-  unregisterSkill: (name: string) =>
-    `${RECO_V2_ADMIN_PREFIX}/skill/${encodeURIComponent(name)}`,
+  unregisterSkill: (name: string) => `${RECO_V2_ADMIN_PREFIX}/skill/${encodeURIComponent(name)}`,
   invokeSkill: `${RECO_V2_ADMIN_PREFIX}/skill/invoke`,
-  enableSkill: (name: string) =>
-    `${RECO_V2_ADMIN_PREFIX}/skill/${encodeURIComponent(name)}/enable`,
+  enableSkill: (name: string) => `${RECO_V2_ADMIN_PREFIX}/skill/${encodeURIComponent(name)}/enable`,
+} as const;
+
+// ─── 学习问答（通过 BFF: /api/chat，SSE 流式透传 A1 /api/v1/chat）─────────
+export const CHAT_API_PATHS = {
+  chat: "/api/chat",
 } as const;
