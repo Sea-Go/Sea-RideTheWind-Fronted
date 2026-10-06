@@ -138,9 +138,6 @@ export const ChatStream = ({
                       <span className="chat-stream-caret" aria-hidden />
                     ) : null}
                   </span>
-                  {message.id === lastAssistantId && message.parts.length === 0 && streaming ? (
-                    <span className="chat-stream-caret" aria-hidden />
-                  ) : null}
                 </div>
               </div>
             ),
