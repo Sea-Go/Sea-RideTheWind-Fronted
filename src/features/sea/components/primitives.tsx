@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -122,12 +123,13 @@ export function StoryRow({
         </div>
       </div>
       <SeaLink href={`/article/${story.id}`} className={`sea-story-image sea-art-${story.image}`}>
-        <img
+        <Image
           src={`/sea/${story.image}.svg`}
           alt="原创自然主题插画"
-          width="210"
-          height="145"
+          width={210}
+          height={145}
           loading="lazy"
+          unoptimized
         />
       </SeaLink>
     </article>

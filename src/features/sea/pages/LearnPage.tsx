@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -326,7 +327,7 @@ export function LearnPage() {
           </button>
         ))}
         <div className="sea-chat-history-bottom">
-          <img src="/sea/whale.svg" alt="WhaleHall 鲸鱼陪伴" width="80" height="70" />
+          <Image src="/sea/whale.svg" alt="WhaleHall 鲸鱼陪伴" width={80} height={70} unoptimized />
           <p>
             慢慢问，慢慢懂。
             <br />

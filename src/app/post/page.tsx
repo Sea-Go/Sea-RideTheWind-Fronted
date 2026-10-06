@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 
@@ -412,9 +413,12 @@ export default function PostPage() {
                           当前封面地址暂时无法预览，请重新上传封面，或稍后再试。
                         </div>
                       ) : (
-                        <img
+                        <Image
                           src={coverPreviewSrc ?? cover ?? ""}
                           alt="封面预览"
+                          width={1200}
+                          height={400}
+                          unoptimized
                           className="h-56 w-full object-cover sm:h-64"
                           onError={() => setIsCoverPreviewFailed(true)}
                         />

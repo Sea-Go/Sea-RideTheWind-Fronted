@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 
 import { MarkdownArticle } from "@/components/article/MarkdownArticle";
@@ -70,7 +71,7 @@ export function PublishedModule({ moduleId }: { moduleId: string }) {
         {snapshot.module.title}
       </div>
       <section className="sea-module-hero">
-        <img src="/sea/book-orbits.svg" width="420" height="290" alt="知识轨道插画" />
+        <Image src="/sea/book-orbits.svg" width={420} height={290} alt="知识轨道插画" unoptimized />
         <div>
           <span className="sea-eyebrow">{snapshot.module.category} · LIVING KNOWLEDGE</span>
           <h1>{snapshot.module.title}</h1>

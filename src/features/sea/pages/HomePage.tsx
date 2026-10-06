@@ -1,4 +1,6 @@
 "use client";
+import Image from "next/image";
+
 import { ArrowRight, BookOpen, Compass, MessageCircle, Plus, Search } from "../components/icons";
 import { EmptyState, Notice, SeaLink, SectionTitle, StoryRow } from "../components/primitives";
 import { useSea } from "../components/SeaShell";
@@ -37,7 +39,7 @@ export function HomePage() {
           </div>
         </div>
         <div className={`sea-hero-art sea-art-${theme}`}>
-          <img
+          <Image
             src={`/sea/${theme}.svg`}
             alt={
               theme === "mountain"
@@ -46,9 +48,10 @@ export function HomePage() {
                   ? "原创天文馆轨道与星图插画"
                   : "纯黑夏夜中天上银河与地上萤火虫河流"
             }
-            width="710"
-            height="450"
-            fetchPriority="high"
+            width={710}
+            height={450}
+            priority
+            unoptimized
           />
           <div className="sea-art-label">
             <span>SEA FIELD NOTES / 01</span>
@@ -142,12 +145,13 @@ export function HomePage() {
               <br />
               读到更辽阔的世界。
             </p>
-            <img
+            <Image
               src="/sea/book-orbits.svg"
               alt="原创轨道图书封面"
-              width="240"
-              height="150"
+              width={240}
+              height={150}
               loading="lazy"
+              unoptimized
             />
             <SeaLink href="/knowledge">
               走进知识书架 <ArrowRight size={15} />
@@ -164,7 +168,13 @@ export function HomePage() {
             ))}
           </div>
           <div className="sea-companion-card">
-            <img src="/sea/whale.svg" alt="WhaleHall 原创鲸鱼桌宠插画" width="70" height="70" />
+            <Image
+              src="/sea/whale.svg"
+              alt="WhaleHall 原创鲸鱼桌宠插画"
+              width={70}
+              height={70}
+              unoptimized
+            />
             <div>
               <strong>让陪伴，回到桌面</strong>
               <p>WhaleHall · 你的桌面伙伴</p>
@@ -187,12 +197,13 @@ export function HomePage() {
             {modules.map((m) => (
               <SeaLink key={m.id} href={`/knowledge/${m.id}`} className="sea-book-card">
                 <div className="sea-book-art">
-                  <img
+                  <Image
                     src={`/sea/${m.image}.svg`}
                     alt={`${m.title}原创封面`}
-                    width="340"
-                    height="220"
+                    width={340}
+                    height={220}
                     loading="lazy"
+                    unoptimized
                   />
                   <span className="sea-release">{m.release} 已发布 · 演示</span>
                 </div>

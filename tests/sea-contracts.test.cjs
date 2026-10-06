@@ -331,6 +331,8 @@ function renderLearningPage(t) {
   const modules = {
     react: hooks,
     "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: "Fragment" },
+    // LearnPage renders the WhaleHall companion art via next/image (img -> Image migration).
+    "next/image": { default: "img" },
     "../components/icons": new Proxy({}, { get: (_target, name) => name }),
     "../components/primitives": { Notice: "Notice", SeaLink: "SeaLink" },
     "../components/SeaShell": { useSea: () => ({ demo: false }) },

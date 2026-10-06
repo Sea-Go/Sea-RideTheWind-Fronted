@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useState } from "react";
 
 import { ArrowLeft, ArrowRight, Plus } from "../components/icons";
@@ -71,7 +72,7 @@ export function CommunityPage() {
               <br />
               写成自己的故事。
             </h3>
-            <img src="/sea/mountain.svg" alt="原创群峰" width="300" height="180" />
+            <Image src="/sea/mountain.svg" alt="原创群峰" width={300} height={180} unoptimized />
             <SeaLink href="/dashboard/travel-agent">
               继续旅行探索 <ArrowRight size={15} />
             </SeaLink>

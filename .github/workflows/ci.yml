@@ -17,9 +17,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
       - name: Lint
-        # errors-only gate: 19 pre-existing @next/next/no-img-element warnings
-        # remain on main (img -> next/image migration tracked as tech debt).
-        # Restore `pnpm lint:ci` (zero warnings) after that migration.
-        run: pnpm lint
+        # Strict gate restored (zero warnings): the 19 pre-existing warnings
+        # (17 @next/next/no-img-element + 2 react-hooks/exhaustive-deps)
+        # were cleared by the img -> next/image migration. Tech debt paid.
+        run: pnpm lint:ci
       - name: Build
         run: pnpm build
