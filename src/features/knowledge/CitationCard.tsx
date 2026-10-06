@@ -122,7 +122,10 @@ export function CitationCard({
             <div className="citation-lane" key={key}>
               <dt>{label}</dt>
               <dd>
-                <span className="citation-lane-track">
+                <span
+                  className="citation-lane-track"
+                  title={`${label}分数 ${lanes[key].toFixed(2)}`}
+                >
                   <span
                     className={`citation-lane-fill lane-${key}`}
                     style={{ width: lanePercent(lanes[key]) }}
@@ -136,7 +139,7 @@ export function CitationCard({
             <div className="citation-lane">
               <dt>重排</dt>
               <dd>
-                <span className="citation-lane-track">
+                <span className="citation-lane-track" title={`重排分数 ${lanes.rerank.toFixed(2)}`}>
                   <span
                     className="citation-lane-fill lane-rerank"
                     style={{ width: lanePercent(lanes.rerank) }}

@@ -113,7 +113,7 @@ export const ChatStream = ({
           {messages.map((message) =>
             message.role === "user" ? (
               <div key={message.id} className="chat-stream-block-enter flex justify-end">
-                <div className="chat-stream-user bg-primary text-primary-foreground shadow-primary/20 shadow-md">
+                <div className="chat-stream-user bg-primary text-primary-foreground">
                   {message.parts.map((part, index) => (
                     <span key={index} className="chat-stream-block">
                       {part.text}

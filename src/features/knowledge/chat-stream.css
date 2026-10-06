@@ -12,6 +12,9 @@
   max-width: min(38rem, 88%);
   padding: 0.75rem 1rem;
   border-radius: 1.1rem;
+
+  /* subtle 阴影：line 色 10% 透明度（§E 第二轮增强；避开 .sea-legacy 对 shadow-md 的清零）。 */
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--sea-line) 10%, transparent);
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   line-height: 1.7;
@@ -61,12 +64,15 @@
   cursor: pointer;
   transition:
     background-color 200ms ease,
-    border-color 200ms ease;
+    border-color 200ms ease,
+    color 200ms ease;
 }
 
+/* hover 变 accent 色（--sea-orange，Sea 全局交互强调色）。 */
 .chat-stream-citation:hover {
-  border-color: color-mix(in oklab, var(--primary) 60%, transparent);
-  background: color-mix(in oklab, var(--primary) 22%, transparent);
+  border-color: color-mix(in oklab, var(--sea-orange) 60%, transparent);
+  background: color-mix(in oklab, var(--sea-orange) 14%, transparent);
+  color: var(--sea-orange);
 }
 
 .chat-stream-citation:focus-visible {
