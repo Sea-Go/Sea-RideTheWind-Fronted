@@ -4,8 +4,8 @@ import { useState } from "react";
 import { CitationCard } from "./CitationCard";
 import type {
   EvidenceLane,
-  EvidencePackUI,
   EvidencePackCandidate,
+  EvidencePackUI,
   StructureLocator,
 } from "./generated/structureComponents";
 
@@ -48,7 +48,8 @@ function CandidateRow({
           {expanded ? "▴" : "▾"}
         </span>
       </button>
-      <div className={`evidence-candidate-items ${expanded ? "open" : ""}`}>
+      {/* 折叠时保持 200ms 高度过渡，同时以 inert 移除隐藏卡片的焦点与可达性。 */}
+      <div className={`evidence-candidate-items ${expanded ? "open" : ""}`} inert={!expanded}>
         <div className="evidence-candidate-items-inner">
           {candidate.evidence.map((item) => (
             <CitationCard

@@ -65,6 +65,8 @@ export function CitationCard({
             tabIndex: 0,
             onClick: open,
             onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
+              // 内部按钮（如“检索分数”）的 Enter/Space 冒泡到此：不触发整卡打开。
+              if (event.target !== event.currentTarget) return;
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
                 open();

@@ -8,7 +8,8 @@ worker。此前阶段交付的缺失读面现已接通。
 
 - 全站 `/chat` 学习问答页：fast/balanced/deep 三档分段选择（文案唯一来源
   `generated/structureComponents.ts`）、SSE 流式文档渲染（AI 无气泡底、用户 primary 气泡、行内
-  `[n]` 引用角标、断线重连按 message id 去重）、Next BFF `/api/chat` 流式透传 A1
+  `[n]` 引用角标、断线重连按 `(message id, seq)` 分片幂等去重，无 `seq`
+  片段不去重）、Next BFF `/api/chat` 流式透传 A1
   `/api/v1/chat`；引用侧栏为 CitationCard/EvidencePanel 占位。验收见
   [CHAT_TIER_ACCEPTANCE.md](CHAT_TIER_ACCEPTANCE.md)。
 - 已接纳知识问答历史从知识书架进入，按已知逻辑会话 ID 查看 RTW 用户态产品记录、固定答案及当前引用可用性；具体合同与局部验收见

@@ -79,7 +79,7 @@ export default function ChatPage() {
               onViewCitation={setSelectedCitation}
               onRetry={() => {
                 const payload = lastPayloadRef.current;
-                if (payload) void send(payload);
+                if (payload) void send(payload, { retry: true });
               }}
               retryDisabled={busy}
             />
