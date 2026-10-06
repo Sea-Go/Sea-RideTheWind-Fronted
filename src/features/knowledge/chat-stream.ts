@@ -123,7 +123,10 @@ export const useChatStream = (options: { onFatal?: (message: string) => void } =
     setMessages((current) => [...current, message]);
   }, []);
 
-  /** 幂等追加增量：按 (message id, seq) 去重后 append 到对应消息的 parts。 */
+  /**
+   * 幂等追加增量：仅在 seq 可用时按 (message id, seq) 去重后 append。
+   * 当上游缺失 seq 时，不再退化为按 text 去重，避免合法重复片段被误丢弃。
+   */
   const applyStreamEvent = useCallback((payload: ChatStreamEvent): boolean => {
     const id = textOf(payload.id);
     const part = asRecord(payload.part);
@@ -131,9 +134,9 @@ export const useChatStream = (options: { onFatal?: (message: string) => void } =
     if (!id || !text) return false;
     const seq =
       typeof payload.seq === "number" && Number.isFinite(payload.seq) ? payload.seq : null;
-    const dedupeKey = `${id}\u0000${seq ?? `t:${text}`}`;
-    if (seenRef.current.has(dedupeKey)) return false;
-    seenRef.current.add(dedupeKey);
+    const dedupeKey = seq === null ? null : `${id}\u0000${seq}`;
+    if (dedupeKey !== null && seenRef.current.has(dedupeKey)) return false;
+    if (dedupeKey !== null) seenRef.current.add(dedupeKey);
     if (seq !== null && (!cursorRef.current || seq > cursorRef.current.seq)) {
       cursorRef.current = { messageId: id, seq };
     }
