@@ -348,3 +348,525 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── 引用卡 / 证据面板 / 结构树 / Lint 待办（引用-定位轨，令牌只取 --sea-*）── */
+
+/* 引用卡：卡底 surface.2 + 边框 border.subtle；hover 边框加深 + 抬起 2px。 */
+.citation-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--sea-line);
+  border-radius: 8px;
+  background: var(--sea-panel);
+  transition:
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+.citation-card.clickable {
+  cursor: pointer;
+}
+.citation-card.clickable:hover {
+  border-color: var(--sea-orange);
+  transform: translateY(-2px);
+}
+.citation-card.clickable:active {
+  transform: translateY(0);
+}
+.citation-card.compact {
+  padding: 8px;
+  gap: 6px;
+}
+.citation-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.citation-card-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--sea-ink);
+}
+.citation-card-revision {
+  flex-shrink: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  line-height: 1.6;
+  padding: 0 5px;
+  border: 1px solid var(--sea-line);
+  border-radius: 4px;
+  background: var(--sea-soft);
+  color: var(--sea-muted);
+  overflow-wrap: anywhere;
+}
+
+/* 面包屑：12px muted，› 分隔。 */
+.citation-card-path {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--sea-muted);
+}
+.citation-card-crumb {
+  overflow-wrap: anywhere;
+}
+.citation-card-sep {
+  font-style: normal;
+  margin: 0 1px;
+}
+
+/* 段落锚：#P12 上标样式，accent 色。 */
+.citation-card-para {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--sea-orange);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* quote：mark 底色 + 3px 左边框 + 衬线/斜体。 */
+.citation-card-quote {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--sea-orange);
+  border-radius: 0 6px 6px 0;
+  background: var(--sea-butter);
+  font-family: Georgia, "Noto Serif CJK SC", serif;
+  font-style: italic;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--sea-ink);
+  overflow-wrap: anywhere;
+}
+.citation-card.compact .citation-card-quote {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* lane 分数折叠区：等宽数字 + 三段小条形（rerank 可选第四段）。 */
+.citation-card-lanes-toggle {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--sea-muted);
+}
+.citation-card-lanes-toggle:hover {
+  color: var(--sea-orange);
+}
+.citation-card-caret {
+  font-size: 9px;
+  line-height: 1;
+}
+.citation-card-lanes {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px dashed var(--sea-line);
+  border-radius: 6px;
+  background: var(--sea-soft);
+}
+.citation-lane {
+  display: grid;
+  grid-template-columns: 30px 1fr 34px;
+  align-items: center;
+  gap: 8px;
+}
+.citation-lane dt {
+  font-size: 10px;
+  color: var(--sea-muted);
+}
+.citation-lane dd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.citation-lane-track {
+  flex: 1;
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--sea-line);
+  overflow: hidden;
+}
+.citation-lane-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 200ms ease;
+}
+.citation-lane-fill.lane-dense {
+  background: var(--sea-orange);
+}
+.citation-lane-fill.lane-sparse {
+  background: var(--sea-muted);
+}
+.citation-lane-fill.lane-multi {
+  background: var(--sea-ink);
+}
+.citation-lane-fill.lane-rerank {
+  background: var(--sea-orange);
+  opacity: 0.55;
+}
+.citation-lane-value {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--sea-ink);
+  text-align: right;
+}
+
+/* 低相关告警条：warning 语义色，不隐藏内容。 */
+.citation-card-warning {
+  margin: 0;
+  padding: 6px 9px;
+  border: 1px solid var(--sea-orange);
+  border-radius: 6px;
+  background: var(--sea-butter);
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--sea-ink);
+}
+
+/* 证据面板：面板标题 13px uppercase；展开 200ms 高度过渡。 */
+.evidence-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.evidence-panel-title {
+  margin: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--sea-line);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sea-muted);
+}
+.evidence-panel-meta {
+  margin: 0;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+  color: var(--sea-muted);
+}
+.evidence-panel-empty {
+  margin: 0;
+  padding: 18px 12px;
+  border: 1px dashed var(--sea-line);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--sea-muted);
+}
+.evidence-panel-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.evidence-candidate {
+  border-bottom: 1px solid var(--sea-line);
+}
+.evidence-candidate:last-child {
+  border-bottom: 0;
+}
+.evidence-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 2px;
+  text-align: left;
+}
+.evidence-row:hover {
+  background: var(--sea-soft);
+}
+.evidence-row-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--sea-ink);
+}
+.evidence-row-score {
+  flex-shrink: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--sea-ink);
+}
+.evidence-row-caret {
+  flex-shrink: 0;
+  font-size: 9px;
+  color: var(--sea-muted);
+}
+
+/* lane 三色徽章：dense/sparse/multi 各一色，徽章文字冗余标识，不单靠颜色。 */
+.lane-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 1.6;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--sea-line);
+  white-space: nowrap;
+}
+.lane-badge.dense {
+  background: var(--sea-sage);
+  color: var(--sea-ink);
+}
+.lane-badge.sparse {
+  background: var(--sea-blue);
+  color: var(--sea-ink);
+}
+.lane-badge.multi {
+  background: var(--sea-butter);
+  color: var(--sea-ink);
+  border-color: var(--sea-orange);
+}
+.evidence-candidate-items {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 200ms ease;
+}
+.evidence-candidate-items.open {
+  grid-template-rows: 1fr;
+}
+.evidence-candidate-items-inner {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 0 10px;
+}
+.evidence-candidate-items.open .evidence-candidate-items-inner {
+  padding: 2px 0 10px;
+}
+
+/* 结构树：行高 32px，16px/级缩进，折叠 150ms；命中 accent 左边条。 */
+.stree {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.stree-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.stree-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sea-muted);
+}
+.stree-doc {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  color: var(--sea-ink);
+}
+.stree-note {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.7;
+  color: var(--sea-muted);
+}
+.stree-scroll {
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid var(--sea-line);
+  border-radius: 8px;
+  background: var(--sea-panel);
+}
+.stree-level {
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+}
+.stree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  width: 100%;
+  padding-right: 8px;
+  box-sizing: border-box;
+  font-size: 13px;
+  text-align: left;
+  color: var(--sea-ink);
+}
+button.stree-row:hover {
+  background: var(--sea-soft);
+}
+.stree-caret {
+  flex-shrink: 0;
+  width: 12px;
+  font-size: 9px;
+  color: var(--sea-muted);
+  transition: transform 150ms ease;
+}
+.stree-row.collapsed .stree-caret {
+  transform: rotate(0deg);
+}
+.stree-heading-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.stree-count {
+  flex-shrink: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  color: var(--sea-muted);
+}
+.stree-paragraph {
+  color: var(--sea-muted);
+  cursor: default;
+}
+.stree-para-mark {
+  flex-shrink: 0;
+  width: 12px;
+  font-size: 10px;
+  text-align: center;
+}
+.stree-para-index {
+  flex-shrink: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: var(--sea-muted);
+}
+.stree-para-line {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+/* 命中高亮：accent 左边条 + 选中底色。 */
+.stree-row.hit {
+  box-shadow: inset 2px 0 0 var(--sea-orange);
+  background: var(--sea-sage);
+}
+.stree-children {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 150ms ease;
+}
+.stree-children.open {
+  grid-template-rows: 1fr;
+}
+.stree-children-inner {
+  overflow: hidden;
+}
+
+/* Lint 待办：类型徽章四色 + 处置按钮占位。 */
+.lint-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.lint-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--sea-line);
+}
+.lint-badge {
+  flex-shrink: 0;
+  margin-top: 2px;
+  font-size: 10px;
+  line-height: 1.6;
+  padding: 1px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--sea-line);
+  white-space: nowrap;
+}
+.lint-badge.conflict {
+  background: var(--sea-butter);
+  color: var(--sea-ink);
+  border-color: var(--sea-orange);
+}
+.lint-badge.orphan {
+  background: var(--sea-soft);
+  color: var(--sea-muted);
+}
+.lint-badge.missing-citation {
+  background: var(--sea-blue);
+  color: var(--sea-ink);
+}
+.lint-badge.stale {
+  background: var(--sea-sage);
+  color: var(--sea-ink);
+}
+.lint-item-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.lint-item-body strong {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--sea-ink);
+}
+.lint-item-body small {
+  font-size: 10px;
+  overflow-wrap: anywhere;
+  color: var(--sea-muted);
+}
+.lint-dispose {
+  flex-shrink: 0;
+  min-height: 34px;
+  font-size: 11px !important;
+}
+
+/* 减少动态偏好：冻结抬起/条形/折叠过渡，直接切换。 */
+@media (prefers-reduced-motion: reduce) {
+  .citation-card,
+  .citation-lane-fill,
+  .evidence-candidate-items,
+  .stree-children,
+  .stree-caret {
+    transition: none;
+  }
+  .citation-card.clickable:hover {
+    transform: none;
+  }
+}

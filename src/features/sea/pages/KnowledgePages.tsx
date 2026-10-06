@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 
+import type { DocStructureTree } from "@/features/knowledge/generated/structureComponents";
 import { KnowledgeWorkbench as LiveKnowledgeWorkbench } from "@/features/knowledge/KnowledgeWorkbench";
 import { PublishedModule, PublishedReader } from "@/features/knowledge/PublishedKnowledge";
+import { StructureTreeViewer } from "@/features/knowledge/StructureTreeViewer";
 import { WorkbenchModules } from "@/features/knowledge/WorkbenchModules";
 
 import {
@@ -296,16 +298,19 @@ export function KnowledgeReader({
   releaseId = "",
   revisionId = "",
   locator = "",
+  structure,
 }: {
   source?: boolean;
   id?: string;
   releaseId?: string;
   revisionId?: string;
   locator?: string;
+  /** 文档结构树：当前由页面传 mock JSON，待后端端点（后端未就绪）。 */
+  structure?: DocStructureTree;
 }) {
   const { demo } = useSea();
   return demo ? (
-    <DemoKnowledgeReader source={source} id={id} />
+    <DemoKnowledgeReader source={source} id={id} structure={structure} />
   ) : (
     <PublishedReader
       key={`${id}:${releaseId}:${revisionId}:${locator}:${source}`}
@@ -314,15 +319,18 @@ export function KnowledgeReader({
       releaseId={releaseId}
       revisionId={revisionId}
       locator={locator}
+      structure={structure}
     />
   );
 }
 function DemoKnowledgeReader({
   source = false,
   id = "mountain",
+  structure,
 }: {
   source?: boolean;
   id?: string;
+  structure?: DocStructureTree;
 }) {
   const { demo } = useSea();
   const [saved, setSaved] = useState(false);
@@ -350,13 +358,21 @@ function DemoKnowledgeReader({
             山地的语言
           </SeaLink>
           <span className="sea-eyebrow">本模块目录</span>
-          {["山地如何塑造气候与生命", "迎风坡与雨影效应", "垂直自然带", "冰川与时间"].map(
-            (t, i) => (
-              <a key={t} href={`#section-${i + 1}`} className={i === 0 ? "active" : ""}>
-                <span>0{i + 1}</span>
-                {t}
-              </a>
-            ),
+          {structure ? (
+            <StructureTreeViewer
+              tree={structure}
+              activeAnchor="section-1"
+              note="演示结构 JSON · 待后端端点（后端未就绪）"
+            />
+          ) : (
+            ["山地如何塑造气候与生命", "迎风坡与雨影效应", "垂直自然带", "冰川与时间"].map(
+              (t, i) => (
+                <a key={t} href={`#section-${i + 1}`} className={i === 0 ? "active" : ""}>
+                  <span>0{i + 1}</span>
+                  {t}
+                </a>
+              ),
+            )
           )}
           <div className="sea-reader-meta">
             <span className="sea-pill">v3 正式版本 · 演示</span>
