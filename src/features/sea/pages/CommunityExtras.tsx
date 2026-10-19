@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 
 import { createArticle, updateArticle } from "@/services/article";
@@ -200,11 +201,12 @@ export function DemoArticle({ id }: { id: string }) {
             </button>
           </div>
           <figure className="sea-article-art">
-            <img
+            <Image
               src={`/sea/${story.image}.svg`}
-              width="840"
-              height="400"
+              width={840}
+              height={400}
               alt="Sea 原创自然主题文章插画"
+              unoptimized
             />
             <figcaption>Sea 原创插画 · 本文及互动均为设计演示</figcaption>
           </figure>
@@ -289,7 +291,13 @@ export function DemoArticle({ id }: { id: string }) {
               <br />
               继续走远一点。
             </h3>
-            <img src="/sea/book-mountain.svg" alt="山地知识模块封面" width="270" height="160" />
+            <Image
+              src="/sea/book-mountain.svg"
+              alt="山地知识模块封面"
+              width={270}
+              height={160}
+              unoptimized
+            />
             <SeaLink href="/knowledge/mountain">
               阅读相关知识
               <ArrowRight size={15} />
@@ -389,7 +397,13 @@ export function CompanionPage() {
   return (
     <div className="sea-content">
       <section className="sea-companion-hero">
-        <img src="/sea/whale.svg" alt="原创 WhaleHall 鲸鱼桌宠" width="240" height="240" />
+        <Image
+          src="/sea/whale.svg"
+          alt="原创 WhaleHall 鲸鱼桌宠"
+          width={240}
+          height={240}
+          unoptimized
+        />
         <span className="sea-eyebrow">WHALEHALL · 桌面上的海</span>
         <h1>
           在屏幕的一角，
