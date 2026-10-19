@@ -2,7 +2,7 @@
 // G6 巨型文件 ratchet（治理基线 G6，前端版）：
 // src/tests/scripts 下 ts/tsx/cjs/mjs 默认上限 600 行；超限文件必须登记
 // size_allowlist.json 且只减不增。三种红：未登记超限 / 超记录值 / 幽灵条目。
-import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
 const ROOT = process.cwd();
@@ -52,4 +52,6 @@ if (errors.length) {
   console.error(errors.join("\n"));
   process.exit(1);
 }
-console.log(`fileratchet ok: ${all.length} files scanned, ${Object.keys(files).length} grandfathered`);
+console.log(
+  `fileratchet ok: ${all.length} files scanned, ${Object.keys(files).length} grandfathered`,
+);
