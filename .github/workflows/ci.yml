@@ -25,5 +25,7 @@ jobs:
         # (17 @next/next/no-img-element + 2 react-hooks/exhaustive-deps)
         # were cleared by the img -> next/image migration. Tech debt paid.
         run: pnpm lint:ci
+      - name: Test
+        run: pnpm test
       - name: Build
         run: pnpm build
