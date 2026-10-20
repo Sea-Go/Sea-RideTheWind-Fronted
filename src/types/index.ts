@@ -73,5 +73,8 @@ export interface DashboardFeedResponse {
   sessionId?: string;
   surface?: string;
   recRequestId?: string;
+  fallbackReason?: string;
+  missingRecommendationIds?: string[];
+  identityDegraded?: boolean;
   fetchedAt: number;
 }

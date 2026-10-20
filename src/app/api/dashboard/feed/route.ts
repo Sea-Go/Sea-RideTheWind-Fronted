@@ -441,16 +441,6 @@ const toSearchFallbackPost = (
   };
 };
 
-const toRecommendFallbackPost = (id: string, index: number, explanation = ""): DashboardPost => ({
-  id: id.trim() || `${INVALID_ID_PREFIX}reco-${index}`,
-  title: `推荐结果 ${index + 1}`,
-  content: explanation || `推荐编号: ${(id.trim() || String(index)).slice(-8)}`,
-  image: null,
-  author: FALLBACK_AUTHOR,
-  likes: 0,
-  publishedAt: "",
-});
-
 const buildSearchEvidence = (
   item: Record<string, unknown>,
 ): NonNullable<DashboardPost["searchEvidence"]> => ({
@@ -719,31 +709,24 @@ const loadRecommendFeed = async ({
         authorIdMap[entry.post.id] = entry.authorId;
       }
     });
+    let fallbackReason: string | undefined;
     if (!posts.length) {
       const fallback = await loadLatestArticleFallback(origin, authorization);
       posts.push(...fallback.posts);
       Object.assign(authorIdMap, fallback.authorIdMap);
+      // 换用最新文章必须可被 UI 识别，不允许顶着"为你推荐"的名义展示。
+      if (posts.length) {
+        fallbackReason = "latest_articles_fallback";
+      }
     }
     const attachRecommendation = ids.length > 0;
     const response: DashboardFeedResponse = {
-      posts:
-        posts.length || !ids.length
-          ? posts.map((post, index) =>
-              attachRecommendation
-                ? {
-                    ...post,
-                    recommendation: {
-                      recRequestId,
-                      userId,
-                      sessionId,
-                      surface: RECOMMEND_SURFACE,
-                      rank: index + 1,
-                    },
-                  }
-                : post,
-            )
-          : ids.map((id, index) => ({
-              ...toRecommendFallbackPost(id, index, explanation),
+      // 推荐结果全部水合失败时返回真实空列表并披露缺失 ID，
+      // 不再伪造"推荐结果 N"占位卡（旧实现让用户看到不存在的文章）。
+      posts: posts.map((post, index) =>
+        attachRecommendation
+          ? {
+              ...post,
               recommendation: {
                 recRequestId,
                 userId,
@@ -751,7 +734,16 @@ const loadRecommendFeed = async ({
                 surface: RECOMMEND_SURFACE,
                 rank: index + 1,
               },
-            })),
+            }
+          : post,
+      ),
+      fallbackReason,
+      // 登录态下取不到用户身份（个性化已静默降级为游客口径）必须披露
+      identityDegraded: !uid,
+      missingRecommendationIds:
+        attachRecommendation && posts.length < ids.length
+          ? ids.filter((id) => !posts.some((post) => post.id === id || post.id.endsWith(`-${id}`)))
+          : undefined,
       authorResults: [],
       searchEvidence: null,
       authorIdMap,
