@@ -1,2 +1,7 @@
 pnpm lint-staged
 pnpm typecheck
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact
+else
+  echo "warn: gitleaks 未安装，跳过密钥扫描（brew install gitleaks）"
+fi
