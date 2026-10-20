@@ -403,6 +403,8 @@ export const CardList = ({
   const [likeMetaMap, setLikeMetaMap] = useState<Record<string, LikeMeta>>({});
   const [favoriteMetaMap, setFavoriteMetaMap] = useState<Record<string, FavoriteMeta>>({});
   const [authorIdMap, setAuthorIdMap] = useState<Record<string, string>>({});
+  const [feedFallbackReason, setFeedFallbackReason] = useState<string | undefined>(undefined);
+  const [feedIdentityDegraded, setFeedIdentityDegraded] = useState(false);
   const [favoriteDialogPost, setFavoriteDialogPost] = useState<Pick<
     DashboardPost,
     "id" | "title" | "image" | "recommendation"
@@ -520,6 +522,8 @@ export const CardList = ({
     setAuthorResults(feed.authorResults);
     setSearchEvidenceView(feed.searchEvidence);
     setAuthorIdMap(feed.authorIdMap);
+    setFeedFallbackReason(feed.fallbackReason);
+    setFeedIdentityDegraded(Boolean(feed.identityDegraded));
     setSearchUpdatedAt(createCurrentTimeLabel());
     setFetchErrorMessage(null);
   }, []);
@@ -879,11 +883,15 @@ export const CardList = ({
     ? normalizedQuery
       ? "搜索结果面板"
       : "分区内容面板"
-    : "为你推荐";
+    : feedFallbackReason === "latest_articles_fallback"
+      ? "最新文章（推荐暂不可用）"
+      : "为你推荐";
   const refreshPanelMeta = isLoading
     ? "正在同步最新内容"
     : posts.length > 0
-      ? `当前展示 ${posts.length} 篇内容`
+      ? feedIdentityDegraded
+        ? `当前展示 ${posts.length} 篇内容（身份识别失败，按游客口径）`
+        : `当前展示 ${posts.length} 篇内容`
       : "暂无内容";
 
   const handleManualRefresh = () => {
