@@ -8,6 +8,7 @@
     "lint:ci": "eslint . --max-warnings=0 && pnpm lint:style",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.cjs",
+    "ratchet": "node scripts/fileratchet.mjs",
     "format": "prettier . --write",
     "fix": "pnpm lint:fix && pnpm format",
     "start": "next start",

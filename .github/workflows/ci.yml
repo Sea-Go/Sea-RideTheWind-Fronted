@@ -27,5 +27,7 @@ jobs:
         run: pnpm lint:ci
       - name: Test
         run: pnpm test
+      - name: Size ratchet
+        run: pnpm ratchet
       - name: Build
         run: pnpm build
