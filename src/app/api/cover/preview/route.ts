@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const DEFAULT_ALLOWED_HOSTS = new Set([
-  "127.0.0.1",
-  "localhost",
-  "175.24.130.226",
-  "sea-ridethewindbreakthewaves.xyz",
-]);
+const DEFAULT_ALLOWED_HOSTS = new Set(["127.0.0.1", "localhost"]);
 const PREVIEW_CACHE_CONTROL = "public, max-age=3600, stale-while-revalidate=86400";
 
 const getAllowedHosts = (): Set<string> => {
   const hosts = new Set(DEFAULT_ALLOWED_HOSTS);
+  process.env.COVER_PREVIEW_EXTRA_HOSTS?.split(",")
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean)
+    .forEach((host) => hosts.add(host));
   const articleServerUrl = process.env.ARTICLE_API_SERVER_URL?.trim();
   if (!articleServerUrl) {
     return hosts;

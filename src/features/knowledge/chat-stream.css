@@ -1,0 +1,145 @@
+/* Chat 流式对话页视觉（前端视觉规范研究依据 §C/§E）：
+   只消费语义令牌，不硬编码色值；动效只动 transform/opacity，
+   prefers-reduced-motion 时全部退化为静态。 */
+
+.chat-stream-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px; /* 消息间距 24px（§E 硬指标） */
+}
+
+.chat-stream-user {
+  max-width: min(38rem, 88%);
+  padding: 0.75rem 1rem;
+  border-radius: 1.1rem;
+
+  /* subtle 阴影：line 色 10% 透明度（§E 第二轮增强；避开 .sea-legacy 对 shadow-md 的清零）。 */
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--sea-line) 10%, transparent);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  line-height: 1.7;
+}
+
+.chat-stream-answer {
+  font-size: 15px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.chat-stream-block {
+  white-space: pre-wrap;
+}
+
+.chat-stream-block-enter {
+  animation: chat-stream-fade-in 200ms ease-out both;
+}
+
+/* 打字光标：块状 caret，steps(2) 1s（§C 惯例）。 */
+.chat-stream-caret {
+  display: inline-block;
+  width: 0.5em;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  background: var(--primary);
+  animation: chat-stream-caret-blink 1s steps(2, start) infinite;
+}
+
+.chat-stream-citation {
+  display: inline-block;
+  min-width: 1.1em;
+  margin: 0 1px;
+  padding: 0 0.28em;
+  border: 1px solid color-mix(in oklab, var(--primary) 34%, transparent);
+  border-radius: 0.4em;
+  background: color-mix(in oklab, var(--primary) 12%, transparent);
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 0.68em;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  vertical-align: super;
+  cursor: pointer;
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease;
+}
+
+/* hover 变 accent 色（--sea-orange，Sea 全局交互强调色）。 */
+.chat-stream-citation:hover {
+  border-color: color-mix(in oklab, var(--sea-orange) 60%, transparent);
+  background: color-mix(in oklab, var(--sea-orange) 14%, transparent);
+  color: var(--sea-orange);
+}
+
+.chat-stream-citation:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.chat-stream-reconnect-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--primary);
+  animation: chat-stream-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes chat-stream-caret-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes chat-stream-fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(0.2rem);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes chat-stream-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-stream-caret {
+    animation: none; /* reduce 时静态光标 */
+  }
+
+  .chat-stream-block-enter {
+    animation: none;
+  }
+
+  .chat-stream-reconnect-dot {
+    animation: none;
+    opacity: 0.7;
+  }
+
+  .chat-stream-citation {
+    transition: none;
+  }
+}

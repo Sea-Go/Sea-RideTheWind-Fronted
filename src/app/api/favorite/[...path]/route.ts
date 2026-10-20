@@ -38,16 +38,10 @@ export async function PATCH(request: NextRequest, context: ProxyRouteContext): P
   return proxyRequest(request, context);
 }
 
-export async function DELETE(
-  request: NextRequest,
-  context: ProxyRouteContext,
-): Promise<Response> {
+export async function DELETE(request: NextRequest, context: ProxyRouteContext): Promise<Response> {
   return proxyRequest(request, context);
 }
 
-export async function OPTIONS(
-  request: NextRequest,
-  context: ProxyRouteContext,
-): Promise<Response> {
+export async function OPTIONS(request: NextRequest, context: ProxyRouteContext): Promise<Response> {
   return proxyRequest(request, context);
 }

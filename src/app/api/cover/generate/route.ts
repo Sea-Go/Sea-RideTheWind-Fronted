@@ -11,10 +11,7 @@ export async function POST(request: NextRequest) {
     const { title, content } = await request.json();
 
     if (typeof content !== "string" || !content.trim()) {
-      return NextResponse.json(
-        { success: false, error: "文章内容不能为空" },
-        { status: 400 },
-      );
+      return NextResponse.json({ success: false, error: "文章内容不能为空" }, { status: 400 });
     }
 
     const authorization = resolveAuthorizationHeader(request);
@@ -44,9 +41,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Failed to generate AI cover:", error);
-    return NextResponse.json(
-      { success: false, error: "智能封面生成失败" },
-      { status: 500 },
-    );
+    return NextResponse.json({ success: false, error: "智能封面生成失败" }, { status: 500 });
   }
 }

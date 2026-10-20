@@ -179,7 +179,12 @@ const uploadArticleAsset = async (
 };
 
 export const uploadArticleCover = async (token: string, file: File): Promise<string> =>
-  uploadArticleAsset(resolveUploadTarget(COVER_API_PATHS.upload), token, file, MAX_COVER_UPLOAD_SIZE_BYTES);
+  uploadArticleAsset(
+    resolveUploadTarget(COVER_API_PATHS.upload),
+    token,
+    file,
+    MAX_COVER_UPLOAD_SIZE_BYTES,
+  );
 
 export const uploadArticleInlineImage = async (token: string, file: File): Promise<string> =>
   uploadArticleAsset(resolveUploadTarget(ARTICLE_API_PATHS.upload), token, file);

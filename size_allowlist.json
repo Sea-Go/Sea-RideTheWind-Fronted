@@ -1,0 +1,24 @@
+{
+  "limit": 600,
+  "files": {
+    "scripts/knowledge-acceptance.cjs": 1096,
+    "scripts/knowledge-live-search-acceptance.cjs": 748,
+    "src/app/admin/traces/page.tsx": 799,
+    "src/app/api/admin/traces/_shared.ts": 817,
+    "src/app/api/dashboard/feed/route.ts": 941,
+    "src/app/article/[id]/LegacyArticlePage.tsx": 2012,
+    "src/app/dashboard/_components/CardList.tsx": 1943,
+    "src/app/messages/page.tsx": 666,
+    "src/app/onboarding/questionnaire/page.tsx": 619,
+    "src/app/profile/edit/page.tsx": 777,
+    "src/components/travel-agent/TravelAgentWorkspace.tsx": 3834,
+    "src/features/knowledge/KnowledgeWorkbench.tsx": 1126,
+    "src/features/sea/pages/KnowledgePages.tsx": 793,
+    "src/services/admin-reco.ts": 1007,
+    "src/services/reco-snapshot.ts": 621,
+    "src/services/reco.ts": 1391,
+    "src/services/travel-agent.ts": 1144,
+    "tests/knowledge-answer-history.test.cjs": 683
+  },
+  "note": "G6 存量建档：只减不增；组件拆分后请收紧记录值"
+}

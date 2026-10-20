@@ -1,5 +1,4 @@
 import { ADMIN_RECO_API_PATHS } from "@/constants/api-paths";
-import { request } from "@/services/request";
 import type {
   ABTestConfig,
   Annotation,
@@ -34,6 +33,7 @@ import type {
   TemporalProfile,
   UserProfile,
 } from "@/services/reco";
+import { request } from "@/services/request";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 频道（channel）admin 类型
@@ -642,9 +642,7 @@ export const listChannelsAdmin = (enabledOnly = false): Promise<ListChannelsResp
   );
 
 /** 注册（创建）频道 */
-export const createChannel = (
-  payload: RegisterChannelPayload,
-): Promise<RegisterChannelResponse> =>
+export const createChannel = (payload: RegisterChannelPayload): Promise<RegisterChannelResponse> =>
   request<RegisterChannelResponse>(ADMIN_RECO_API_PATHS.createChannel, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -689,9 +687,7 @@ export const batchEvaluateQuality = (
   });
 
 /** 提交质量反馈（反馈闭环） */
-export const submitQualityFeedback = (
-  payload: QualityFeedback,
-): Promise<QualityFeedbackResp> =>
+export const submitQualityFeedback = (payload: QualityFeedback): Promise<QualityFeedbackResp> =>
   request<QualityFeedbackResp>(ADMIN_RECO_API_PATHS.submitQualityFeedback, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -767,9 +763,7 @@ export const getCFConfig = (): Promise<CFConfigResponse> =>
   });
 
 /** 更新 CF 配置（算法切换 + 权重 + 冷启动） */
-export const updateCFConfig = (
-  payload: UpdateCFConfigPayload,
-): Promise<CFConfigResponse> =>
+export const updateCFConfig = (payload: UpdateCFConfigPayload): Promise<CFConfigResponse> =>
   request<CFConfigResponse>(ADMIN_RECO_API_PATHS.updateCFConfig, {
     method: "PUT",
     body: JSON.stringify(payload),
@@ -808,19 +802,14 @@ export const getSimilarItems = (
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** 获取指定用户画像（管理员视角，可含时间画像） */
-export const getProfileAdmin = (
-  userId: string,
-  includeTemporal = false,
-): Promise<UserProfile> =>
+export const getProfileAdmin = (userId: string, includeTemporal = false): Promise<UserProfile> =>
   request<UserProfile>(
     `${ADMIN_RECO_API_PATHS.getProfileAdmin(userId)}?include_temporal=${encodeURIComponent(String(includeTemporal))}`,
     { method: "GET" },
   );
 
 /** 调优用户画像（调整衰减参数 / 强制复活或淘汰标签 / 覆盖时间画像） */
-export const tuneProfile = (
-  payload: ProfileTuningPayload,
-): Promise<ProfileTuningResponse> =>
+export const tuneProfile = (payload: ProfileTuningPayload): Promise<ProfileTuningResponse> =>
   request<ProfileTuningResponse>(ADMIN_RECO_API_PATHS.tuneProfile, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -856,9 +845,7 @@ export const createEvalCase = (payload: EvalCase): Promise<EvalCase> =>
   });
 
 /** 删除评估用例 */
-export const deleteEvalCase = (
-  caseId: string,
-): Promise<SubmitAnnotationResponse> =>
+export const deleteEvalCase = (caseId: string): Promise<SubmitAnnotationResponse> =>
   request<SubmitAnnotationResponse>(ADMIN_RECO_API_PATHS.deleteEvalCase(caseId), {
     method: "DELETE",
   });
@@ -871,9 +858,7 @@ export const runEval = (payload: EvalRunPayload): Promise<EvalRunResponse> =>
   });
 
 /** 获取评估报告（行为漂移报告：当前分布 vs 基线，2σ 突增检测） */
-export const getEvalReport = (
-  payload: GetEvalReportPayload = {},
-): Promise<BehaviorDriftReport> => {
+export const getEvalReport = (payload: GetEvalReportPayload = {}): Promise<BehaviorDriftReport> => {
   const params = new URLSearchParams();
   if (payload.window_start) params.set("window_start", String(payload.window_start));
   if (payload.window_end) params.set("window_end", String(payload.window_end));
@@ -896,17 +881,14 @@ export const submitAnnotation = (payload: Annotation): Promise<SubmitAnnotationR
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** 获取 CPU profile 快照（goroutine/池/缓存/GC + 可选火焰图） */
-export const getCPUProfile = (
-  payload: GetCPUProfilePayload = {},
-): Promise<CPUProfile> => {
+export const getCPUProfile = (payload: GetCPUProfilePayload = {}): Promise<CPUProfile> => {
   const params = new URLSearchParams();
   if (payload.include_flame_graph)
     params.set("include_flame_graph", String(payload.include_flame_graph));
   const query = params.toString();
-  return request<CPUProfile>(
-    `${ADMIN_RECO_API_PATHS.getCPUProfile}${query ? `?${query}` : ""}`,
-    { method: "GET" },
-  );
+  return request<CPUProfile>(`${ADMIN_RECO_API_PATHS.getCPUProfile}${query ? `?${query}` : ""}`, {
+    method: "GET",
+  });
 };
 
 /** 采集 pprof（cpu/heap/goroutine/block/mutex + 可选火焰图） */
@@ -953,9 +935,7 @@ export const queryGraph = (payload: GraphQueryPayload): Promise<GraphQueryRespon
   });
 
 /** 图谱召回（多跳召回候选文章，支持多种召回模板） */
-export const recallByGraph = (
-  payload: GraphRecallPayload,
-): Promise<GraphRecallResponse> =>
+export const recallByGraph = (payload: GraphRecallPayload): Promise<GraphRecallResponse> =>
   request<GraphRecallResponse>(ADMIN_RECO_API_PATHS.recallByGraph, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -986,9 +966,7 @@ export const getGraphSchema = (): Promise<GraphSchema> =>
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** 列出全部 Skill（12 类，支持按类别/启用/内置/二开筛选） */
-export const listSkills = (
-  payload: ListSkillsPayload = {},
-): Promise<ListSkillsResponse> => {
+export const listSkills = (payload: ListSkillsPayload = {}): Promise<ListSkillsResponse> => {
   const params = new URLSearchParams();
   if (payload.category) params.set("category", payload.category);
   if (payload.enabled_only) params.set("enabled_only", String(payload.enabled_only));
@@ -1002,9 +980,7 @@ export const listSkills = (
 };
 
 /** 注册 Skill（二开点：业务方放置技能目录扫描加载） */
-export const registerSkill = (
-  payload: RegisterSkillPayload,
-): Promise<RegisterSkillResponse> =>
+export const registerSkill = (payload: RegisterSkillPayload): Promise<RegisterSkillResponse> =>
   request<RegisterSkillResponse>(ADMIN_RECO_API_PATHS.registerSkill, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -1017,9 +993,7 @@ export const unregisterSkill = (name: string): Promise<RegisterSkillResponse> =>
   });
 
 /** 调用 Skill（输入 JSON → 输出 JSON，可物化到 tool result） */
-export const invokeSkill = (
-  payload: InvokeSkillPayload,
-): Promise<InvokeSkillResponse> =>
+export const invokeSkill = (payload: InvokeSkillPayload): Promise<InvokeSkillResponse> =>
   request<InvokeSkillResponse>(ADMIN_RECO_API_PATHS.invokeSkill, {
     method: "POST",
     body: JSON.stringify(payload),

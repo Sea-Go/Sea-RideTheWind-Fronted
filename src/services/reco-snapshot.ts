@@ -1,6 +1,5 @@
-import type { DashboardPost } from "@/types";
-
 import { recommendArticles, type RecommendArticlesPayload } from "@/services/reco";
+import type { DashboardPost } from "@/types";
 
 export const RECO_FRESH_TTL_MS = 5 * 60 * 1000;
 export const RECO_STALE_TTL_MS = 24 * 60 * 60 * 1000;

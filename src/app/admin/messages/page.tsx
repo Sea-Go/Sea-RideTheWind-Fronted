@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AdminPageContainer } from "@/components/admin/AdminPanel";
 import { AdminShell } from "@/components/admin/AdminShell";
@@ -81,51 +81,53 @@ export default function AdminMessagesPage() {
     setToken(currentToken);
   }, [router]);
 
-  const loadConversations = async (
-    currentToken: string,
-    options?: { nextSelectedConversationId?: string; preserveSelection?: boolean },
-  ): Promise<void> => {
-    const preserveSelection = options?.preserveSelection ?? true;
-    const nextSelectedConversationId =
-      options?.nextSelectedConversationId ?? selectedConversationId;
+  const loadConversations = useCallback(
+    async (
+      currentToken: string,
+      options?: { nextSelectedConversationId?: string; preserveSelection?: boolean },
+    ): Promise<void> => {
+      const preserveSelection = options?.preserveSelection ?? true;
+      const nextSelectedConversationId = options?.nextSelectedConversationId ?? "";
 
-    setIsRefreshing(true);
-    setErrorMessage(null);
+      setIsRefreshing(true);
+      setErrorMessage(null);
 
-    try {
-      const result = await listAdminConversations(currentToken, {
-        offset: 0,
-        limit: CONVERSATION_LIMIT,
-      });
-      const nextItems = Array.isArray(result.items) ? result.items : [];
-      setConversations(nextItems);
+      try {
+        const result = await listAdminConversations(currentToken, {
+          offset: 0,
+          limit: CONVERSATION_LIMIT,
+        });
+        const nextItems = Array.isArray(result.items) ? result.items : [];
+        setConversations(nextItems);
 
-      if (nextItems.length === 0) {
-        setSelectedConversationId("");
-        setConversationDetail(null);
-      } else if (
-        preserveSelection &&
-        nextSelectedConversationId &&
-        nextItems.some((item) => item.conversation_id === nextSelectedConversationId)
-      ) {
-        setSelectedConversationId(nextSelectedConversationId);
-      } else {
-        setSelectedConversationId(nextItems[0]?.conversation_id ?? "");
+        if (nextItems.length === 0) {
+          setSelectedConversationId("");
+          setConversationDetail(null);
+        } else if (
+          preserveSelection &&
+          nextSelectedConversationId &&
+          nextItems.some((item) => item.conversation_id === nextSelectedConversationId)
+        ) {
+          setSelectedConversationId(nextSelectedConversationId);
+        } else {
+          setSelectedConversationId(nextItems[0]?.conversation_id ?? "");
+        }
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "会话列表加载失败");
+      } finally {
+        setIsRefreshing(false);
+        setIsBootstrapping(false);
       }
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "会话列表加载失败");
-    } finally {
-      setIsRefreshing(false);
-      setIsBootstrapping(false);
-    }
-  };
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!token) {
       return;
     }
     void loadConversations(token, { preserveSelection: false });
-  }, [token]);
+  }, [token, loadConversations]);
 
   useEffect(() => {
     if (!token || !selectedConversationId) {
@@ -155,7 +157,7 @@ export default function AdminMessagesPage() {
     };
 
     void loadDetail();
-  }, [token, selectedConversationId, conversations]);
+  }, [token, selectedConversationId, conversations, loadConversations]);
 
   const selectedConversation = useMemo(
     () => conversations.find((item) => item.conversation_id === selectedConversationId) ?? null,
@@ -166,7 +168,7 @@ export default function AdminMessagesPage() {
     if (!token) {
       return;
     }
-    await loadConversations(token);
+    await loadConversations(token, { nextSelectedConversationId: selectedConversationId });
   };
 
   const handleSendNotification = async (): Promise<void> => {

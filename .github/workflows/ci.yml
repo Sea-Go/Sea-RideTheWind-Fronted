@@ -1,0 +1,33 @@
+name: web
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+jobs:
+  build:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        # Strict gate restored (zero warnings): the 19 pre-existing warnings
+        # (17 @next/next/no-img-element + 2 react-hooks/exhaustive-deps)
+        # were cleared by the img -> next/image migration. Tech debt paid.
+        run: pnpm lint:ci
+      - name: Test
+        run: pnpm test
+      - name: Size ratchet
+        run: pnpm ratchet
+      - name: Build
+        run: pnpm build

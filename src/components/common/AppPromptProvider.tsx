@@ -20,8 +20,7 @@ export type ConfirmState = ConfirmOptions & {
 };
 
 const AppPromptDialog = dynamic(
-  () =>
-    import("@/components/common/AppPromptDialog").then((module) => module.AppPromptDialog),
+  () => import("@/components/common/AppPromptDialog").then((module) => module.AppPromptDialog),
   { ssr: false },
 );
 const AppToaster = dynamic(

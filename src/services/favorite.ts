@@ -345,10 +345,7 @@ export const createArticleFavoriteInFolder = async (
   }
 };
 
-export const deleteFavoriteItems = async (
-  token: string,
-  favoriteIds: string[],
-): Promise<void> => {
+export const deleteFavoriteItems = async (token: string, favoriteIds: string[]): Promise<void> => {
   const uniqueIds = Array.from(
     new Set(
       favoriteIds

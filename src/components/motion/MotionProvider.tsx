@@ -32,8 +32,7 @@ const canUseFineMotion = () => {
   const lowPowerDevice =
     typeof navigatorWithMemory.deviceMemory === "number" &&
     navigatorWithMemory.deviceMemory <= 4 &&
-    navigator.hardwareConcurrency <=
-      FRONTEND_MOTION_CONFIG.pointer.lowPowerHardwareConcurrency;
+    navigator.hardwareConcurrency <= FRONTEND_MOTION_CONFIG.pointer.lowPowerHardwareConcurrency;
 
   return !reducedMotion && !coarsePointer && !lowPowerDevice;
 };

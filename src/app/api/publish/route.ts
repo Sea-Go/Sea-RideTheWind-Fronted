@@ -15,17 +15,11 @@ export async function POST(request: NextRequest) {
     const { title, content, cover } = await request.json();
 
     if (typeof title !== "string" || !title.trim()) {
-      return NextResponse.json(
-        { success: false, error: "文章标题不能为空" },
-        { status: 400 },
-      );
+      return NextResponse.json({ success: false, error: "文章标题不能为空" }, { status: 400 });
     }
 
     if (typeof content !== "string" || !content.trim()) {
-      return NextResponse.json(
-        { success: false, error: "文章内容不能为空" },
-        { status: 400 },
-      );
+      return NextResponse.json({ success: false, error: "文章内容不能为空" }, { status: 400 });
     }
 
     let finalCover = typeof cover === "string" && cover.trim() ? cover.trim() : "";

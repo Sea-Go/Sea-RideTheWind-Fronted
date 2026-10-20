@@ -1,8 +1,11 @@
 "use client";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 
+import type { DocStructureTreeUI } from "@/features/knowledge/generated/structureComponents";
 import { KnowledgeWorkbench as LiveKnowledgeWorkbench } from "@/features/knowledge/KnowledgeWorkbench";
 import { PublishedModule, PublishedReader } from "@/features/knowledge/PublishedKnowledge";
+import { StructureTreeViewer } from "@/features/knowledge/StructureTreeViewer";
 import { WorkbenchModules } from "@/features/knowledge/WorkbenchModules";
 
 import {
@@ -69,12 +72,13 @@ export function KnowledgeShelf() {
           </h1>
           <p>原始资料保留来处，知识页连接理解。每个正式版本，都由人认真维护。</p>
         </div>
-        <img
+        <Image
           className="sea-heading-art"
           src="/sea/book-orbits.svg"
           alt="原创知识轨道"
-          width="340"
-          height="210"
+          width={340}
+          height={210}
+          unoptimized
         />
       </div>
       <div className="sea-toolbar">
@@ -99,11 +103,12 @@ export function KnowledgeShelf() {
         {data.items.map((m) => (
           <SeaLink key={m.id} href={`/knowledge/${m.id}`} className="sea-book-card">
             <div className="sea-book-art">
-              <img
+              <Image
                 src={`/sea/${["mountain", "planetarium", "summer", "ocean"].includes(m.image) ? m.image : "book-orbits"}.svg`}
-                width="350"
-                height="230"
+                width={350}
+                height={230}
                 alt={`${m.title}原创封面`}
+                unoptimized
               />
               <span className="sea-release">
                 {m.release} 已发布{demo ? " · 演示" : ""}
@@ -206,11 +211,12 @@ function DemoModulePage({ id }: { id: string }) {
         {knowledgeModule.title}
       </div>
       <section className="sea-module-hero">
-        <img
+        <Image
           src={`/sea/${knowledgeModule.image}.svg`}
-          width="420"
-          height="290"
+          width={420}
+          height={290}
           alt={`${knowledgeModule.title}原创封面`}
+          unoptimized
         />
         <div>
           <span className="sea-eyebrow">{knowledgeModule.category} · KNOWLEDGE MODULE</span>
@@ -296,16 +302,19 @@ export function KnowledgeReader({
   releaseId = "",
   revisionId = "",
   locator = "",
+  structure,
 }: {
   source?: boolean;
   id?: string;
   releaseId?: string;
   revisionId?: string;
   locator?: string;
+  /** 文档结构树：当前由页面传 mock JSON，待后端端点（后端未就绪）。 */
+  structure?: DocStructureTreeUI;
 }) {
   const { demo } = useSea();
   return demo ? (
-    <DemoKnowledgeReader source={source} id={id} />
+    <DemoKnowledgeReader source={source} id={id} structure={structure} />
   ) : (
     <PublishedReader
       key={`${id}:${releaseId}:${revisionId}:${locator}:${source}`}
@@ -314,15 +323,18 @@ export function KnowledgeReader({
       releaseId={releaseId}
       revisionId={revisionId}
       locator={locator}
+      structure={structure}
     />
   );
 }
 function DemoKnowledgeReader({
   source = false,
   id = "mountain",
+  structure,
 }: {
   source?: boolean;
   id?: string;
+  structure?: DocStructureTreeUI;
 }) {
   const { demo } = useSea();
   const [saved, setSaved] = useState(false);
@@ -358,6 +370,13 @@ function DemoKnowledgeReader({
               </a>
             ),
           )}
+          {structure ? (
+            <StructureTreeViewer
+              tree={structure}
+              activeAnchor="section-1"
+              note="演示结构 JSON · 待后端端点（后端未就绪）"
+            />
+          ) : null}
           <div className="sea-reader-meta">
             <span className="sea-pill">v3 正式版本 · 演示</span>
             <p>
@@ -387,11 +406,12 @@ function DemoKnowledgeReader({
             </button>
           </div>
           <figure className="sea-article-art">
-            <img
+            <Image
               src="/sea/mountain.svg"
               alt="原创山地、垂直植被与湖泊构图"
-              width="840"
-              height="390"
+              width={840}
+              height={390}
+              unoptimized
             />
             <figcaption>图 01 · 从河谷到雪线，一座山里的多个世界。原创示意插画。</figcaption>
           </figure>
